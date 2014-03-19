@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Байка про порчу данных, стек и red zone</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Несу подвиг добровольного безумия!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">меню</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Байка про порчу данных, стек и red zone</h2>
+                            <h6 class="post-meta">
+                              27 янв 2014, в категории 
+                              <a class="disabled" href="/categories/programming">programming</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>Ничто не предвещало череды увлекательных открытий. Я сидел и занимался своей работой, как вдруг ко мне подошёл коллега и говорит:</p>
+<p>– Слушай, можешь подсказать, у меня тут какая-то странная фигня происходит.<br />– Да, конечно. Что за фигня?<br />– Данные портятся, причём как-то, ну, уж совсем странно.</p>
+<p>Порча данных – это один из самых мерзких случаев, которые обычно трудно диагностировать. Так было и в этом случае.</p>
+<p>Жил да был алгоритм расчёта синдромов для RAID массива. Ничего примечательного – просто куча функций, которые получают указатель на буфер, обсчитывают память по этому указателю и возвращают код ошибки в случае чего. Изначально алгоритм писался в пространстве пользователя, для простоты отладки и проверки корректности, а потом был собран как модуль ядра. И вот тут-то и начались проблемы.</p>
+<p>Во-первых, при сборке из <a href="http://www.linuxjournal.com/content/kbuild-linux-kernel-build-system">kbuild</a> gcc тупо крашился<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup>, выжирая при этом всю память. По этой причине исходники собирались отдельным от kbuild Makefile’ом. А вообще я не особо этому удивился, учитывая размер исходников – по 17 мегабайт на файл<sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup>. Тем не менее, хотелось бы, чтобы gcc так не делал.</p>
+<p>Во-вторых, данные портились не всегда и это было обиднее всего. Если читать 1 ГБ, то всё хорошо. Если читать 2 ГБ, то иногда данные были какие-то левые, а иногда те, что надо.</p>
+<p>Вдумчивое чтение исходников не привело ни к чему достойному гипотезы. Было выяснено, что память, в которой обсчитываются данные портится именно в расчетных функциях. Но эти функции представляли собой чистую математику: они тупо работали с куском памяти, у них не было никаких side эффектов – они ничего не вызывали и ничего не трогали, кроме переданного им буфера и своих локальных переменных.</p>
+<p>Потом проявилась удивительная особенность – если в эту самую расчётную функцию добавить</p>
+<pre><code>printk(&quot;&quot;);</code></pre>
+<p>то данные волшебным образом переставали портиться. Признаться, я думал такое бывает только в анекдотах. Мы перепроверили всё несколько раз на разных машинах – данные чисты как слёзы младенцев. Что ж, нам не оставалось ничего другого кроме как дизассемблировать объектники и выяснять что же привносит с собой спасительный <code>printk</code>.</p>
+<p>Сделали <code>diff</code> между двумя объектниками:</p>
+<pre class="sourceCode diff"><code class="sourceCode diff"><span class="kw">--- Calculation.s    2014-01-27 15:52:11.581387291 +0300</span>
+<span class="dt">+++ Calculation_printk.s 2014-01-27 15:51:50.109512524 +0300</span>
+<span class="dt">@@ -1,10 +1,15 @@</span>
+    .file   &quot;Calculation.c&quot;
+<span class="ot">+   .section    .rodata.str1.1,&quot;aMS&quot;,@progbits,1</span>
+<span class="ot">+.LC0:</span>
+<span class="ot">+   .string &quot;&quot;</span>
+    .text
+    .p2align 4,,15
+ .globl Calculation_5d
+    .type   Calculation_5d, @function
+ Calculation_5d:
+ .LFB20:
+<span class="ot">+   subq    $24, %rsp</span>
+<span class="ot">+.LCFI0:</span>
+    movq    (%rdi), %rax
+    movslq  %ecx, %rcx
+    movdqa  (%rax,%rcx), %xmm4
+<span class="dt">@@ -46,7 +51,7 @@</span>
+    pxor    %xmm2, %xmm6
+    movdqa  96(%rax,%rcx), %xmm2
+    pxor    %xmm5, %xmm1
+<span class="st">-   movdqa  %xmm14, -24(%rsp)</span>
+<span class="ot">+   movdqa  %xmm14, (%rsp)</span>
+    pxor    %xmm15, %xmm2
+    pxor    %xmm5, %xmm0
+    movdqa  112(%rax,%rcx), %xmm14
+<span class="dt">@@ -108,11 +113,16 @@</span>
+    movq    24(%rdi), %rax
+    movdqa  %xmm6, 80(%rax,%rcx)
+    movq    24(%rdi), %rax
+<span class="st">-   movdqa  -24(%rsp), %xmm0</span>
+<span class="ot">+   movdqa  (%rsp), %xmm0</span>
+    movdqa  %xmm0, 96(%rax,%rcx)
+    movq    24(%rdi), %rax
+<span class="ot">+   movl    $.LC0, %edi</span>
+    movdqa  %xmm14, 112(%rax,%rcx)
+<span class="ot">+   xorl    %eax, %eax</span>
+<span class="ot">+   call    printk</span>
+    movl    $128, %eax
+<span class="ot">+   addq    $24, %rsp</span>
+<span class="ot">+.LCFI1:</span>
+    ret
+ .LFE20:
+    .size   Calculation_5d, .-Calculation_5d
+<span class="dt">@@ -143,6 +153,14 @@</span>
+    .long   .LFB20
+    .long   .LFE20-.LFB20
+    .uleb128 0x0
+<span class="ot">+   .byte   0x4</span>
+<span class="ot">+   .long   .LCFI0-.LFB20</span>
+<span class="ot">+   .byte   0xe</span>
+<span class="ot">+   .uleb128 0x20</span>
+<span class="ot">+   .byte   0x4</span>
+<span class="ot">+   .long   .LCFI1-.LCFI0</span>
+<span class="ot">+   .byte   0xe</span>
+<span class="ot">+   .uleb128 0x8</span>
+    .align 8
+ .LEFDE1:
+    .ident  &quot;GCC: (GNU) 4.4.5 20110214 (Red Hat 4.4.5-6)&quot;</code></pre>
+<p>Вроде бы ничем особенно не отличается – в начале объявление пустой строки, в конце вызов <code>printk</code>. Но что мне не понравилось сразу, так это разница в обращениях к стеку в инструкциях <code>movdqa</code>. Вроде бы делают одно и то же, только во втором случае адреса как бы сдвинуты на 24 байта, потому что в начале делается <code>subq $24, %rsp</code>. Сначала мы не придали этому значения и списали это на оптимизации компилятора. Но потом я решил порисовать стек и до меня допёрло.</p>
+<div class="figure">
+<img src="/assets/img/red-zone.png" alt="Stack" /><p class="caption">Stack</p>
+</div>
+<p>На архитектуре x86 стек растёт вниз, т.е. в сторону уменьшения адресов, а значит конструкции вида</p>
+<pre class="asm"><code>movdqa  -24(%rsp), %xmm0</code></pre>
+<p>то есть положить в регистр <code>xmm0</code> выровненные данные по адресу <code>rsp-24</code>, являются обращением за вершину стека!</p>
+<div class="figure">
+<img src="https://mlpforums.com/uploads/monthly_03_2012/post-2103-0-68261500-1332210132.png" />
+</div>
+<p><strong>Почему</strong>?</p>
+<p>Я был настолько в шоке, что аж спросил <a href="http://stackoverflow.com/questions/20661190/gcc-access-memory-above-stack-top">на stackoverflow</a>. И вот там-то мне и сказали заветную фразу:</p>
+<p><span style="text-decoration:underline;color:red"><a href="http://eli.thegreenplace.net/2011/09/06/stack-frame-layout-on-x86-64/"><strong>Red Zone</strong></a></span></p>
+<p>Вкратце, <em>red zone</em> это кусок памяти размером 128 байт <strong>за вершиной</strong> стека, которые согласно <a href="http://www.x86-64.org/documentation/abi.pdf">amd64 ABI</a> не должны использоваться обработчиками прерываний и сигналов. И, действительно, в пространстве пользователя он и не использовался. Но стоит вам перейти в ядро, то можете не надеятся, стек здесь на вес золота. Поэтому когда в ядро приходит прерывание, то используется стек текущего потока, а именно <code>%rsp</code>, за пределами которого мы имеем наши локальные переменные, которые перетирает обработчик прерывания. А локальные переменные использовались для обсчёта данных, отсюда и получалась порча данных.</p>
+<p>Именно поэтому при сборке ядре обязательно указывается опция <code>-mno-red-zone</code>, чтобы в ядерных функциях явно выделялось место в стеке под локальные переменные. Эту опцию ставит <code>kbuild</code>, но т.к. у нас gcc крашился в kbuild – мы вызывали gcc из отдельного Makefile и, естесственно, не указали всех тех опций, о которых знает только <code>kbuild</code>. Они, кстати, все перечислены в скрытых файликах <code>.&lt;исходник&gt;.o.cmd</code>.</p>
+<p>В общем, поставили в Makefile <code>EXTRA_CFLAGS += -mno-red-zone</code> и всё починилось. Однако у меня так и остались неотвеченными вопросы:</p>
+<ul>
+<li>Почему добавление <code>printk(&quot;&quot;)</code> сподвигает gcc на <code>subq $24, %rsp</code>?</li>
+<li>Зачем вообще нужен Red Zone? Ради сохранения 1 инструкции <code>sub $24, %rsp</code>? Это же просто смешно. Один чувак спрашивал про это <a href="http://stackoverflow.com/questions/13768459/who-invented-the-red-zone-where-was-it-first-used">на stackoverflow</a>, но его вопрос закрыли как оффтоп какие-то поганые SQLщики, дельфист и чувак, пишущий на дотнете. Видимо, тайна этого явления останется неразгаданной.</li>
+</ul>
+<p>That’s all, folks!</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>При этом крашился он только в kbuild и только на версии 4.4.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>17 мегабайт, потому что это были полусгенерированные исходники состоящие в основном из <a href="http://en.wikipedia.org/wiki/Intrinsic_function">интринсиков</a>.<a href="#fnref2">↩</a></p></li>
+</ol>
+</div>
+
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>

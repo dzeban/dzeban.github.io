@@ -1,0 +1,127 @@
+@import url(http://fonts.googleapis.com/css?family=Lobster&subset=latin,cyrillic);
+@import url('pandoc-highlight.css');
+
+/* Override stupid Foundation styles for code */
+code {
+    font-weight: normal;
+    color: black;
+    font-size: 10pt;
+}
+pre {
+    margin-bottom: 1em;
+}
+
+.header {
+    background-image: url('../img/header_texture.png');
+    font-family: 'Lobster', cursive;
+    font-size: 24pt;
+    text-align: center;
+    color: white;
+    padding: 0.5em;
+}
+
+.post-list {
+    padding-top: 1em;
+}
+
+.post-list li {
+    list-style: none;
+    padding: 0.5em;
+}
+
+.date {
+    color: #666;
+}
+
+.side-nav li {
+    font-size: 14pt;
+    color: black;
+}
+
+.post-header {
+    padding: 1em 0;
+}
+
+.post-meta {
+    color: #666;
+}
+
+.contacts {
+    padding: 1em;    
+}
+
+/* Disabled link for categories */
+a.disabled {
+    pointer-events: none;
+    cursor: default;
+    color: gray !important;
+}
+
+/**************** 
+ * Sticky footer 
+ ***************/
+* {
+    margin: 0;
+}
+
+html, body {
+    height: 100%;
+}
+
+.wrapper {
+    min-height: 100%;
+    height: auto !important;
+    height: 100%;
+    margin: 0 auto -2em;
+}
+
+.footer, .push {
+    height: 2em;
+}
+
+.footer {
+    text-align: right;
+    color: #999;
+    padding: 0 1em; 
+}
+/* End of sticky footer */
+
+
+
+/******************************************
+ * Override foundation styles for top bar *
+ ******************************************/
+
+.top-bar {
+    background-color: #003585;
+}
+
+.top-bar h1 > a {
+    font-family: 'Lobster', cursive;
+    font-size: 24pt;
+}
+
+ /* Color and font for unexpanded top bar */
+.top-bar-section ul, .top-bar-section ul li a {
+    background-color: #003585 !important;
+    font-size: 14pt;
+}
+
+/* Expanded top bar styles */
+.top-bar.expanded .title-area {
+    background-color: #003585;
+}
+
+.top-bar.expanded .toggle-topbar.menu-icon a {
+    color: white ;
+}
+.top-bar.expanded .toggle-topbar a:after {
+    box-shadow: 0px 10px 0px 1px white, 0px 16px 0px 1px white, 0px 22px 0px 1px white;
+}
+
+/* Expanded top bar items on hover */
+.top-bar-section ul li a:hover {
+    background-color: #002d59 !important; 
+}
+
+ /* End of overriding foundation styles for top bar */

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>yii framework. MVC. Вид</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Несу подвиг добровольного безумия!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">меню</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>yii framework. MVC. Вид</h2>
+                            <h6 class="post-meta">
+                              28 мар 2010, в категории 
+                              <a class="disabled" href="/categories/IT">IT</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>Привет.</p>
+<p>В <a href="http://finger.reduct.ru/2010/03/yii-framework-1/">прошлой серии</a> сериала про Yii Framework мы рассмотрели минимальное приложение с Yii.</p>
+<p>Сегодня, как и обещал, буду говорить про MVC в yii, а конкретно про вид.</p>
+<p>Итак, вид — это то, что отвечает за внешний вид и, как я говорил раньше, отображает данные из модели. Эти данные ему передает контроллер. Так как сейчас у нас модели нет, то вид будет получать просто жестко забитые значения.</p>
+<p>Для того, чтобы отобразить вид в Yii используется <a href="http://www.yiiframework.com/doc/api/CController#render-detail"><code>render()</code></a>. <code>render()</code> - это метод класса <code>CController</code>, его параметрами являются</p>
+<ol style="list-style-type: decimal">
+<li><code>string $view</code> — имя вида</li>
+<li><code>array $data</code> — передаваемые параметры</li>
+<li><code>boolean $return</code> — возвращать ли нам результат или сразу отобразить пользователю</li>
+</ol>
+<p>Изменим наш класс <code>SiteController</code> из предыдущей части следующим образом:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">class</span> SiteController <span class="kw">extends</span> CController
+{
+    <span class="kw">public</span> <span class="kw">function</span> actionIndex<span class="ot">()</span>
+    {
+        <span class="kw">$this</span>-&gt;render<span class="ot">(</span><span class="st">&#39;index&#39;</span><span class="ot">,</span> <span class="fu">array</span><span class="ot">(</span>
+                    <span class="st">&#39;message1&#39;</span>=&gt;<span class="st">&#39;Это сообщение 1&#39;</span><span class="ot">,</span>
+                    <span class="st">&#39;message2&#39;</span>=&gt;<span class="st">&#39;Это сообщение 2&#39;</span><span class="ot">,</span>
+                    <span class="ot">)</span>
+                <span class="ot">)</span>
+    }
+}</code></pre>
+<p>Здесь мы сказали, чтобы в действии index отобразился вид … сюрприз!… index. При этом ему передаются 2 параметра-строки — message1 и message2.</p>
+<p>Теперь мы должны создать этот самый вид index.</p>
+<p>Вид в Yii – это тупо html-файл (иногда со скриптами), который лежит в <code>protected/views/&lt;ID контроллера&gt;/&lt;имя вида&gt;</code></p>
+<p>ID контроллера — это его имя. Наш контроллер имеет ID  site. Итого нам нужно создать вид protected/views/site/index.php</p>
+<pre class="sourceCode html"><code class="sourceCode html"><span class="kw">&lt;h1&gt;</span> Привет, привет <span class="kw">&lt;/h1&gt;</span>
+
+<span class="kw">&lt;h4&gt;</span> Сообщение 1 <span class="kw">&lt;/h4&gt;</span>
+<span class="kw">&lt;?php</span> echo $message1; <span class="kw">?&gt;</span>
+
+<span class="kw">&lt;h4&gt;</span> Сообщение 2 <span class="kw">&lt;/h4&gt;</span>
+<span class="kw">&lt;?php</span> echo $message2; <span class="kw">?&gt;</span></code></pre>
+<p>Теперь, когда вы откроете свое приложение, то увидите примерно следующее:</p>
+<p>Вы уже чувтвуете, как отделяется логика от внешнего вида ;-) ?</p>
+<p>Как можно видеть, к переданным в вид переменным <code>message1</code> и <code>message2</code> можно спокойно обращаться.</p>
+<p>Однако, это еще не всё. В Yii также есть такое понятие как макет - layout. Макеты используются, например, для многократного использования элементов вида, например, таких как шапка(header) и подвал(footer)сайта. Эти элементы есть практически на каждом сайте. Понятное дело, что каждый раз прописывать одинаковую шапку в каждом виде никто не хочет, поэтому используют макеты.</p>
+<p>Макет, также как и вид, представляет собой html страницу, которая содержит, как это не удивительно макет сайта, то есть по сути всю верстку. Макеты лежат в <code>protected/views/layouts/&lt;имя макета&gt;</code>. По умолчанию используется макет main.php, однако это можно изменить в свойстве layout контроллера либо всего приложения.</p>
+<p>На самом деле, обращение к макету для его отрисовки неявно вызывается при каждом вызове <code>render()</code>.  То есть, как это происходит:</p>
+<ul>
+<li>Входной скрипт передает управление контроллеру</li>
+<li>В контроллере выполняется вызов метода <code>render()</code></li>
+<li>Сначала отрисовывается макет</li>
+<li>В макет вставляется вид</li>
+</ul>
+<p>Для того, чтобы указать место, в которое вставляется вид используется переменная <code>$content</code>.</p>
+<p>Давайте рассмотрим на примере. Создадим файл <code>protected/views/layouts/main.php</code></p>
+<pre class="sourceCode html"><code class="sourceCode html"><span class="kw">&lt;html&gt;</span>
+<span class="kw">&lt;head&gt;</span>
+<span class="kw">&lt;title&gt;</span>Салют!<span class="kw">&lt;/title&gt;</span>
+<span class="kw">&lt;style</span><span class="ot"> type=</span><span class="st">&quot;text/css&quot;</span><span class="kw">&gt;</span>
+<span class="fl">.header</span><span class="kw">{</span>
+    <span class="kw">font-size:</span><span class="dt">150%</span><span class="kw">;</span>
+    <span class="kw">color:</span><span class="dt">#AAF</span><span class="kw">;</span>
+    <span class="kw">width:</span><span class="dt">100%</span><span class="kw">;</span>
+    <span class="kw">height:</span><span class="dt">100px</span><span class="kw">;</span>
+    <span class="kw">text-align:</span><span class="dt">center</span><span class="kw">;</span>
+    <span class="kw">margin-bottom:</span><span class="dt">50px</span><span class="kw">;</span>
+    <span class="kw">padding-top:</span><span class="dt">5px</span><span class="kw">;</span>
+    <span class="kw">padding-bottom:</span><span class="dt">5px</span><span class="kw">;</span>
+    <span class="kw">background:</span><span class="dt">#DDD</span><span class="kw">;</span>
+<span class="kw">}</span>
+
+<span class="fl">.footer</span><span class="kw">{</span>
+    <span class="kw">font-size:</span><span class="dt">90%</span><span class="kw">;</span>
+    <span class="kw">color:</span><span class="dt">#AAA</span><span class="kw">;</span>
+    <span class="kw">width:</span><span class="dt">100%</span><span class="kw">;</span>
+    <span class="kw">text-align:</span><span class="dt">right</span><span class="kw">;</span>
+    <span class="kw">margin-top:</span><span class="dt">200px</span><span class="kw">;</span>
+<span class="kw">}</span>
+<span class="kw">&lt;/style&gt;</span>
+<span class="kw">&lt;/head&gt;</span>
+
+<span class="kw">&lt;body&gt;</span>
+<span class="kw">&lt;div</span><span class="ot"> class=</span><span class="st">&quot;header&quot;</span><span class="kw">&gt;</span>
+<span class="kw">&lt;h1&gt;</span>Компания <span class="dv">&amp;laquo;</span>Супер-пупер<span class="dv">&amp;raquo;</span><span class="kw">&lt;/h1&gt;</span>
+<span class="kw">&lt;/div&gt;</span>
+
+------------------------Вставка из вида-----------------------------
+<span class="kw">&lt;?php</span> echo $content; <span class="kw">?&gt;</span>
+---------------------Конец вставки из вида--------------------------
+<span class="kw">&lt;br/&gt;</span>
+
+<span class="kw">&lt;div</span><span class="ot"> class=</span><span class="st">&quot;footer&quot;</span><span class="kw">&gt;</span>
+Copyright <span class="dv">&amp;copy;</span> компания <span class="dv">&amp;laquo;</span>Супер-пупер<span class="dv">&amp;raquo;</span>
+<span class="kw">&lt;/div&gt;</span>
+<span class="kw">&lt;/body&gt;</span>
+<span class="kw">&lt;/html&gt;</span></code></pre>
+<p>Мы только что создали макет нашей страницы и вставили в него данные из вида через echo $content. Как видите, я вбил css прямо в голову html-документа, но это, как говорится, не комильфо.</p>
+<p>Чтобы подключить внешний css используется обычный <code>&lt;link rel=...&gt;</code></p>
+<p>Создадим в корне приложения папку css, в которую будем ложить наши таблицы стилей и подключим их следующим образом:</p>
+<pre class="sourceCode html"><code class="sourceCode html"><span class="kw">&lt;link</span><span class="ot"> rel=</span><span class="st">&quot;stylesheet&quot;</span><span class="ot"> type=</span><span class="st">&quot;text/css&quot;</span><span class="ot"> href=</span><span class="st">&quot;</span><span class="er">&lt;</span><span class="st">?php echo Yii::app()-&gt;request-&gt;baseUrl; ?&gt;/css/main.css&quot;</span> <span class="kw">/&gt;</span></code></pre>
+<p>Здесь мы в ссылке вставили php-код Yii::app()-&gt;request-&gt;baseUrl, который для данного экземпляра приложения берет объект запрос и из достает его свойство baseUrl, которое хранит в себе строку относительной ссылки на приложение, т.е. имя папки в которой лежит входной скрипт. К этой строке потом просто дописывается путь до css-файла и всё.</p>
+<p>На этом мои знания о видах в Yii заканчиваются. В следующий раз поговорим о моделях.</p>
+
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>

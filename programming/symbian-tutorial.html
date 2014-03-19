@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Разработка под Symbian S60</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Несу подвиг добровольного безумия!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">меню</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Разработка под Symbian S60</h2>
+                            <h6 class="post-meta">
+                              04 фев 2010, в категории 
+                              <a class="disabled" href="/categories/programming">programming</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <h2 id="преамбула">Преамбула</h2>
+<p>Решил я тут пописать программки под свой телефон — Nokia N73. Зашел я на сайт нокии. И был разочарован. Во-первых, я минут 5 пытался отыскать какой-нибудь мануал о том, что мне делать. Во-вторых, когда я его нашел, то впал в уныние, ибо там был унылый базар, что наша среда разработки для виндоус. А как заставить это работать под линуксом нокия давала какие-то невнятные советы. Поэтому я решил написать свой мануал, вдруг кому пригодиться.</p>
+<h2 id="фабула">Фабула</h2>
+<p>Итак, допустим у вас есть:</p>
+<ol style="list-style-type: decimal">
+<li>Телефон, работающий под Symbian S60</li>
+<li>Компьютер с работающим на нем линуксом</li>
+<li>Непреодолимое желание писать программы под ваш телефон</li>
+</ol>
+<p>Если все 3 пункта верны, то можете читать дальше.</p>
+<h3 id="установка-sdk">Установка SDK</h3>
+<p>Перед тем как что-либо программировать необходимо настроить среду разработки (здесь не про IDE идет речь).</p>
+<p>Итак, сперва качаем SDK с сайта нокии. Идем <a href="http://www.forum.nokia.com/Tools_Docs_and_Code/Tools/Platforms/S60_Platform_SDKs/">сюда</a>, справа нажимаем “Download all-in-one S60s SDK”. На появившейся странице выбираем в выпадающем списке версию SDK для вашего устройства. В моем случае, это 3rd Edition. Посмотреть, какая у вас Symbian можно <a href="http://www.forum.nokia.com/devices/matrix_s60_1.html">здесь</a>.</p>
+<p>Далее идем к Мартину. Господин Мартин Сторсйо (Martin Storsjö) собирает наборы тулзов, патчей к sdk и компилятору, чтобы мы не занимались рутинной работой. Качаем с <a href="http://www.martin.st/symbian/">его страницы</a> последнюю версию.</p>
+<p>Теперь надо поставить toolchain. Для различных версий Symbian это делается по-разному. В моем случае, надо поставить EKA2 toolchain (как это делать для EKA1 написано у Мартина).</p>
+<p>Для начала качаем <a href="http://www.codesourcery.com/gnu_toolchains/arm/releases/2005Q1C">CodeSourcery’s GCC</a>. Далее ставим его, просто распаковывая:</p>
+<pre><code>[finger@laptop s60]$ mkdir csl-gcc
+[finger@laptop s60]$ cd csl-gcc/
+[finger@laptop csl-gcc]$ mv ../gnu-csl-arm-2005Q1C-arm-none-symbianelf-i686-pc-linux-gnu.tar.bz2 .
+[finger@laptop csl-gcc]$ tar -xvf gnu-csl-arm-2005Q1C-arm-none-symbianelf-i686-pc-linux-gnu.tar.bz2</code></pre>
+<p>Далее ставим тулзы:</p>
+<pre><code>[finger@laptop s60]$ cd gnupoc-package-1.15
+[finger@laptop gnupoc-package-1.15]$ cd tools/
+[finger@laptop tools]$ ./install_eka2_tools ../../csl-gcc/</code></pre>
+<p>Если g++ будет ругаться, что</p>
+<pre><code>cp: невозможно создать обычный файл `../../csl-gcc/bin&#39;: Нет такого файла или каталогаUnexpected error: aborting.</code></pre>
+<p>то вместо относительного пути к csl-gcc пропишите абсолютный.</p>
+<p>Теперь пришло время ставить SDK. Смотрим в таблицу и выбираем скрипт в зависимости от версии Symbian нашего устройства:</p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Version</th>
+<th align="left">File name</th>
+<th align="left">Install script</th>
+<th align="left">Comments</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">S60 1st Edition, FP1, WINS</td>
+<td align="left"><code>nS60_sdk_v1_2.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_12</code></td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">S60 2nd Edition, WINS</td>
+<td align="left"><code>s60_sdk_v2_0.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_20</code></td>
+<td align="left">Working emulator</td>
+</tr>
+<tr class="odd">
+<td align="left">S60 2nd Edition, FP1, WINS</td>
+<td align="left"><code>S60_SDK_2_1_NET.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_21</code></td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">S60 2nd Edition, FP1, CW</td>
+<td align="left"><code>S60_SDK_v21c_CW.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_21_cw</code></td>
+<td align="left">Working emulator</td>
+</tr>
+<tr class="odd">
+<td align="left">S60 2nd Edition, FP2, WINS</td>
+<td align="left"><code>s60_2nd_fp2_sdk_msb.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_26</code></td>
+<td align="left">Working emulator</td>
+</tr>
+<tr class="even">
+<td align="left">S60 2nd Edition, FP2, CW</td>
+<td align="left"><code>s60_2nd_fp2_sdk.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_26_cw</code></td>
+<td align="left">Working emulator</td>
+</tr>
+<tr class="odd">
+<td align="left">S60 2nd Edition, FP3</td>
+<td align="left"><code>s60_2nd_sdk_fp3.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_28</code></td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">S60 3rd Edition, Maintenance Release</td>
+<td align="left"><code>S60-SDK-0616-3.0-mr.3.749.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_30</code></td>
+<td align="left"></td>
+</tr>
+<tr class="odd">
+<td align="left">S60 3rd Edition, FP 1</td>
+<td align="left"><code>S60-SDK-200634-3.1-Cpp-f.1090b.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_31</code></td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">S60 3rd Edition, FP 2</td>
+<td align="left"><code>S60-3.2-SDK-f.inc3.2130.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_32</code></td>
+<td align="left"></td>
+</tr>
+<tr class="odd">
+<td align="left">S60 5th Edition</td>
+<td align="left"><code>S60_5th_Edition_SDK_v1_0_en.zip</code></td>
+<td align="left"><code>install_gnupoc_s60_50</code></td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">UIQ 3.0</td>
+<td align="left"><code>UIQ3.0SDK.exe</code></td>
+<td align="left"><code>install_gnupoc_uiq_30</code></td>
+<td align="left"></td>
+</tr>
+<tr class="odd">
+<td align="left">UIQ 3.1</td>
+<td align="left"><code>UIQ3.1SDK.exe</code></td>
+<td align="left"><code>install_gnupoc_uiq_31</code></td>
+<td align="left"></td>
+</tr>
+</tbody>
+</table>
+<p>В случае N73 — это S60 3rd Edition, Maintenance Release. Однако, тут есть подстава. Когда я попытался запустить скрипт install_gnupoc_s60_30, то ничего не получилось, т.к. SDK у меня для S60 3rd edition FP2. Поэтому я запускал скрипт для 3rd edition FP2:</p>
+<pre><code>[finger@laptop s60]$ cd gnupoc-package-1.15/sdks/
+[finger@laptop sdks]$ ./install_gnupoc_s60_32 ../../S60_3rd_Edition_SDK_Feature_Pack_2_v1_1_en.zip ../../symbian-sdk30/</code></pre>
+<p>Если вы устанавливали CodeSourcery GCC в директорию отличную от ~/csl-gcc, то надо зайти в gnupoc/sdks и подправить в скрипте gnupoc-common.sh переменные EKA1TOOLS или EKA2TOOLS соответствующим образом.</p>
+<pre><code>EKA2TOOLS=~/projects/s60/csl-gcc/bin</code></pre>
+<p>Далее запускаем скрипт:</p>
+<pre><code>./install_wrapper ~/projects/s60/gnupoc-package-1.15</code></pre>
+<p>Затем добавляем переменные окружения:</p>
+<pre><code>export PATH=~/projects/s60/gnupoc-package-1.15:&lt;%text&gt;${PATH}&lt;/%text&gt;export EPOCROOT=~/projects/s60/symbian-sdk30/</code></pre>
+<h3 id="компиляция-тестового-примера">Компиляция тестового примера</h3>
+<p>Попробуем собрать тестовый пример, чтобы проверить, что всё было установлено и настроено правильно.</p>
+<p>Идем в директорию с примером</p>
+<pre><code>[finger@laptop ~]$ cd $EPOCROOT/s60cppexamples/helloworldbasic/group</code></pre>
+<p>Делаем следующие магические команды:</p>
+<pre><code>[finger@laptop group]$ bldmake bldfiles[finger@laptop group]$ abld build gcce urel</code></pre>
+<p>Если всё было сделано правильно, то можем идти делать sis-файл:</p>
+<pre><code>[finger@laptop group]$ cd ../sis[finger@laptop sis]$ makesis helloworldbasic_gcce.pkg helloworldbasic.sis</code></pre>
+<p>Заливаем полученный sis на телефон и наблюдаем:</p>
+<p><a href="http://4.bp.blogspot.com/_xgU_QNsrAi0/S2tHYVOV62I/AAAAAAAAAEg/AmwXdpJXxNs/s1600-h/img_3033.jpg"><img src="http://4.bp.blogspot.com/_xgU_QNsrAi0/S2tHYVOV62I/AAAAAAAAAEg/AmwXdpJXxNs/s400/img_3033.jpg" alt="IMG_3033_small" /></a> <a href="http://2.bp.blogspot.com/_xgU_QNsrAi0/S2tHuuiiOXI/AAAAAAAAAEw/hXTgCC9il9c/s1600-h/img_3037.jpg"><img src="http://2.bp.blogspot.com/_xgU_QNsrAi0/S2tHuuiiOXI/AAAAAAAAAEw/hXTgCC9il9c/s400/img_3037.jpg" alt="IMG_3037_small" /></a> <a href="http://3.bp.blogspot.com/_xgU_QNsrAi0/S2tHj3B-XBI/AAAAAAAAAEo/-93uDIAX3Zc/s1600-h/img_3036.jpg"><img src="http://3.bp.blogspot.com/_xgU_QNsrAi0/S2tHj3B-XBI/AAAAAAAAAEo/-93uDIAX3Zc/s400/img_3036.jpg" alt="IMG_3036_small" /></a></p>
+<p>P.S. Собранное приложение я не подписывал, т.к. у меня можно ставить неподписанные. Как разработчику подписывать приложения расскажу в следующий раз.</p>
+
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>

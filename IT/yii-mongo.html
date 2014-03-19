@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Yii framework. Модель. MongoDB</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Несу подвиг добровольного безумия!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">меню</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Yii framework. Модель. MongoDB</h2>
+                            <h6 class="post-meta">
+                              23 авг 2011, в категории 
+                              <a class="disabled" href="/categories/IT">IT</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>Продолжаю изучать Yii и сегодня покажу как связать Yii с <a href="http://www.mongodb.org/">MongoDB</a>.</p>
+<p>Как я говорил <a href="http://finger.reduct.ru/?p=124">в прошлом посте</a> о моделях — делать что-то на уровне CModel дело крайне неблагодарное и нудное. Мы разобрались зачем оно нужно и как работает и можем ехать дальше. Единственный случай, когда вам может понадобится делать что-то на этом уровне — это если вы сделаете свой расчудесный способ хранить данные, с которым захотите удобненько работать. В моем случае таким расчудесным способом хранить данные оказалась нереляционная СУБД MongoDB. И именно для неё я покажу реальные примеры работы.</p>
+<p>Я, конечно, мог бы рассказать в 100500-ый раз о том, как с помощью Yii работать с MySQL, но ребята, об этом кто только не писал. Для вас сделали <a href="http://www.yiiframework.com/doc/guide/1.1/en/database.ar">ActiveRecord</a> — пользуйтесь!</p>
+<p>Для своего приложения я выбрал MongoDB, потому что, во-первых, я хотел посмотреть на эти ваши NoSQL базы данных, а во-вторых потому что идея MongoDB <a href="http://www.mongodb.org/display/DOCS/Schema+Design">о документах и коллекциях</a> просто идельно ложится на идеологию того, что я делаю (RSS-аггрегатор).</p>
+<p>После того как я немного поигрался с голой MongoDB через консольку, прошел <a href="http://mongly.com/">туториалы</a>, я начал связывать её с Yii. Я храню в Mongo сами посты, поэтому я хотел, чтобы у меня была модель Item, используя которую, я мог бы в контроллере написать примерно так</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">$items</span> = Item::model<span class="ot">()</span>-&gt;findAll<span class="ot">();</span></code></pre>
+<p>и получить какой-нибудь массив.</p>
+<p>И слава Yii и человеку с ником canni, который запилил готовое расширение для Yii — <a href="http://canni.github.com/YiiMongoDbSuite/">YiiMongoDbSuite</a>. Это расширение по сути тот самый класс унаследованный от CModel, который делает всю грязную работу с MongoDB. Если взглянуть внутрь его исходников, то можно увидеть знакомые куски кода:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">abstract</span> <span class="kw">class</span> EMongoEmbeddedDocument <span class="kw">extends</span> CModel
+{
+    <span class="st">...</span>
+
+        <span class="kw">public</span> <span class="kw">function</span> attributeNames<span class="ot">()</span>
+        {
+            <span class="kw">$className</span>=<span class="fu">get_class</span><span class="ot">(</span><span class="kw">$this</span><span class="ot">);</span>
+            <span class="kw">if</span><span class="ot">(</span>!<span class="fu">isset</span><span class="ot">(</span><span class="kw">self</span>::<span class="kw">$_attributes</span><span class="ot">[</span><span class="kw">$className</span><span class="ot">]))</span>
+                <span class="st">...</span>
+        }
+}</code></pre>
+<p>Это расширение работает через официальный <a href="http://www.mongodb.org/display/DOCS/PHP+Language+Center">PHP-драйвер для MongoDB</a>. В разных классах это замечательно видно:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="co">// Соединение</span>
+<span class="kw">$this</span>-&gt;_mongoConnection = <span class="kw">new</span> Mongo<span class="ot">(</span><span class="kw">$this</span>-&gt;connectionString<span class="ot">,</span> <span class="fu">array</span><span class="ot">(</span>
+            <span class="st">&#39;connect&#39;</span>=&gt;<span class="kw">$this</span>-&gt;autoConnect<span class="ot">))</span>
+
+<span class="co">// Выбор базы данных</span>
+<span class="kw">$this</span>-&gt;_mongoDb = <span class="kw">$this</span>-&gt;getConnection<span class="ot">()</span>-&gt;selectDb<span class="ot">(</span><span class="kw">$name</span><span class="ot">);</span>
+
+<span class="co">//Поиск документа из текущей коллекции</span>
+<span class="kw">$cursor</span> = <span class="kw">$this</span>-&gt;getCollection<span class="ot">()</span>-&gt;find<span class="ot">(</span><span class="kw">$criteria</span>-&gt;getConditions<span class="ot">());</span></code></pre>
+<p>А самое шикарное во всём этом — это то, что пользоваться этим расширением можно точно также как и Active Record. Вот весь код моей модели:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">class</span> Item <span class="kw">extends</span> EMongoDocument {
+    <span class="kw">public</span> <span class="kw">$title</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$date</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$link</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$feed_id</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$feed_title</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$feed_link</span><span class="ot">;</span>
+
+    <span class="co">// This has to be defined in every model, this is same as with standard Yii ActiveRecord</span>
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">function</span> model<span class="ot">(</span><span class="kw">$className</span>=<span class="kw">__CLASS__</span><span class="ot">)</span>
+    {
+        <span class="kw">return</span> <span class="kw">parent</span>::model<span class="ot">(</span><span class="kw">$className</span><span class="ot">);</span>
+    }
+
+    <span class="co">// This method is required!</span>
+    <span class="kw">public</span> <span class="kw">function</span> getCollectionName<span class="ot">()</span>
+    {
+        <span class="kw">return</span> <span class="st">&#39;item&#39;</span><span class="ot">;</span>
+    }
+
+    <span class="kw">public</span> <span class="kw">function</span> rules<span class="ot">()</span>
+    {
+        <span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span> <span class="ot">);</span>
+    }
+
+    <span class="kw">public</span> <span class="kw">function</span> attributeLabels<span class="ot">()</span>
+    {
+        <span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span>
+                <span class="st">&#39;title&#39;</span>       =--&gt; <span class="st">&#39;Item title&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;content&#39;</span>     =&gt; <span class="st">&#39;Item content&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;date&#39;</span>        =&gt; <span class="st">&#39;Item date&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;link&#39;</span>        =&gt; <span class="st">&#39;Item link&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;feed_id&#39;</span>     =&gt; <span class="st">&#39;Item feed&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;feed_title&#39;</span>  =&gt; <span class="st">&#39;Item feed title&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;feed_link&#39;</span>   =&gt; <span class="st">&#39;Item feed link&#39;</span><span class="ot">,</span>
+                <span class="ot">);</span>
+    }
+}</code></pre>
+<p>Всё, что нужно сделать в своём классе — это заимплементить методы: - model — как в ActiveRecord - getCollectionName — этого требует само расширение - attributeLabels — это требует CModel</p>
+<p>С этих пор можно делать весьма изящные вещи (код из контроллера):</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">$criteria</span> = <span class="kw">new</span> EMongoCriteria<span class="ot">;</span>
+<span class="kw">$criteria</span>-&gt;<span class="fu">sort</span><span class="ot">(</span><span class="st">&#39;date&#39;</span><span class="ot">,</span> EMongoCriteria::<span class="kw">SORT_DESC</span><span class="ot">)</span>
+            -&gt;feed_id<span class="ot">(</span><span class="st">&#39;notIn&#39;</span><span class="ot">,</span> <span class="fu">array</span><span class="ot">(</span><span class="dv">39</span><span class="ot">,</span> <span class="dv">21</span><span class="ot">))</span>
+            -&gt;limit<span class="ot">(</span><span class="dv">20</span><span class="ot">)</span>
+            -&gt;offset<span class="ot">(</span><span class="kw">$_POST</span><span class="ot">[</span><span class="st">&#39;offset&#39;</span><span class="ot">]);</span>
+<span class="kw">$items</span> = Item::model<span class="ot">()</span>-&gt;findAll<span class="ot">(</span><span class="kw">$criteria</span><span class="ot">);</span></code></pre>
+<p>Для того, чтобы делать хитрые запросы с условиями существует специальный класс EMongoCriteria, которым можно описать любое мыслимое условие. Так в примере выше я выбираю первые 20 документов, начиная с некоторого значения в $<em>POST[‘offset’], отсортированных по дате в обратном порядке, у которых атрибут feed</em>id не равен 39 и 21.</p>
+<p>О том, как можно еще делать запросы можно почитать в <a href="http://canni.github.com/YiiMongoDbSuite/xhtml/querying.criteria-object.html">соответствующей документации</a> по YiiMongoDbSuite. Естесственно, нужно понимать как вообще работает MongoDB.</p>
+<p>Результат, полученный через findAll() парсится в стиле ActiveRecord. То есть буквально вот так(код из представления):</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="fu">echo</span> <span class="st">&#39;&lt;a class=&quot;feed-link feed-link-minimized&quot; href=&quot;&#39;</span>.<span class="kw">$item</span>-&gt;feed_link.<span class="st">&#39;&quot;&gt;&#39;</span><span class="ot">;</span>
+<span class="fu">echo</span> <span class="kw">$item</span>-&gt;feed_title<span class="ot">;</span>
+<span class="fu">echo</span> <span class="st">&#39;&lt;/a&gt;&#39;</span><span class="ot">;</span></code></pre>
+<p>Всё это так славно и быстро работает, что я прям нарадоваться не могу. Причем это еще не всё на что способна вся эта связка. YiiMongoDbSuite поддерживает все возможности MongoDB, включая индексы, GridFS, вложенные документы и т.д.</p>
+<p>Напоследок расскажу как это всё заставить работать.</p>
+<p>Сначала <a href="http://www.mongodb.org/display/DOCS/Quickstart+Unix">ставим MongoDB</a>. В моём любимом арчике это делается через</p>
+<pre><code>$ yaourt -S mongodb</code></pre>
+<p>Дальше нужно запустить демон, проверить что он работает. Частенько бывает так, что Mongo не запускается. В этом случае бывает полезно посмотреть логи — они очень информативны. Обычно все проблемы с запуском заключаются в правах доступа. У меня еще были проблемы с тем, что я перенес файлы баз данных с 32-битной системы на 64-битную (купил себе новый комп ;-).</p>
+<p>После того, как Mongo заработала, нужно поставить драйвер для PHP — либо через PECL, либо руками, либо как в в Арче:</p>
+<pre><code>yaourt -S php-mongo</code></pre>
+<p>После этого не забываем включаить модуль в php.ini:</p>
+<pre><code>extension=mongo.so</code></pre>
+<p>Теперь качаем YiiMongoDbSuite и распаковываем его в директорию <web-приложение>/protected/extensions.</p>
+<p>После этого в конфиге добавляем автозагрузку и настраиваем параметры подключения:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span>
+        <span class="st">&#39;basePath&#39;</span> =&gt; <span class="fu">dirname</span><span class="ot">(</span><span class="kw">__FILE__</span><span class="ot">)</span>.<span class="st">&#39;/..&#39;</span><span class="ot">,</span>
+        <span class="st">&#39;name&#39;</span> =&gt; <span class="st">&#39;Web App&#39;</span><span class="ot">,</span>
+        <span class="co">// autoloading model and component classes</span>
+        <span class="st">&#39;import&#39;</span>=&gt;<span class="fu">array</span><span class="ot">(</span>
+            <span class="st">&#39;application.models.*&#39;</span><span class="ot">,</span>
+            <span class="st">&#39;application.components.*&#39;</span><span class="ot">,</span>
+            <span class="st">&#39;ext.YiiMongoDbSuite.*&#39;</span><span class="ot">,</span>
+            <span class="ot">),</span>
+
+        <span class="st">&#39;components&#39;</span> =&gt; <span class="fu">array</span><span class="ot">(</span>
+            <span class="st">...</span>
+
+            <span class="st">&#39;mongodb&#39;</span> =&gt; <span class="fu">array</span><span class="ot">(</span>
+                <span class="st">&#39;class&#39;</span> =&gt; <span class="st">&#39;EMongoDB&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;connectionString&#39;</span> =&gt; <span class="st">&#39;mongodb://localhost&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;dbName&#39;</span> =&gt; <span class="st">&#39;fingerdb&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;fsyncFlag&#39;</span> =&gt; <span class="kw">true</span><span class="ot">,</span>
+                <span class="st">&#39;safeFlag&#39;</span> =&gt; <span class="kw">true</span><span class="ot">,</span>
+                <span class="st">&#39;useCursor&#39;</span> =&gt; <span class="kw">false</span><span class="ot">,</span>
+                <span class="ot">),</span>
+            <span class="ot">),</span>
+        <span class="ot">);</span></code></pre>
+<p>И всё, можно развлекаться!</p>
+<p>Успехов!</p>
+
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>

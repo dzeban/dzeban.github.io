@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Yii framework. Модель.</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Несу подвиг добровольного безумия!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">меню</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Yii framework. Модель.</h2>
+                            <h6 class="post-meta">
+                              27 фев 2011, в категории 
+                              <a class="disabled" href="/categories/IT">IT</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <h2 id="теория">Теория</h2>
+<p>Продолжаю писать <a href="http://finger.reduct.ru/?tag=yii">про Yii.</a> Сегодня поговорим о <strong>модели</strong>. Поговорим спокойно, обстоятельно и не торопясь.</p>
+<p>Итак, согласно документации по Yii, модель «<em>используется для хранения данных и применимых к ним бизнес-правил</em>».</p>
+<p>Вспоминаем великую идею MVC о разделении кода приложения на 3 части — управление данными, внешний вид, взаимодействие предыдущих двух.</p>
+<p>Теперь нужно очень четко понять суть моделей.</p>
+<p>Так вот, <strong>модель — это НЕ механизм доступа к данным</strong>. Очень многие так считают, однако понятие модели намного шире и оно становится предельно ясным, если немного абстрагироваться.</p>
+<p>Забудьте о PHP, забудьте о том, что вы делаете сайт. Вы делаете приложение. Ваше приложение работает с некими сущностями, которые вам дают «что-то», а вы с этим «что-то» чего-то делаете. В качестве сущности может быть что угодно — карта мира, двигатель автомобиля, матрица. Подчеркиваю — приложение работает с сущностями.</p>
+<p>Так вот, модель вашего приложения это механизм работы с сущностями, который содержит в себе всё для работы с этими сущностями — правила, ограничения, поведение, доступ к этим сущностям.</p>
+<p>Приведу аналогию из реальной жизни:</p>
+<p>Вы пишете приложение «оркестр».</p>
+<ul>
+<li>Сущность — музыкальный инструмент</li>
+<li>Модель — музыкант</li>
+<li>Контроллер — дирижер</li>
+<li>Вид(представление) — уши слушателей</li>
+</ul>
+<p>Музыкант(модель) знает всё о работе с музыкальным инструментом(сущностью) — как его держать (доступ к сущности), как на нем можно играть(правила), как на нем нельзя играть(ограничения). И он на нем, собственно, играет(поведение).</p>
+<p>Но музыкант не будет играть на инструменте, пока ему не скажет дирижер(контроллер). Дирижер(контролер) знает как сказать музыканту(модели), что делать (использует интерфейс модели). В результате мы получаем музыку через наши уши(представление).</p>
+<p>Надеюсь, стало понятно.</p>
+<p>Каждая часть MVC — это кучка PHP-кода. И на самом-то деле, MVC-кодинг не обязывает нас использовать какой-либо фреймворк. MVC — это паттерн программирования, т.е. подход к архитектуре ПО. Мы можем сами писать в MVC-стиле, выделив 3 части и сделав для каждой из них интерфейс, используя который, другие части могут с ней взаимодействовать.</p>
+<p>MVC-фреймворк же предоставляет уже готовые куски базового кода для того, чтобы кодить в этом паттерне. Этот базовый код предоставляет реализованные интерфейсы, служебные функции, какие-то обработчики ошибок и прочие вещи, которые пришлось бы писать каждый раз.</p>
+<h2 id="практика">Практика</h2>
+<p>Всё, что я сказал выше, на практике представляется следующим образом (для ООП, естесственно):</p>
+<ul>
+<li>Сущности представляются в виде классов</li>
+<li>Атрибуты сущности — свойства класса</li>
+<li>Доступ к сущности, ограничения и пр. — методы класса</li>
+</ul>
+<p>Каждый фреймворк реализует это по-своему и мы рассмотрим вариант Yii. Мы не будем следовать официальному туториалу Yii и будем изучать модель с самого низа. О чем это я? Читая документацию можно подумать, что в Yii всего 2 сущности — запись БД и форма. Это, на самом деле, не совсем правда — это те сущности, для которых уже реализованы модели. В Yii они представляются как CFormModel и CActiveRecord — модели для работы с формами и БД соответственно. Это уже готовые модели, которые можно просто брать и использовать.</p>
+<p>На низком же уровне модель в Yii представляется в виде класса CModel, который содержит в себе реализацию основных вещей и, наследуя от которого, мы создаем собственные модели и начнем мы с чего-нибудь примитивного.</p>
+<p>Вообще, работу с примитивными объектами, например plain text, можно сделать средствами чистого PHP, передавая их через метод render() в контроллере. И в реальной жизни бессмысленно заводить под такие данные модель. И вообще, не нужно забывать зачем нужны все эти фреймворки — для того, чтобы писать большие, сложные приложения быстро и просто. А когда используют обычный текст для хранения информации — это несерьезно и вам тогда вообще не нужен никакой фреймворк.</p>
+<p>Давайте представим, что мы пишем приложение RSS-агрегатор. В нем есть, например, такая сущность как подписка (feed).</p>
+<h3 id="модель-подписок">Модель подписок</h3>
+<p>Создаем модель —делаем файл protected/models/Feed.php</p>
+<p>В нем пишем</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">class</span> Feed <span class="kw">extends</span> CModel
+{
+}<span class="ot">;</span>
+<span class="kw">?&gt;</span></code></pre>
+<p>Это заготовка для нашей модели. Как видно, мы отнаследовали наш класс модели от класса CModel. Опишем атрибуты сущности и способы работы с ними.</p>
+<p>У подписки есть следующие атрибуты:</p>
+<ul>
+<li>Название</li>
+<li>Описание</li>
+<li>Автор</li>
+<li>Ссылка</li>
+</ul>
+<p>Как я уже говорил раньше, атрибуты сущности задаются в модели через свойства класса, а все механизмы работы через методы. Поэтому то, что я описал выше представляется примерно вот так:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">class</span> Feed <span class="kw">extends</span> CModel
+{
+    <span class="kw">public</span> <span class="kw">$title</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$description</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$author</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$link</span><span class="ot">;</span>
+}
+<span class="kw">?&gt;</span></code></pre>
+<p>Если у вас такая модель как сверху, то код не будет работать. Это происходит потому что в классе CModel есть абстрактный метод attributeNames, который обязательно нужно переопределить иначе возникнет ошибка вида.</p>
+<pre><code>Fatal error: Class Feed contains 1 abstract method and
+must therefore be declared abstract or implement the
+remaining methods.</code></pre>
+<p>Поэтому добавляем код для этого метода, который собственно и будет возвращать эти имена</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">public</span> <span class="kw">function</span> attributeNames<span class="ot">()</span>
+{
+    <span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span>
+            <span class="st">&#39;title&#39;</span><span class="ot">,</span>
+            <span class="st">&#39;description&#39;</span><span class="ot">,</span>
+            <span class="st">&#39;author&#39;</span><span class="ot">,</span>
+            <span class="st">&#39;link&#39;</span>
+            <span class="ot">);</span>
+}</code></pre>
+<p>Чтобы это заработало надо добавить в конфиг автозагрузку моделей. Для этого просто добавляем в protected/config/main.php</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span>
+        <span class="st">&#39;basePath&#39;</span>=&gt;<span class="fu">dirname</span><span class="ot">(</span><span class="kw">__FILE__</span><span class="ot">)</span>.<span class="kw">DIRECTORY_SEPARATOR</span>.<span class="st">&#39;..&#39;</span><span class="ot">,</span>
+        <span class="st">&#39;name&#39;</span>=&gt;<span class="st">&#39;MVC models &amp; Yii&#39;</span><span class="ot">,</span>
+        <span class="st">&#39;import&#39;</span>=&gt;<span class="fu">array</span><span class="ot">(</span>
+            <span class="st">&#39;application.models.*&#39;</span>
+            <span class="ot">)</span>
+        <span class="ot">);</span>
+<span class="kw">?&gt;</span></code></pre>
+<p>Теперь можно в контроллере protected/controllers/SiteController.php создавать экземпляр класса:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">class</span> SiteController <span class="kw">extends</span> CController
+{
+    <span class="kw">function</span> actionIndex<span class="ot">()</span>
+    {
+        <span class="kw">$feed</span> = <span class="kw">new</span> Feed<span class="ot">();</span>
+    }
+}</code></pre>
+<p>Хорошо, атрибуты мы задавать научились. Теперь хотелось бы уже сделать чего-то полезного. Для начала определимся чего мы хотим. На первых порах от модели хотелось бы следующего:</p>
+<ol style="list-style-type: decimal">
+<li>Чтобы она задавала значения своих атрибутов</li>
+<li>Чтобы она отдавала значения своих атрибутов</li>
+<li>Чтобы она проверяла корректность своих атрибутов</li>
+</ol>
+<p>Первые два пункта делаются с помощью методов setAttributes() и getAttributes() соответственно. Эти методы уже реализованы в CModel, т.е. их нам писать не неадо. Они просты как молоток, и про них можно посмотреть на сайте Yii. Вкратце, им передается массив с именами аттрибутов которые хотим взять/задать. Однако, чего нет на сайте Yii так это вот такого маленького момента, из-за которого я чуть с ума не сошел. Если наши аттрибуты объявить как private, то setAttributes их не увидит и будет ругаться словами <code>Property &quot;Feed.title&quot; is not defined</code>. Если же аттрибуты public или даже protected, то всё нормално. С чем это связано — я не понял.</p>
+<p>В конечно итоге, я написал в контроллере такой нехитрый код для работы с атрибутами</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">$feed</span>-&gt;setAttributes<span class="ot">(</span>
+        <span class="fu">array</span><span class="ot">(</span>
+            <span class="st">&#39;title&#39;</span>=&gt;<span class="st">&#39;Feed title&#39;</span><span class="ot">,</span>
+            <span class="st">&#39;description&#39;</span>=&gt;<span class="st">&#39;Feed description&#39;</span><span class="ot">,</span>
+            <span class="st">&#39;author&#39;</span>=&gt;<span class="st">&#39;Feed author&#39;</span><span class="ot">,</span>
+            <span class="st">&#39;link&#39;</span>=&gt;<span class="st">&#39;Feed link&#39;</span>
+            <span class="ot">),</span>
+        <span class="kw">false</span>
+        <span class="ot">);</span>
+<span class="fu">var_dump</span><span class="ot">(</span><span class="kw">$feed</span>-&gt;getAttributes<span class="ot">());</span></code></pre>
+<p>Второй аргумент в вызове setAttributes это параметр $safeOnly. По умолчанию он установлен в true, а значит будет устанавливать значения только для тех аттрибутов, которые прошли проверку на валидность (об этом дальше).</p>
+<p>Собственно, это все хитрости связанные с изменением аттрибутов.</p>
+<p>Другое дело — проверка корректности. Для этого в Yii используются так называемые валидаторы. Это такие методы, которые получают на вход аттрибуты и в случае ошибки вызывают метод addError(). В качестве валидатора можно использовать какой-либо метод класса, создать свой собственный валидатор, отнаследовав его от CValidator, либо же воспользоваться одним из уже готовых валидаторов в поставке Yii.</p>
+<p>Каждому атрибуту можно назначить один или несколько валидаторов. Задаются они с помощью метода rules() в классе нашей модели.</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">public</span> <span class="kw">function</span> rules<span class="ot">()</span>
+{
+    <span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span>
+            <span class="fu">array</span><span class="ot">(</span><span class="st">&#39;title, link&#39;</span><span class="ot">,</span> <span class="st">&#39;required&#39;</span><span class="ot">),</span>
+            <span class="fu">array</span><span class="ot">(</span><span class="st">&#39;link&#39;</span><span class="ot">,</span> <span class="st">&#39;url&#39;</span><span class="ot">),</span>
+            <span class="ot">);</span>
+}</code></pre>
+<p>Видно, что правила организованы в массив. Каждое правило также представляет собой массив, который имеет формат.</p>
+<pre><code>&#39;список аттрибутов&#39;, &#39;применяемый валидатор&#39;, &#39;аргументы валидатора&#39;, &#39;on&#39;=&gt;&#39;сценарий валидации&#39;</code></pre>
+<p>В моем случае я попросил, чтобы название и ссылка подписки были не пусты, а также чтобы ссылка на подписку была составлена правильно.</p>
+<p>Чтобы проверить на валидность вызывается метод validate(), ошибки от которого можно проверить с помощью метода getErorrs(). Выглядит это примерно так:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">if</span><span class="ot">(</span>!<span class="kw">$feed</span>-&gt;validate<span class="ot">())</span>
+{
+    <span class="fu">var_dump</span><span class="ot">(</span><span class="kw">$feed</span>-&gt;getErrors<span class="ot">());</span>
+}</code></pre>
+<p>Это делается, естесственно, в контроллере.</p>
+<p>В моем случае getErrors мне вернул ошибку</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="fu">array</span><span class="ot">(</span><span class="dv">1</span><span class="ot">)</span> {
+    <span class="ot">[</span><span class="st">&quot;link&quot;</span><span class="ot">]</span>=&gt;
+        <span class="fu">array</span><span class="ot">(</span><span class="dv">1</span><span class="ot">)</span> {
+            <span class="ot">[</span><span class="dv">0</span><span class="ot">]</span>=&gt;
+                string<span class="ot">(</span><span class="dv">24</span><span class="ot">)</span> <span class="st">&quot;Link is not a valid URL.&quot;</span>
+        }
+}</code></pre>
+<p>то есть атрибут link не валидный.</p>
+<p>Проверку валидаторами можно организовать в т.н. сценарии. Сценарий — это определенная последовательность валидаторов. Например, могут быть разные сценарии валидации при логине и при регистрации пользователя. В последнем случае помимо полей имени пользователя и пароля  обязательным является поле e-mail.</p>
+<p>Сценарий — четвертый ‘on’-аргумент в массиве правил валидации. Для того, чтобы указать по какому сценарию провести валидацию задаётся свойство scenario класса CModel. В будущих статьях я, возможно,  это подробнее расскажу.</p>
+<p>Полный код модели, который даже что-то делает:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+
+<span class="kw">class</span> Feed <span class="kw">extends</span> CModel
+{
+    <span class="kw">public</span> <span class="kw">$title</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$description</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$author</span><span class="ot">;</span>
+    <span class="kw">public</span> <span class="kw">$link</span><span class="ot">;</span>
+
+    <span class="kw">public</span> <span class="kw">function</span> attributeNames<span class="ot">()</span>
+    {
+        <span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span>
+                <span class="st">&#39;title&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;description&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;author&#39;</span> <span class="ot">,</span>
+                <span class="st">&#39;link&#39;</span>
+                <span class="ot">);</span>
+    }
+
+    <span class="kw">public</span> <span class="kw">function</span> attributeLabels<span class="ot">()</span>
+    {
+        <span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span>
+                <span class="st">&#39;title&#39;</span> =&gt; <span class="st">&#39;Title&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;description&#39;</span> =&gt; <span class="st">&#39;Description&#39;</span><span class="ot">,</span>
+                <span class="st">&#39;author&#39;</span> =&gt; <span class="st">&#39;Author&#39;</span> <span class="ot">,</span>
+                <span class="st">&#39;link&#39;</span> =&gt; <span class="st">&#39;Link&#39;</span>
+                <span class="ot">);</span>
+    }
+
+    <span class="kw">public</span> <span class="kw">function</span> rules<span class="ot">()</span>
+    {
+        <span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span>
+                <span class="fu">array</span><span class="ot">(</span><span class="st">&#39;title, link&#39;</span><span class="ot">,</span> <span class="st">&#39;required&#39;</span><span class="ot">),</span>
+                <span class="fu">array</span><span class="ot">(</span><span class="st">&#39;link&#39;</span><span class="ot">,</span> <span class="st">&#39;url&#39;</span><span class="ot">),</span>
+                <span class="ot">);</span>
+    }
+}</code></pre>
+<p>И контроллер</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">class</span> SiteController <span class="kw">extends</span> CController
+{
+
+    <span class="kw">function</span> actionIndex<span class="ot">()</span>
+    {
+        <span class="kw">$feed</span> = <span class="kw">new</span> Feed<span class="ot">();</span>
+        <span class="fu">echo</span> <span class="st">&#39;&lt;pre&gt;&#39;</span><span class="ot">;</span>
+        <span class="fu">var_dump</span><span class="ot">(</span><span class="kw">$feed</span>-&gt;attributeNames<span class="ot">());</span>
+
+        <span class="kw">$feed</span>-&gt;setAttributes<span class="ot">(</span>
+                <span class="fu">array</span><span class="ot">(</span>
+                    <span class="st">&#39;title&#39;</span>=&gt;<span class="st">&#39;Feed title&#39;</span><span class="ot">,</span>
+                    <span class="st">&#39;description&#39;</span>=&gt;<span class="st">&#39;Feed description&#39;</span><span class="ot">,</span>
+                    <span class="st">&#39;author&#39;</span>=&gt;<span class="st">&#39;Feed author&#39;</span><span class="ot">,</span>
+                    <span class="st">&#39;link&#39;</span>=&gt;<span class="st">&#39;Feed link&#39;</span>
+                    <span class="ot">),</span>
+                <span class="kw">false</span>
+                <span class="ot">);</span>
+        <span class="fu">var_dump</span><span class="ot">(</span><span class="kw">$feed</span>-&gt;getAttributes<span class="ot">());</span>
+
+        <span class="kw">if</span><span class="ot">(</span>!<span class="kw">$feed</span>-&gt;validate<span class="ot">())</span>
+        {
+            <span class="fu">var_dump</span><span class="ot">(</span><span class="kw">$feed</span>-&gt;getErrors<span class="ot">());</span>
+        }
+
+        <span class="fu">echo</span> <span class="st">&#39;&lt;/pre&gt;&#39;</span><span class="ot">;</span>
+    }
+}
+
+<span class="kw">?&gt;</span></code></pre>
+<h2 id="итог">Итог</h2>
+<p>Вообще говоря, по моделям сказать больше нечего. По крайней мере на том уровне, на котором я только что рассказал. Еще раз напомню, что CModel — это очень низкоуровневый класс, который дает только следующие вещи:</p>
+<ul>
+<li>Установить/забрать атрибуты</li>
+<li>Сделать валидацию</li>
+<li>Функции обработки ошибок</li>
+</ul>
+<p>И ничего более. Поэтому создавать какое-то реально полезное приложение на таком низком уровне просто глупо. Для работы с базами данных и прочими полезными штуками расскажу дальше.</p>
+<p>По поводу обработки ошибок хочется сказать еще пару слов. Для того, чтобы сообщения об ошибках были красивые и понятные можно задать имена аттрибутов (attribute’s label). Я не стал передовить label как “метка”, потому что это убого. Так вот, например, чтобы вместо</p>
+<pre><code>Error with $someVariable</code></pre>
+<p>писать</p>
+<pre><code>Error with current feed list</code></pre>
+<p>мы задаем эти самые имена. Задаются они с помощью метода attributeLabels(). Если посмотреть в исходники Yii, то там видно, что по умолчанию этот метод возвращает пустой массив. А вот мы его возьмем и переопределим</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+<span class="kw">public</span> <span class="kw">function</span> attributeLabels<span class="ot">()</span>
+{
+    <span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span>
+            <span class="st">&#39;title&#39;</span> =&gt; <span class="st">&#39;Title&#39;</span><span class="ot">,</span>
+            <span class="st">&#39;description&#39;</span> =&gt; <span class="st">&#39;Description&#39;</span><span class="ot">,</span>
+            <span class="st">&#39;author&#39;</span> =&gt; <span class="st">&#39;Author&#39;</span> <span class="ot">,</span>
+            <span class="st">&#39;link&#39;</span> =&gt; <span class="st">&#39;Link&#39;</span>
+            <span class="ot">);</span>
+}</code></pre>
+<p>В Yii есть дефолтная функция для генерации меток. Она заменяет подчеркивания и дефисы на пробелы, делает первые буквы заглавными. Эта функция состоит всего лишь из одной строчки, но зато какой</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+return ucwords<span class="ot">(</span><span class="fu">trim</span><span class="ot">(</span><span class="fu">strtolower</span><span class="ot">(</span><span class="fu">str_replace</span><span class="ot">(</span><span class="fu">array</span><span class="ot">(</span><span class="st">&#39;-&#39;</span><span class="ot">,</span><span class="st">&#39;_&#39;</span><span class="ot">,</span><span class="st">&#39;.&#39;</span><span class="ot">),</span><span class="st">&#39; &#39;</span><span class="ot">,</span><span class="fu">preg_replace</span><span class="ot">(</span><span class="st">&#39;/(?&lt;![A-Z])[A-Z]/&#39;</span><span class="ot">,</span> <span class="st">&#39; \0&#39;</span><span class="ot">,</span> <span class="kw">$name</span><span class="ot">)))));</span></code></pre>
+<p>В большинстве случаев этого вполне хватит, но если хотите экзотики, то attributeLabels вам в помощь.</p>
+<h2 id="ссылки">Ссылки</h2>
+<ol style="list-style-type: decimal">
+<li><a href="http://blog.astrumfutura.com/2008/12/the-m-in-mvc-why-models-are-misunderstood-and-unappreciated/">The M in MVC: Why Models are Misunderstood and Unappreciated</a></li>
+<li><a href="http://www.littlehart.net/atthekeyboard/2007/04/27/fat-models-skinny-controllers/">Fat models, skinny controllers</a></li>
+<li><a href="http://chtivo.webhost.ru/articles/mvc.php">MVC для начинающих</a></li>
+</ol>
+
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>

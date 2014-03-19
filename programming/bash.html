@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Bash для страдающих склерозом</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Несу подвиг добровольного безумия!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">меню</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Bash для страдающих склерозом</h2>
+                            <h6 class="post-meta">
+                              15 янв 2014, в категории 
+                              <a class="disabled" href="/categories/programming">programming</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>Иногда мне приходится писать больше чем</p>
+<pre><code>lsscsi 7 | head -n -1 | awk &#39;{print $6}&#39;</code></pre>
+<p>и тогда я делаю себе скрипты на bash. И в такие моменты я понимаю 2 вещи:</p>
+<ol style="list-style-type: decimal">
+<li>Bash отвратительно неудобный язык полный нелогичностей и грязных хаков.</li>
+<li>Я ненавижу писать на баше.</li>
+<li>Мне приходится писать на баше, потому что это иногда быстрее и ничего другого нет.</li>
+<li>По причине №1 я постоянно забываю как делать простейшие вещи.</li>
+</ol>
+<p>И чтобы не рыскать по интернетам каждые 5 минут здесь я буду хранить постоянно пополняющуюся коллекцию частых приемов, в поисках которых лично я трачу много времени.</p>
+<h2 id="переменные">Переменные</h2>
+<p>Во-первых, присваивание переменным:</p>
+<pre><code>MYVAR=182</code></pre>
+<p><strong>Пробела между именем переменной и <code>=</code> не должно быть</strong>, в противном случае <code>MYVAR</code> будет восприниматься как команда.</p>
+<h2 id="циклы">Циклы</h2>
+<p>Циклы делаются так:</p>
+<pre class="sourceCode bash"><code class="sourceCode bash"><span class="kw">for</span> <span class="kw">i</span> in <span class="dt">{a..z}</span>        <span class="co"># &lt;1&gt;</span>
+<span class="kw">do</span>
+    <span class="kw">...</span>
+    <span class="kw">echo</span> <span class="st">&quot;/dev/sd</span><span class="ot">$i</span><span class="st">&quot;</span>   <span class="co"># &lt;2&gt;</span>
+    <span class="kw">some</span> code
+    <span class="kw">...</span>
+<span class="kw">done</span></code></pre>
+<ol style="list-style-type: decimal">
+<li><code>{a..z}</code>, <code>{0..29}</code> и пр.</li>
+<li>Подставлять переменную в строку только в двойных кавычках</li>
+</ol>
+<p>Однако ежели надо сделать range по переменной, в смысле от <code>0</code> до <code>$N</code>, то <code>{0..$N}</code> не работает. Тут спасет только <code>seq</code>:</p>
+<pre class="sourceCode bash"><code class="sourceCode bash"><span class="kw">for</span> <span class="kw">i</span> in <span class="ot">$(</span><span class="kw">seq</span> 0 <span class="ot">$N)</span></code></pre>
+<h2 id="разбор-опций">Разбор опций</h2>
+<p>Разбор опций делается через <code>getopt</code></p>
+<pre class="sourceCode bash"><code class="sourceCode bash"><span class="kw">while</span> <span class="kw">getopts</span> <span class="kw">&lt;</span>optstring<span class="kw">&gt;</span> OPTION <span class="co"># &lt;1&gt;</span>
+<span class="kw">do</span>
+    <span class="kw">case</span> <span class="ot">$OPTION</span><span class="kw"> in</span>              <span class="co"># &lt;2&gt;</span>
+    &lt;optval&gt;<span class="kw">)</span>                    <span class="co"># &lt;2&gt;</span>
+        <span class="kw">...</span>
+        <span class="kw">some</span> code
+        <span class="kw">echo</span> <span class="ot">$OPTARG</span>             <span class="co"># &lt;3&gt;</span>
+        <span class="kw">...</span>
+        <span class="kw">;;</span>                       <span class="co"># &lt;4&gt;</span>
+    ?<span class="kw">)</span>                           <span class="co"># &lt;5&gt;</span>
+        <span class="kw">usage</span>
+        <span class="kw">exit</span> 1
+        <span class="kw">;;</span>
+    <span class="kw">esac</span>
+<span class="kw">done</span></code></pre>
+<ol style="list-style-type: decimal">
+<li><code>optstring</code> - строка возможных опций, допустим <code>&quot;ha:bc:d&quot;</code>. Двоеточие после буквы означает наличие обязательного аргумента. В данном случае возможно опции ‘-h’, ‘-a <обязательный аргумент>’, ‘-b’, ‘-c <обязательный аргумент>’, ‘-d’.</li>
+<li>Каждая опция раскрывается в своём case: ‘a)’, ‘b)’, …</li>
+<li>Аргумент опции (<code>-b &lt;что-то&gt;</code>) можно получить через <code>$OPTARG</code></li>
+<li>Каждый case надо закрывать <code>;;</code></li>
+<li>Если случилась ошибка при разборе опций, то вызывается кол в кейсе <code>?)</code></li>
+</ol>
+<h2 id="ссылки">Ссылки</h2>
+<ol style="list-style-type: decimal">
+<li><a href="http://matt.might.net/articles/bash-by-example/">Shell programming with bash: by example, by counter-example</a></li>
+</ol>
+
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>

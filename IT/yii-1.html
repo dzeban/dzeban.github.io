@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Yii framework.1</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Несу подвиг добровольного безумия!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">меню</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Yii framework.1</h2>
+                            <h6 class="post-meta">
+                              17 мар 2010, в категории 
+                              <a class="disabled" href="/categories/IT">IT</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>Привет.</p>
+<p>Пора, пора уже наконец позаботиться о своей будущей занятости и иметь различные варианты устройства на работу. И неплохой вариант здесь — это PHP-программист. С PHP я немного знаком, но для устройства этого явно недостаточно. Помимо всего этого, судя по требованиям к кандидатам на всяких сайтах работы, требуется знание какого-либо MVC-фреймворка. Обычно, это Zend, однако, как я читал по отзывам, новичкам лучше начинать с чего попроще. Так или иначе, но я выбрал Yii framework. И с этого момента начинается мой цикл статей об Yii.</p>
+<p>Несмотря на отличную документацию по Yii и их туториалы, я предпочитаю учится так, как это удобно мне, поэтому здесь я не буду в стотысячный раз описывать и пояснять <a href="http://www.yiiframework.com/doc/blog/">примеры</a> с их сайта. А начну с того, как это мне удобно.</p>
+<p>Сегодня мы попробуем создать простейшее приложение.  Оно будет выводить нам только “Hello, World”.</p>
+<p>Начнем с того, что нужно <a href="http://www.yiiframework.com/download/">скачать сам фреймворк</a> и распаковать его в место, которое назовем <code>yii_dir</code>.</p>
+<p>Дальше мы будем создавать скелет. Для этого в составе Yii есть утилита yiic — она может создать структуру для вашего сайта, однако мы ей пользоваться не будем. Да, не будем, потому что она делает много работы, суть которуй необходимо понять самому. Поэтому будем делать всё руками.</p>
+<p>Создадим в корне нашего веб-сервера папку, которую назовем example — в ней будет лежать всё, что мы будем делать. В этой папке создаём файл index.php.</p>
+<p>index.php в терминах Yii framework называется входным скриптом (entry script). Вся его задача принять запрос пользователя и передать его т.н. приложению. Приложение — это, как говорится, контекст выполнения запроса. Лучше не скажешь. Приложение создается тем самым входным скриптом. Приложение нужно для того, чтобы обработать запрос от пользователя и передать его соответствующему контроллеру. Здесь надо отвлечься на MVC.</p>
+<p>MVC-архитектура — это когда мы представляем наше приложение в виде трёх частей:</p>
+<ol style="list-style-type: decimal">
+<li>Модель — содержит в себе данные и логику</li>
+<li>Вид — содержит в себе пользовательский интерфейс</li>
+<li>Контроллер — контролирует взаимодействие между предыдущими.</li>
+</ol>
+<p>Всё это нужно для того, чтобы отделить форму от содержания, то есть, чтобы логика была отдельно от пользовательского интерфейса. Очень благие намерения.</p>
+<p>В общем и целом структура создаваемого нами сайта/сервиса/вставить_нужное выглядит следующим образом:</p>
+<div class="figure">
+<img src="http://www.yiiframework.com/tutorial/image?type=guide&amp;version=1.1&amp;lang=en&amp;file=structure.png" title="MVC-архитектура" alt="MVC-архитектура" /><p class="caption">MVC-архитектура</p>
+</div>
+<p>Как это работает.</p>
+<p>На этой схеме показан тот самый входной скрипт index.php, который создает приложение и передает ему запрос. Приложение на основании запроса вызывает соответствующий Контроллер. Контроллер обращается к Модели за данными и логикой, и к Виду за внешним видом. Получив то, что нужно, Контроллер возвращает результат приложению.</p>
+<p>Про MVC можно почитать еще <a href="http://www.yiiframework.com/doc/guide/ru/basics.mvc">здесь</a></p>
+<p>Запрос, который делает пользователь и который обрабатывает приложение представляется в GET и имеет вид <code>index.php?r=&lt;controller&gt;/&lt;action&gt;</code>. Где <code>&lt;controller&gt;</code> — тот контроллер, который нужно вызвать, а <code>action</code> - это действие в контроллере, которое нужно сделать. Действие представляет собой метод класса контроллера.</p>
+<p>Надо бы сказать, что приложение это, по сути, контроллер, который стоит перед всеми. Его также называют фронт-контроллер</p>
+<p>Итак, мы создали наш входной скрипт. Теперь нужно его наполнить. Для этого напишем там следующее</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+
+<span class="co">//Задаем путь к Yii framework</span>
+<span class="kw">$yii</span> = <span class="fu">dirname</span><span class="ot">(</span><span class="kw">__FILE__</span><span class="ot">)</span>.<span class="st">&#39;/yii/framework/yii.php&#39;</span><span class="ot">;</span>
+
+<span class="co">//Задаем путь к файлу конфигурации приложения</span>
+<span class="kw">$config</span> = <span class="fu">dirname</span><span class="ot">(</span><span class="kw">__FILE__</span><span class="ot">)</span>.<span class="st">&#39;/protected/config/main.php&#39;</span><span class="ot">;</span>
+
+<span class="co">//echo &quot;Yii path = &quot;.$yii.&quot;\n&quot;;</span>
+<span class="co">//echo &quot;config path = &quot;.$config.&quot;\n&quot;;</span>
+
+<span class="fu">defined</span><span class="ot">(</span><span class="st">&#39;YII_DEBUG&#39;</span><span class="ot">)</span> <span class="kw">or</span> <span class="fu">define</span><span class="ot">(</span><span class="st">&#39;YII_DEBUG&#39;</span><span class="ot">,</span> <span class="kw">true</span><span class="ot">);</span>
+<span class="kw">require_once</span><span class="ot">(</span><span class="kw">$yii</span><span class="ot">);</span>
+
+Yii::createWebApplication<span class="ot">(</span><span class="kw">$config</span><span class="ot">)</span>-&gt;run<span class="ot">();</span></code></pre>
+<p>В четвертой строке мы указали путь к <code>yii_dir</code>, т.е. к директории, в которую мы распаковали скачанный ранее yii framework.</p>
+<p>В седьмой строке мы указываем путь до файла с конфигурацией приложения. Об этом позже</p>
+<p>В двенадцатой строке мы определяем YII_DEBUG для того, чтобы нам выводили замечательные сообщения об ошибках.</p>
+<p>В четырнадцатой строке мы подключаем framework</p>
+<p>И, наконец, в пятнадцатой строке мы создаем приложение и передаем ему управление.</p>
+<p>На самом деле, если в пятнадцатой строке вызвать createWebApplication() без параметра, то ничего страшного не случится. Можете попробовать http://localhost/example. Вам выдастся сообщение</p>
+<pre><code>Page not found. Unable to resolve the request &quot;site&quot;</code></pre>
+<p>Сама функция createWebApplication принимает на вход массив, который содержит конфигурацию приложения. Его можно определить его прямо в index.php и передать как аргумент. Однако, это не есть хорошо, и давай вести себя культурно и сделаем его в отдельном файле.</p>
+<p>Итак, у каждого приложения должна быть своя конфигурация, потому что это логично. Конфигурация приложения — это тупо ассоциативный массив, т.е. массив пар ‘ключ’ =&gt; ‘значение’. В конфигурации задается много параметров, но сегодня мы зададим только 2</p>
+<p>Создадим папку в соответствии с тем, что мы написали в переменной <code>$config</code>, то есть папку protected, в ней папку config, и в ней файл main.php. В сам main.php напишем следующее:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+
+<span class="kw">return</span> <span class="fu">array</span><span class="ot">(</span>
+
+        <span class="co">//Корневая директория приложения. В данном случае — это protected</span>
+        <span class="st">&#39;basePath&#39;</span> =&gt; <span class="fu">dirname</span><span class="ot">(</span><span class="kw">__FILE__</span><span class="ot">)</span>.<span class="kw">DIRECTORY_SEPARATOR</span>.<span class="st">&#39;..&#39;</span><span class="ot">,</span>
+
+        <span class="co">//Имя приложения</span>
+        <span class="st">&#39;name&#39;</span> =&gt; <span class="st">&#39;Example&#39;</span><span class="ot">,</span>
+<span class="ot">);</span></code></pre>
+<p>Как видно, мы определили 2 параметра:</p>
+<ol style="list-style-type: decimal">
+<li><code>name</code> — имя приложения. (Приложения, они же как дети и им тоже нужно давать имена)</li>
+<li><code>basePath</code> — базовая директория приложения. Это такая директория, которая содержит в себе всё самое важное с точки зрения безопасности, т.е. все скрипты, интерфейсы и т.д. По умолчанию, т.е. если не указать в конфигурации, это директория protected в корневой папке приложения.</li>
+</ol>
+<p>Теперь, еще раз взглянем на то, что пишет веб-сервер. Он не знает, что делать с запросом site. Всё дело в том, что по умолчанию, если ничего не писать в запросе, вызывается контроллер <code>SiteController</code>, а в нем действие(то бишь метод класса) <code>index</code>. То есть запрос выглядит следующим образом <code>index.php?r=site/index</code></p>
+<p>Поэтому давайте сделаем так, чтобы этот запрос обрабатывался. Для этого, очевидно, нужно создать контроллер <code>SiteController</code>, а в нем действие <code>actionIndex</code>.</p>
+<p>Создадим в protected папку controllers, и в ней файл SiteController.php. Напишем в него следующую простую вещь:</p>
+<pre class="sourceCode php"><code class="sourceCode php"><span class="kw">&lt;?php</span>
+
+<span class="kw">class</span> SiteController <span class="kw">extends</span> CController
+{
+    <span class="kw">public</span> <span class="kw">function</span> actionIndex<span class="ot">()</span>
+    {
+        <span class="fu">echo</span> <span class="st">&quot;Hello, World!&quot;</span><span class="ot">;</span>
+    }
+}</code></pre>
+<p>Здесь мы создали класс контроллера <code>SiteController</code>, наследованный от класса <code>CController</code>, определенного в Yii framework. И добавили действие по-умолчанию <code>actionIndex()</code></p>
+<p>Вот, в общем-то, и всё. Теперь, если вы зайдете на сайт, то вам напишут Hello, World.</p>
+<p>Таким образом, мы создали минимальное приложение для Yii, состоящее всего из трех файлов — index.php, конфига и контроллера по умолчанию.</p>
+<p>В следующий раз будем добавлять модель и вид.</p>
+
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>
