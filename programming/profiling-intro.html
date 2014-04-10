@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Профилирование в Linux. Введение</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Несу подвиг добровольного безумия!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">меню</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Профилирование в Linux. Введение</h2>
+                            <h6 class="post-meta">
+                              30 янв 2014, в категории 
+                              <a class="disabled" href="/categories/programming">programming</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <h2 id="введение-введения">Введение введения</h2>
+<p>Изначально я хотел написать обзор средств профилирования в Linux, но, будучи человеком чрезмерно любознательным, я раздул статью до невообразимых размеров. Поэтому я решил сделать цикл статей, которые бы были в достаточной степени технически интересными и в конечном итоге покрывали большинство основных и/или интересных инструментов профилирования. Так что, встречайте – цикл статей о профилировании в Linux!</p>
+<p>Содержание:</p>
+<ol style="list-style-type: decimal">
+<li>Введение</li>
+<li><a href="/programming/profiling-gprof-gcov.html">Userspace profiling: gprof, gcov</a></li>
+<li><a href="/programming/profiling-valgrind.html">Userspace profiling: Valgrind</a></li>
+<li>Userspace profiling: Google Performance tools</li>
+<li>Kernel profiling: Intro</li>
+<li>Kernel profiling: ftrace</li>
+<li>Kernel profiling: perf</li>
+<li>Kernel profiling: SystemTap</li>
+<li>Kernel profiling: ktap</li>
+<li>Vendor specific profiling: Intel VTune</li>
+</ol>
+<h2 id="ликбез">Ликбез</h2>
+<p><strong>Профилирование</strong> (profiling) – динамический анализ програмного обеспечения, заключающийся в сборе различных метрик и получении по ним статистической информации. Профилирование выполняется в основном для анализа производительности ПО, но не ограничивается этим. Например, в последнее время стали делать профилирование для анализа <a href="http://infoscience.epfl.ch/record/181628/files/eprof.pdf">энергопотребления</a>.</p>
+<p>Не стоит путать профилирование с трассировкой. <em>Трассировка</em> – это сохранение шагов выполнения какого-либо процесса без сбора и получения статистики. Другими словами трассировка - это способ отладки ПО.</p>
+<p>Также не стоит путать профилирование с бенчмаркингом. <em>Бенчмаркинг</em> – это получение маркетинговых показателей с целью их сравнения и применения в первую очередь для маркетинговых исследований. Короче говоря, это итоговая оценка, которую выставляют ПО.</p>
+<p><strong>Профилировщик</strong> – программа занимающаяся профилированием.</p>
+<p><strong>Профиль</strong> – результат работы профилировщика, статистика по набору метрик для конкретного приложения.</p>
+<p>Метрики, которые собирает для нас профилировщик могут быть самыми разнообразными – я постараюсь привести некую классификацию, потому что невозможно перечислить абсолютно все.</p>
+<ul>
+<li>Метрики кода
+<ul>
+<li>Граф вызовов</li>
+<li>Глубина циклов</li>
+<li>…</li>
+</ul></li>
+<li>Временные метрики
+<ul>
+<li>Время выполнения программы/функции</li>
+<li>Время ожидания I/O</li>
+<li>…</li>
+</ul></li>
+<li>Пространственные метрики
+<ul>
+<li>Потребляемая память</li>
+<li>Открытые файлы</li>
+<li>Объём записанных данных (в файл/сокет)</li>
+<li>…</li>
+</ul></li>
+<li>Аппаратные метрики
+<ul>
+<li>Попадание в кеш CPU</li>
+<li>Количество прерываний</li>
+<li>…</li>
+</ul></li>
+</ul>
+<p>Для получения разных классов метрик используются разные методы и технологии. Например, для получения графа вызовов обычно вставляют специальные конструкции в начало каждой функции, которые и отслеживают кто кого вызвал, а заодно и сколько времени было проведено в каждой функции. такой метод получил название <em>инструментирвоание исходного текста (Source code instrumenting)</em>. Для получения времени выполнения функций профилировщик периодически опрашивает регистр Program Counter. Этот метод получил название <em>сэмплинг (Sampling)</em>. Аппаратные метрики, как правило, получают с помощью аппаратных средств, таких [PMU] (performance monitoring unit).</p>
+<p>Условно, профилирование можно разделить на следующие типы:</p>
+<ul>
+<li>Инвазивное профилирование (Invasive profiling) – изменяющее профилируемый код
+<ul>
+<li>Инструментирование исходного кода (Source Code instumentation)</li>
+<li>Статическое бинарное инструментирование (Static binary instrumentation)</li>
+<li>Динамическое бинарное инструментирование (Dynamic binary instrumentation)</li>
+</ul></li>
+<li>Неинвазивное профилирование (Non-invasive profiling) – не изменяющее профилируемый код
+<ul>
+<li>Сэмплинг (Sampling)</li>
+<li>Событийное (Event-based)</li>
+<li>Эмуляция</li>
+</ul></li>
+</ul>
+<p>Про инструментирование исходного кода я уже говорил. Бинарное инструментирование есть то же самое, только модифицируется не исходный код, а бинарный. Статическое бинарное инструментирование заключается в добавлении бинарного кода и данных в бинарник и создании <em>нового</em> бинарника, который затем запускается. Динамическое бинарное инструментирование подразумевает модификацию образа бинарника в памяти, то есть запущенной и исполняемой программы. Вообще бинарное инструментирование как техника появилось вследствие того, что далеко не всегда доступны исходные тексты, правда тогда не понятно зачем вообще делать её профилирование. На самом деле бинарное инструментирование – это разработка реверс инженеров, то есть людей занимающихся исследованием разных зловредов или взломом проприетарщины. Если вам это интересно, то советую обратиться к моему другу, с которым я вместе учился, и который сейчас работает в “Digital Security” – Диме Евдокимову(<a href="https://twitter.com/evdokimovds">@evdokimovds</a>). Он от этой темы прям кипятком писает (<a href="http://habrahabr.ru/company/dsec/blog/142575/">DBI в ИБ</a>)</p>
+<p>Понятное дело, что для событийного профилирования эти самые события должны быть где-то заранее определены и доступны. События для аппаратных метрик закладываются архитекторами аппаратного обеспечения, например, <a href="http://software.intel.com/sites/products/documentation/doclib/iss/2013/amplifier/lin/ug_docs/GUID-EEC5294C-5599-44F7-909D-9D617DE8AB92.htm">архитекторами CPU</a>.</p>
+<h2 id="постановка-задачи">Постановка задачи</h2>
+<p>Лучше всего изучать что-либо на каких-то реальных примерах, решая настоящие проблемы, вместо бездумного чтения мануалов, поэтому в своих статьях я буду с помощью профилирования решить вот какую проблему.</p>
+<p>Есть у меня приложение, которое делает многопоточный анализ данных на диске. Проще говоря, создаётся несколько потоков, которые выполняют чтение с блочного устройства и пишут контрольную сумму своих блоков в файл.</p>
+<p>Код лежит на <a href="https://gist.github.com/dzeban/8731209">gist</a>. <!-- <script src="https://gist.github.com/dzeban/8731209.js"></script> --></p>
+<p>Я делаю чтение с RAID0 из 8 дисков, сделанного через mdraid. Чтение идёт блоками по 1MiB в 10 потоков, т.е. вот так:</p>
+<pre><code>./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000</code></pre>
+<p>И получаю такие себе результаты:</p>
+<pre><code>[root@simplex block_hasher]# cat bad.out 
+T06: 57.12 MB/s c86253f827c0e40a056d2afc7d6605c291e57400
+T08: 56.72 MB/s 9364a42836daa9beadf02c15777b3e1779f57b00
+T04: 54.82 MB/s d0d7c3e2faed39d83ea25e468b5714bbfe23e200
+T00: 53.06 MB/s c32caf8e5bdebeb2ffa73707e61fad50a751e800
+T02: 53.00 MB/s 34a7495fe2ccaac4afee0e7460d9dff051701900
+T07: 29.93 MB/s 95b3dc919fc4d61548a3b0737dd2ab03a0bab400
+T03: 29.93 MB/s c1228ce6d4920e3bc101f1874bd5beeeb25ec600
+T01: 29.89 MB/s 63d484d0fc2456c9a3c18d1d0ef43d60957d1200
+T05: 29.89 MB/s 5c229e2fe168fb60a0d56b22f6eaa8fc6675d700
+T09: 29.88 MB/s f6eb529ee5b59824a657fb8de43c8c6d3e29cb00</code></pre>
+<p>Если сложить скорости для всех потоков, то получим сколько тянет весь RAID:</p>
+<pre><code>[root@simplex block_hasher]# cut -f2 -d&#39; &#39; bad.out |  paste -sd + | bc
+424.24</code></pre>
+<p>То есть <strong>424.24 MB/s</strong>, что, вообще говоря, не очень. Посчитаем, сколько может RAID в такой конфигурации потянуть в теории<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>:</p>
+<pre><code>Speed = &lt;IOPS 1 диска&gt; * &lt;размер блока&gt; * &lt;кол-во дисков&gt; </code></pre>
+<p>что даёт нам</p>
+<pre><code>180 * 1048576 * 8 = 1509949440 Bytes/s = 1.5 GB/s</code></pre>
+<p>На практике же, скорее всего, должно получиться что-то около 1GB/s.</p>
+<p>В каком месте происходят тормоза мы попытаемся узнать с помощью профилировщиков. Будем профилировать как само приложение <code>block_hasher</code><a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a>, так и всё, что лежит ниже, включая ядро Linux.</p>
+<p>В данной цикле я надеюсь суметь рассмотреть следующие профилировщики:</p>
+<ul>
+<li>gprof</li>
+<li>gcov</li>
+<li>valgrind</li>
+<li>GPT (Google Performance Tools)</li>
+<li>perf</li>
+<li>SystemTap</li>
+<li>ktap</li>
+<li>VTune</li>
+<li>Block devices related tools: blktrace, etc.</li>
+</ul>
+<h2 id="почитать">Почитать</h2>
+<ul>
+<li><a href="http://en.wikibooks.org/wiki/Introduction_to_Software_Engineering/Testing/Profiling">Profiling wikibook</a></li>
+</ul>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Эта примитивная формула подразумевает, что время обработки блоков разных размеров одинаково, что в действительности не так. Также она действительна только для RAID уровня 0. Другие уровни считаются по другому.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>Именно для того, чтобы можно было профилировать приложения я делал тесты именно самописным приложением, а не взял fio.<a href="#fnref2">↩</a></p></li>
+</ol>
+</div>
+
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>
