@@ -64,7 +64,6 @@
 <li><a href="/programming/profiling-intro.html">Введение</a></li>
 <li>Userspace profiling: gprof, gcov</li>
 <li><a href="/programming/profiling-valgrind.html">Userspace profiling: Valgrind</a></li>
-<li>Userspace profiling: Google Performance tools</li>
 <li>Kernel profiling: Intro</li>
 <li>Kernel profiling: ftrace</li>
 <li>Kernel profiling: perf</li>
@@ -201,7 +200,7 @@ block_hasher.c:creating &#39;block_hasher.c.gcov&#39;</code></pre>
 <p>Видно, что 60% вызовов мы считали разницу во времени с заёмом (branch 0).</p>
 <h2 id="заключение">Заключение</h2>
 <p><em>gprof</em> и <em>gcov</em> весьма занятные утилиты хоть их и считают морально устаревшими. С одной стороны они простые и по простому автоматизируют очевидный подход – расставить в каждой функции счётчики, а потом посмотреть где больше всего провели времени.</p>
-<p>С другой стороны такой простой подход мало о чём говорит. <em>gprof</em> и <em>gcov</em> полезны исключительно для приложений в пространстве пользователя и они бесполезны в случае, когда ваша программа проводит большую часть времени в ожидании какого-нибудь системного вызова (в моём случае <code>pread</code>).</p>
+<p>С другой стороны такой простой подход мало о чём говорит. <em>gprof</em> и <em>gcov</em> полезны в основном для приложений в пространстве пользователя, хотя есть способы использовать их для ядра, например, <a href="https://www.kernel.org/doc/Documentation/gcov.txt">для ядра Linux</a>. Тем не менее <em>gprof</em> и <em>gcov</em> бесполезны в случае, когда ваша программа проводит большую часть времени в ожидании какого-нибудь системного вызова (в моём случае <code>pread</code>).</p>
 <h2 id="почитать">Почитать</h2>
 <ul>
 <li><a href="https://sourceware.org/binutils/docs/gprof/">Мануал по gprof</a></li>
