@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html class="no-js" lang="ru">
 <head>
-    <title>Профилирование в Linux. Valgrind</title>
+    <title>Profiling in Linux. Valgrind</title>
     <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="stylesheet" href="/assets/css/foundation.css" />
@@ -15,7 +15,7 @@
         <div class="row show-for-large-up">
   <div class="small-12 columns">
     <div class="header">
-      Несу подвиг добровольного безумия!
+      Voluntary madness!
     </div>
   </div>
 </div>
@@ -26,15 +26,15 @@
       <h1><a href="/">avd</a></h1>
     </li>
     <li class="toggle-topbar menu-icon">
-      <a href="#">меню</a>
+      <a href="#">menu</a>
     </li>
   </ul>
 
   <section class="top-bar-section">
     <ul class="left">
-      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
-      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
-      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Categories</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
     </ul>
   </section>
 </nav>
@@ -43,46 +43,51 @@
         <div class="row">
             <div class="large-2 columns show-for-large-up">
   <ul class="side-nav">
-      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Главная</a></li>
-      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Категории</a></li>
-      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Контакты</a></li>
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Categories</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
   </ul>
 </div>
 
                 <div class="large-10 small-12 columns ">
                     <article class="post-wrapper">
                         <div class="post-header">
-                            <h1>Профилирование в Linux. Valgrind</h2>
+                            <h1>Profiling in Linux. Valgrind</h2>
                             <h6 class="post-meta">
-                              15 мар 2014, в категории 
-                              <a class="disabled" href="/categories/programming">programming</a>
+                              15 Mar 2014, in
+                              <a class="disabled" href="/categories/linux">linux</a>
                             </h6>
                         </div>
                         <div class="post-content">
-                            <p>Содержание:</p>
+                            <p>TOC:</p>
 <ol style="list-style-type: decimal">
-<li><a href="/programming/profiling-intro.html">Введение</a></li>
-<li><a href="/programming/profiling-gprof-gcov.html">Userspace profiling: gprof, gcov</a></li>
+<li><a href="/linux/profiling-intro.html">Intro</a></li>
+<li><a href="/linux/profiling-gprof-gcov.html">Userspace profiling: gprof, gcov</a></li>
 <li>Userspace profiling: Valgrind</li>
-<li><a href="/programming/profiling-kernel.html">Kernel profiling: Intro</a></li>
+<li><a href="/linux/profiling-kernel.html">Kernel profiling: Intro</a></li>
 <li>Kernel profiling: ftrace</li>
 <li>Kernel profiling: perf</li>
 <li>Kernel profiling: SystemTap</li>
 <li>Kernel profiling: ktap</li>
 <li>Vendor specific profiling: Intel VTune</li>
 </ol>
+<p>Quick reminder. I’m&nbsp;trying to&nbsp;understand why my&nbsp;nice little program is&nbsp;doing reading from RAID so&nbsp;slow. I’m&nbsp;using various profiling tools to&nbsp;inspect my&nbsp;<code>block_hasher</code> and get a&nbsp;<nobr>hands-on</nobr> experience with profilers.</p>
 <h2 id="valgrind">Valgrind</h2>
-<p>Вопреки расхожему мнению, <em>Valgrind</em> это не тулза, а набор тузов, из которых дефолтным является <em>Memcheck</em>. На текущий момент в <em>Valgrind</em> есть:</p>
+<p>Countrary to&nbsp;popular belief, <em>Valgrind is&nbsp;not a&nbsp;single tool, but a&nbsp;suite of&nbsp;such tools, with </em>Memcheck_ as&nbsp;default. By&nbsp;the time of&nbsp;writing <em>Valgrind</em> consists of:</p>
 <ul>
-<li>Memcheck – средство обнаружений ошибок управления памяти.</li>
-<li>Cachegrind – профилировщик обращений к процессорному кешу.</li>
-<li>Massif – сэмплирующий профилировщик кучи.</li>
-<li>Helgrind – средство обнаружения состояний гонки (race conditions).</li>
-<li>DRD – средство обнаружения ошибок в многопоточных программах.</li>
+<li>Memcheck&nbsp;&mdash; memory management errors detection.</li>
+<li>Cachegrind&nbsp;&mdash; CPU cache access profiling tool.</li>
+<li>Massif&nbsp;&mdash; sampling heap profiler.</li>
+<li>Helgrind&nbsp;&mdash; race condition detector.</li>
+<li>DRD&nbsp;&mdash; tool to&nbsp;detect error in&nbsp;multithreading applications.</li>
 </ul>
-<p>В довесок к этому есть неофициальные средства, которые не включены в дистрибутив и распространяются в виде <a href="http://valgrind.org/downloads/variants.html">патчей</a> .</p>
+<p>Plus there are unofficial tools not included in&nbsp;<em>Valgrind</em> and distributed as&nbsp;<a href="http://valgrind.org/downloads/variants.html">patches</a> .</p>
+<p>Despite some of&nbsp;the tools are not profilers per se&nbsp;(e.g. <em>Memcheck</em> is&nbsp;more like debugger) I&nbsp;will use all of&nbsp;them just because it’s&nbsp;incredibly useful for every single programmer.</p>
+<p>We&nbsp;don’t&nbsp;need to&nbsp;recompile or&nbsp;modify our program in&nbsp;any way because <em>Valgrind</em> tools use emulation as&nbsp;a&nbsp;method of&nbsp;profiling. All of&nbsp;that tools are using common infrastructure that emulates application runtime&nbsp;&mdash; memory management function, CPU caches, threading primitives, etc. That’s&nbsp;where our program is&nbsp;executing and being analyzed by&nbsp;<em>Valgrind</em>.</p>
+<p>Now let’s&nbsp;look at&nbsp;what <em>Valgrind</em> can do.</p>
 <h2 id="memcheck">Memcheck</h2>
-<p>Запускаем наш хешер под <em>Memcheck</em> и смотрим на результат:</p>
+<p>Ok, so&nbsp;<em>Memcheck</em> is&nbsp;memory errors detector. Though it’s&nbsp;not profile it’s&nbsp;one of&nbsp;most useful tools in&nbsp;programmer’s&nbsp;toolbox.</p>
+<p>Let’s&nbsp;launch our hasher under <em>Memcheck</em></p>
 <pre><code>[root@simplex block_hasher]# valgrind --leak-check=full ./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000
 ==4323== Memcheck, a memory error detector
 ==4323== Copyright (C) 2002-2010, and GNU GPL&#39;d, by Julian Seward et al.
@@ -105,11 +110,11 @@
 ==4323== 
 ==4323== For counts of detected and suppressed errors, rerun with: -v
 ==4323== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 6 from 6)</code></pre>
-<p>Что такое <em>definitely lost</em>, <em>indirectly lost</em> и пр. я не буду объяснять – об этом прекрасно написано в <a href="http://valgrind.org/docs/manual/mc-manual.html">документации</a>.</p>
-<p>Из профиля <em>Memcheck</em> мы можем судить о том, что ошибок практически нет, за исключением небольшой утечки, 1 блок <em>still reachable</em>. Судя по сообщению</p>
+<p>I&nbsp;won’t&nbsp;explain what is&nbsp;<em>definitely lost</em>, <em>indirectly lost</em> and other&nbsp;&mdash; that’s&nbsp;what is&nbsp;<a href="http://valgrind.org/docs/manual/mc-manual.html">documentaion</a> for.</p>
+<p>From <em>Memcheck</em> profile we&nbsp;can say that there are no&nbsp;errors except little leak, 1 block is&nbsp;<em>still reachable</em>. From the message</p>
 <pre><code>total heap usage: 43 allocs, 42 frees, 10,491,624 bytes allocated</code></pre>
-<p>я где-то забыл <code>free</code>. Проверил – действительно. В <code>bdev_open</code> при открытии устройства выделяется память под структуру <code>block_device</code>, а в <code>bdev_close</code> она не освобождается. Интересно, что <em>Memcheck</em> говорит о пропаже 16 байт, но структура <code>block_device</code> – это <code>int</code> и <code>off_t</code>, которые в сумме занимают <code>4 + 8 = 12</code>. Откуда взялись ещё 4 байта? Скорее всего выравнивание.</p>
-<p>Ну да ладно лирики – исправил утечку:</p>
+<p>I&nbsp;have somewhere forgotten to&nbsp;call <code>free</code>. And that’s&nbsp;true, in&nbsp;<code>bdev_open</code> I’m&nbsp;allocating struct for <code>block_device</code> but in&nbsp;<code>bdev_close</code> it’s&nbsp;not freeing. By&nbsp;the way, it’s&nbsp;interesting that <em>Memcheck</em> reports about 16 bytes loss, while <code>block_device</code> is&nbsp;<code>int</code> and <code>off_t</code> that should occupy <code>4 + 8 = 12</code> bytes. Where are 4 more bytes? Structs are 8 byte aligned (for 64 bit system), that’s&nbsp;why <code>int</code> field are padded with 4 bytes.</p>
+<p>Anyway, I’ve&nbsp;<a href="https://github.com/dzeban/block_hasher/commit/f86fa71c45c3a59ced99b74b44a30cb8d94ba72d">fixed</a> memory leak:</p>
 <pre class="sourceCode diff"><code class="sourceCode diff"><span class="dt">@@ -240,6 +241,9 @@ void bdev_close( struct block_device *dev )</span>
          perror(&quot;close&quot;);
      }
@@ -119,7 +124,7 @@
 <span class="ot">+</span>
      return;
  }</code></pre>
-<p>Проверил:</p>
+<p>Check:</p>
 <pre><code>[root@simplex block_hasher]# valgrind --leak-check=full ./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000
 ==15178== Memcheck, a memory error detector
 ==15178== Copyright (C) 2002-2010, and GNU GPL&#39;d, by Julian Seward et al.
@@ -135,15 +140,15 @@
 ==15178== 
 ==15178== For counts of detected and suppressed errors, rerun with: -v
 ==15178== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 6 from 6)</code></pre>
-<p>Прям любо-дорого стало смотреть.</p>
-<p>В качестве резюме хочется сказать, что <em>Memcheck</em> может очень много, и не только в плане обнаружения, но и в плане объяснения. Мало сказать, что в программе утечка или доступ к неинициализированным данным – надо в идеале показать в каком месте кода это происходит и как это исправлять. И <em>Memcheck</em> это делает. Он настолько хорош, что умение им пользоваться является архиважным навыком, который даже указывают в требованиях на вакансии системщиков. Короче говоря, изучайте.</p>
+<p>Real pleasure to&nbsp;see.</p>
+<p>As&nbsp;a&nbsp;resume I’d&nbsp;like to&nbsp;say that <em>Memcheck</em> can do&nbsp;a&nbsp;lot. Not only in&nbsp;detection of&nbsp;memory errors, but also in&nbsp;explaining. It’s&nbsp;understatement to&nbsp;say &laquo;Hey, you’ve&nbsp;got some error here!&raquo;&nbsp;&mdash; to&nbsp;fix error it’s&nbsp;better to&nbsp;know what is&nbsp;the reason. And <em>Memcheck</em> does it. It’s&nbsp;so&nbsp;good that it’s&nbsp;even listed as&nbsp;a&nbsp;skill for system programmers positions.</p>
 <h2 id="cachegrind">CacheGrind</h2>
-<p><em>Cachegrind</em> – профилировщик обращений к кешу процессора. Что меня удивило в <em>Cachegrind</em>, так это то, как он собственно делает профилирование обращений к кешу процессора – он его эмулирует.</p>
+<p><em>Cachegrind</em>&nbsp;&mdash; CPU cache access profiler. What amazed me&nbsp;is&nbsp;that how it&nbsp;trace cache accesses&nbsp;&mdash; <em>Cachegrind</em> simulates it, see excerpt from documentation:</p>
 <blockquote>
-<p>It performs detailed simulation of the I1, D1 and L2 caches in your CPU and so can accurately pinpoint the sources of cache misses in your code.</p>
+<p>It&nbsp;performs detailed simulation of&nbsp;the I1, D1 and L2 caches in&nbsp;your CPU and so&nbsp;can accurately pinpoint the sources of&nbsp;cache misses in&nbsp;your code.</p>
 </blockquote>
-<p>Если вы думаете, что это просто, то советую почитать на эту тему <a href="http://www.lighterra.com/papers/modernmicroprocessors/">замечательную статью</a>.</p>
-<p>Соберём же скорее профиль!</p>
+<p>If&nbsp;you think it’s&nbsp;easy, please spend 90 minutes to&nbsp;read <a href="http://www.lighterra.com/papers/modernmicroprocessors/">this great article</a>.</p>
+<p>Let’s&nbsp;collect profile!</p>
 <pre><code>[root@simplex block_hasher]# valgrind --tool=cachegrind ./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000
 ==9408== Cachegrind, a cache and branch-prediction profiler
 ==9408== Copyright (C) 2002-2010, and GNU GPL&#39;d, by Nicholas Nethercote et al.
@@ -168,12 +173,12 @@
 ==9408== LL refs:           163,355,579  (   163,351,541 rd   +         4,038 wr)
 ==9408== LL misses:          74,750,686  (    74,746,658 rd   +         4,028 wr)
 ==9408== LL miss rate:              0.0% (           0.0%     +           0.0%  )</code></pre>
-<p>Первое на что лично я смотрю – промахи кеша. Но тут они &lt; 1%, а значит проблема не в этом и надо смотреть дальше.</p>
-<p>Для тех, кто задаётся вопросом в каких же случаях <em>Cachegrind</em> может быть полезен, приведу пример с работы. Для ускорения расчёта синдромов для RAID6 коллега придумал улучшение для алгоритма – уменьшил количество умножений за счёт увеличения сложений и использования более хитроумной структуры данных. В теории должно было работать быстрее, но на практике, как это часто бывает, всё оказалось наоборот. После безуспешных поисков ошибок в коде погоняли под <em>Cachegrind</em>’ом и увидели miss rate в районе 80%. Пришлось отбросить идею.</p>
+<p>First thing, I&nbsp;look at&nbsp;&mdash; cache misses. But here it’s&nbsp;less then 1% so&nbsp;it&nbsp;can’t&nbsp;be&nbsp;the problem.</p>
+<p>If&nbsp;you asking yourself how <em>Cachegrind</em> can be&nbsp;useful, I’ll&nbsp;tell you one of&nbsp;the work stories. To&nbsp;accelerate some of&nbsp;RAID calculation algorithm my&nbsp;collegue has reduced multiplications for the price of&nbsp;increased additions and complicated data structure. In&nbsp;theory it&nbsp;should’ve&nbsp;worked better like in&nbsp;Karatsuba multiplication. But in&nbsp;reality it&nbsp;became much worse. After few days of&nbsp;hard debugging we&nbsp;launched it&nbsp;under <em>Cachegrind</em> and saw cache miss rate about 80%. More additions invoked more memory accesses and reduced locality. So&nbsp;we&nbsp;abandoned the idea.</p>
 <h2 id="massif">Massif</h2>
-<p><em>Massif</em> – профилировщик кучи, в том смысле что он показывает динамику потребления памяти, то есть сколько в определённый момент времени ваша программа сожрала.</p>
-<p><em>Massif</em> делает периодические снимки состояния кучи, генерирует файлик анализа, который потом преобразуется в отчёт с помощью <code>ms_print</code>.</p>
-<p>Запустили:</p>
+<p><em>Massif</em>&nbsp;&mdash; heap profiler, in&nbsp;the sense that it&nbsp;shows dynamic of&nbsp;heap allocations, i.e. how much memory your applications were using in&nbsp;some moment.</p>
+<p>To&nbsp;do&nbsp;that <em>Massif</em> samples heap state, generating file that later transformed to&nbsp;report with help of&nbsp;<code>ms_print</code> tool.</p>
+<p>Ok, launch it</p>
 <pre><code>[root@simplex block_hasher]# valgrind --tool=massif ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 100
 ==29856== Massif, a heap profiler
 ==29856== Copyright (C) 2003-2010, and GNU GPL&#39;d, by Nicholas Nethercote
@@ -181,9 +186,9 @@
 ==29856== Command: ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 100
 ==29856== 
 ==29856== </code></pre>
-<p>Получили файлик <em>massif.out.29856</em>. Сделаем отчётик:</p>
+<p>Got a&nbsp;<em>massif.out.29856</em> file. Convert it&nbsp;to&nbsp;text profile:</p>
 <pre><code>[root@simplex block_hasher]# ms_print massif.out.29856 &gt; massif.profile</code></pre>
-<p>В отчёте получаем гистограмму выделения памяти:</p>
+<p>Profile conteins histogram of&nbsp;heap allocations</p>
 <pre><code>    MB
 10.01^::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::#
      |:                                                                 #
@@ -207,7 +212,7 @@
      |@                                                                 # ::@@
    0 +-----------------------------------------------------------------------&gt;Gi
      0                                                                   15.63</code></pre>
-<p>И сводную таблицу выделенной памяти для нескольких наиболее примечательных сэмплов. Пример такой таблицы:</p>
+<p>and summary table of&nbsp;most noticable allocations. Example:</p>
 <pre><code>--------------------------------------------------------------------------------
   n        time(i)         total(B)   useful-heap(B) extra-heap(B)    stacks(B)
 --------------------------------------------------------------------------------
@@ -240,12 +245,12 @@
 |   -&gt;09.99% (1,048,576B) 0xCDE56FE: ???
 |
 -&gt;00.06% (5,864B) in 1+ places, all below ms_print&#39;s threshold (01.00%)</code></pre>
-<p>Из приведенной выше таблицы видно, что всего выделяется 10 MiB, которые на самом деле получаются 10 кусками (количество потоков) по 1 MiB (размер блока). Ничего удивительного, но было интересно.</p>
-<p><em>Massif</em> – утилита, безусловно, полезная, т.к. в отличие от <em>Memcheck</em> может показать историю выделения памяти, сколько на самом деле выделяется с учётом выравнивания и учёта, а также какие участки кода используют больше всего памяти.</p>
+<p>In&nbsp;the table above we&nbsp;can see that we&nbsp;usually allocate in&nbsp;10 MiB portions that is&nbsp;really just a&nbsp;10 blocks of&nbsp;1 MiB (our block size). Nothing special but it&nbsp;was interesting.</p>
+<p>Of&nbsp;course, <em>Massif</em> is&nbsp;useful, because it&nbsp;can show you a&nbsp;history of&nbsp;allocation, how much memory was allocated with all the alignment and also what code pieces allocated most. Too bad I&nbsp;don’t&nbsp;have heap errors.</p>
 <h2 id="helgrind">Helgrind</h2>
-<p><em>Helgrind</em> – это не профилировщик, это утилита для обнаружения ошибок многопоточного программирования. Это в первую очередь инструмент для отладки программ, а не для сбора метрик.</p>
-<p>Я здесь привожу пример работы с ним просто потому что он в составе <em>Valgrind</em> и благодаря ему я исправил одну ошибку.</p>
-<p>Запуская его на свой <code>block_hasher</code> я был уверен, что никаких ошибок я не получу, а в итоге залип на несколько дней в исправлениях.</p>
+<p><em>Helgrind</em> is&nbsp;not a&nbsp;profiler but a&nbsp;tool to&nbsp;detect threading errors. It’s&nbsp;a&nbsp;thread debugger.</p>
+<p>I&nbsp;just show how I’ve&nbsp;fixed bug in&nbsp;my&nbsp;code with <em>Helgrind</em> help.</p>
+<p>When I’ve&nbsp;launched my&nbsp;<code>block_hasher</code> under it&nbsp;I&nbsp;was sure that I&nbsp;will have 0 errors, but stuck in&nbsp;debugging for couple of&nbsp;days.</p>
 <pre><code>[root@simplex block_hasher]# valgrind --tool=helgrind ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 100
 ==3930== Helgrind, a thread error detector
 ==3930== Copyright (C) 2007-2010, and GNU GPL&#39;d, by OpenWorks LLP et al.
@@ -286,11 +291,21 @@
 ==3930== Use --history-level=approx or =none to gain increased speed, at
 ==3930== the cost of reduced accuracy of conflicting-access information
 ==3930== ERROR SUMMARY: 9 errors from 1 contexts (suppressed: 955 from 9)</code></pre>
-<p>Как видим, используемая у меня <code>EVP_MD_CTX_create</code> приводит к data race. Эта функция инициализирует контекст для расчёта контрольной суммы. Пока происходит чтение блочного устройства в этом контексте рассчитывается хеш. То есть каждое чтение блока сопровождается вызовом <code>EVP_DigestUpdate</code>, а в конце делается окончательный <code>EVP_DigestFinal_ex</code>, который записывает хеш из контекста в буфер.</p>
-<p>Короче говоря, функция эта <code>EVP_MD_CTX_create</code> не моя, а из openssl, что навело меня на вопрос “А является ли вообще libcrypto<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> потокобезопасной (thread-safe)?”. Ответ – <strong>по умолчанию</strong> <a href="http://wiki.openssl.org/index.php/Libcrypto_API#Thread_Safety">нет</a>. Сам openssl предлагает зарегистрировать 2 callback-функции или замутить динамические локи (см. подробнее <a href="http://www.openssl.org/docs/crypto/threads.html">здесь</a>). Я же просто обернул инициализацию контекста в обычный pthread мьютекс и всё стало хорошо. А вообще надо как-нибудь разузнать эту ситуацию получше.</p>
+<p>As&nbsp;we&nbsp;see, <code>EVP_MD_CTX_create</code> leads to&nbsp;data race. This is&nbsp;an&nbsp;openssl’s&nbsp;<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> function that initializes context for hash calculation. I&nbsp;calculate hash for blocks read in&nbsp;each thread with <code>EVP_DigestUpdate</code> and then write it&nbsp;to&nbsp;file after final <code>EVP_DigesFinal_ex</code>. So&nbsp;this <em>Helgrind</em> errors are related to&nbsp;openssl functions. And I&nbsp;asked myself&nbsp;&mdash; &laquo;Is&nbsp;libcrypto <nobr>thread-safe</nobr>?&raquo;. So&nbsp;I&nbsp;used my&nbsp;<nobr>google-fu</nobr> and the answer is&nbsp;&mdash; <a href="http://wiki.openssl.org/index.php/Libcrypto_API#Thread_Safety"><strong>by&nbsp;default</strong> no</a>. To&nbsp;use EVP functions in&nbsp;multithreaded applications openssl recommends to&nbsp;either register 2 crazy callbacks or&nbsp;use dynamic locks (see <a href="http://www.openssl.org/docs/crypto/threads.html">here</a>). As&nbsp;for me, I’ve&nbsp;just wrapped context initialization in&nbsp;pthread mutex and <a href="https://github.com/dzeban/block_hasher/commit/c1994f763d4fce8bb41e97af45eac6e2ad0dc3b7">that’s&nbsp;it</a>.</p>
+<pre class="sourceCode diff"><code class="sourceCode diff">
+<span class="dt">@@ -159,9 +159,11 @@ void *thread_func(void *arg)</span>
+     gap = num_threads * block_size; // Multiply here to avoid integer overflow
+ 
+     // Initialize EVP and start reading
+<span class="ot">+    pthread_mutex_lock( &amp;mutex );</span>
+     md = EVP_sha1();
+     mdctx = EVP_MD_CTX_create();
+     EVP_DigestInit_ex( mdctx, md, NULL );
+<span class="ot">+    pthread_mutex_unlock( &amp;mutex );</span></code></pre>
+<p>If&nbsp;anyone knows something about this&nbsp;&mdash; please, tell me.</p>
 <h2 id="drd">DRD</h2>
-<p><em>DRD</em> – ещё один инструмент в составе <em>Valgrind</em>, который позволяет обнаруживать ошибки при работе с потоками. Отличия от <em>Helgrind</em> заключаются в якобы меньшем потреблении памяти и наличии нескольких фич.</p>
-<p><em>DRD</em> считается более тщательным отладчиком потоков чем <em>Helgrind</em>. Так, например, в моём случае он нашел некий загадочный data race для <code>pread</code>. Сам по себе <code>pread</code> обещается как thread-safe, то есть его можно вызывать из разных потоков, однако <em>доступ</em> к данным может быть не синхронизирован <em>в</em> том смысле, что в одном делаем <code>pread</code>, а в другом <code>pwrite</code> и тогда будет data <em>race</em>. В моём случае блоки не пересекаются, так что я не могу диагностировать в чём здесь проблема.</p>
+<p><em>DRD</em> is&nbsp;one more tool in&nbsp;<em>Valgrind</em> suite that can detect thread errors. It’s&nbsp;more thorough and has more features while less memory hungry.</p>
+<p>In&nbsp;my&nbsp;case it&nbsp;has detected some mysterious <code>pread</code> data race.</p>
 <pre><code>==16358== Thread 3:
 ==16358== Conflicting load by thread 3 at 0x0563e398 size 4
 ==16358==    at 0x5431030: pread (in /lib64/libpthread-2.12.so)
@@ -298,25 +313,25 @@
 ==16358==    by 0x4C33470: vgDrd_thread_wrapper (drd_pthread_intercepts.c:281)
 ==16358==    by 0x54299D0: start_thread (in /lib64/libpthread-2.12.so)
 ==16358==    by 0x75EE6FF: ???</code></pre>
-<h2 id="заключение">Заключение</h2>
-<p>Очевидный вывод – научитесь пользоваться Valgrind.</p>
-<h2 id="почитать">Почитать</h2>
+<p><code>pread</code> itself is&nbsp;<nobr>thread-safe</nobr> in&nbsp;the sense that it&nbsp;can be&nbsp;called from multiple threads, but <em>access</em> to&nbsp;data might be&nbsp;not synchronized. For example, you can call <code>pread</code> in&nbsp;one thread while calling <code>pwrite</code> in&nbsp;another and that’s&nbsp;where you got <em>data</em> race. But in&nbsp;my&nbsp;case data blocks do&nbsp;not overlap, so&nbsp;I&nbsp;can’t&nbsp;tell what’s&nbsp;a&nbsp;real problem here.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Conclusion will be&nbsp;dead simple&nbsp;&mdash; learn how to&nbsp;use Valgrind, it’s&nbsp;extremely useful.</p>
+<h2 id="to-read">To&nbsp;read</h2>
 <ul>
-<li>Истории успеха:
+<li>Success stories:
 <ul>
 <li><a href="http://blog.gerhards.net/2009/01/rsyslog-data-race-analysis.html">rsyslog data race analysis</a></li>
 <li><a href="http://blog.evanweaver.com/2008/02/05/valgrind-and-ruby/">valgrind and ruby</a></li>
 <li><a href="http://sql.dzone.com/articles/profiling-mysql-memory-usage">Profiling MySQL Memory Usage With Valgrind Massif</a></li>
 </ul></li>
-<li><a href="http://courses.cs.washington.edu/courses/cse326/05wi/valgrind-doc/mc_techdocs.html">The design and implementation of Valgrind. Detailed technical notes for hackers, maintainers and the overly-curious</a></li>
+<li><a href="http://courses.cs.washington.edu/courses/cse326/05wi/valgrind-doc/mc_techdocs.html">The design and implementation of&nbsp;Valgrind. Detailed technical notes for hackers, maintainers and the <nobr>overly-curious</nobr></a></li>
 </ul>
 <div class="footnotes">
 <hr />
 <ol>
-<li id="fn1"><p>libcrypto – это библиотека крипографических функций и примитивов, на которой базируется openssl.<a href="#fnref1">↩</a></p></li>
+<li id="fn1"><p>libcrypto is&nbsp;a&nbsp;library of&nbsp;cryptography functions and primitives that’s&nbsp;openssl is&nbsp;based on.<a href="#fnref1">&#8617;</a></p></li>
 </ol>
 </div>
-
                         </div>
                     </article>
                 </div>

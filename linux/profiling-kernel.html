@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Linux profiling. Kernel</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Categories</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Categories</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Linux profiling. Kernel</h2>
+                            <h6 class="post-meta">
+                              12 May 2014, in
+                              <a class="disabled" href="/categories/linux">linux</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>TOC:</p>
+<ol style="list-style-type: decimal">
+<li><a href="/linux/profiling-intro.html">Intro</a></li>
+<li><a href="/linux/profiling-gprof-gcov.html">Userspace profiling: gprof, gcov</a></li>
+<li><a href="/linux/profiling-valgrind.html">Userspace profiling: Valgrind</a></li>
+<li>Kernel profiling: Intro</li>
+<li>Kernel profiling: ftrace</li>
+<li>Kernel profiling: perf</li>
+<li>Kernel profiling: SystemTap</li>
+<li>Kernel profiling: ktap</li>
+<li>Vendor specific profiling: Intel VTune</li>
+</ol>
+<p>Quick reminder. I’m&nbsp;trying to&nbsp;understand why my&nbsp;nice little program is&nbsp;reading from RAID so&nbsp;slow. I’m&nbsp;using various profiling tools to&nbsp;inspect my&nbsp;<code>block_hasher</code> and get a&nbsp;<nobr>hands-on</nobr> experience with profilers.</p>
+<p>So, we&nbsp;reviewed userspace profiling and arrived to&nbsp;main theme of&nbsp;my&nbsp;article series which is&nbsp;kernel profiling: tools, profilers, facilities and methods of&nbsp;profiling.</p>
+<p>In&nbsp;this article I’ll&nbsp;tell you about facilities that kernel provides to&nbsp;profile it.</p>
+<h2 id="intro">Intro</h2>
+<p>Sometimes when you’re&nbsp;facing really hard performance problem it’s&nbsp;not always enough to&nbsp;profile your applicatiion. As&nbsp;we&nbsp;saw while profiling our application with <a href="/linux/profiling-intro.html">gprof, gcov</a> and <a href="/linux/profiling-valgrind.html">Valgrind</a> problem is&nbsp;somewhere underneath our application&nbsp;&mdash; something is&nbsp;holding <code>pread</code> in&nbsp;long I/O wait cycles.</p>
+<p>How to&nbsp;trace system call is&nbsp;not clear at&nbsp;first sight&nbsp;&mdash; there are various kernel profilers, all of&nbsp;them works in&nbsp;it’s&nbsp;own way, requires unique configuration, methods, analyzis and so&nbsp;on. Yes, it’s&nbsp;really hard to&nbsp;figure it&nbsp;out. Being the biggest <nobr>open-source</nobr> project developed by&nbsp;massive community, Linux absorbed several different and sometimes conflicting profiling facilities. And it’s&nbsp;in&nbsp;some sense getting even worse&nbsp;&mdash; while some profiles tend to&nbsp;merge (<em>ftrace</em> and <em>perf</em>) other tools emerge&nbsp;&mdash; last example is&nbsp;<em>ktap</em>.</p>
+<p>To&nbsp;undertand that <a href="https://ru.wikipedia.org/wiki/%D0%A1%D0%BE%D0%B1%D0%BE%D1%80_%D0%B8_%D0%91%D0%B0%D0%B7%D0%B0%D1%80">bazaar</a> lets start from the bottom&nbsp;&mdash; what does kernel have that makes it&nbsp;able profile it? Basically there are only 3 kernel facilities that enable profiling:</p>
+<ul>
+<li>Kernel tracepoints</li>
+<li>Kernel probes</li>
+<li>Perf events</li>
+</ul>
+<p>It’s&nbsp;features that gives us&nbsp;access to&nbsp;kernel internals. By&nbsp;using them we&nbsp;can measure kernel functions execution, trace access to&nbsp;devices, analyze CPU states and so&nbsp;on.</p>
+<p>This very features are really awkward for direct use and accessible only from kernel. Well, if&nbsp;you really want you can write your own Linux kernel module that will utilize these facilities for your custom use, but it’s&nbsp;pretty much pointless. That’s&nbsp;why people have created a&nbsp;few really good general purpose profilers:</p>
+<ul>
+<li>ftrace</li>
+<li>perf</li>
+<li>SystemTap</li>
+<li>ktap</li>
+</ul>
+<p>All of&nbsp;them are based on&nbsp;that features and will be&nbsp;discussed later more thoroughly, but now let’s&nbsp;review features itself.</p>
+<h2 id="kernel-tracepoints">Kernel tracepoints</h2>
+<p>Kernel Tracepoints&nbsp;&mdash; it’s&nbsp;framework for tracing kernel function via static instrumenting<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>.</p>
+<p>Tracepoint&nbsp;&mdash; it’s&nbsp;a&nbsp;place in&nbsp;code where you can bind your callback. <em>Tracepoints</em> can be&nbsp;disabled (no&nbsp;callback) and enabled (has callback). There might be&nbsp;several callbacks though it’s&nbsp;still lightweight&nbsp;&mdash; when callback disabled it’s&nbsp;actually looks like <code>if&nbsp;(unlikely(tracepoint.enabled))</code>.</p>
+<p><em>Tracepoint</em> output is&nbsp;written in&nbsp;ring buffer that is&nbsp;export through <em>debugfs</em> at&nbsp;<code>/sys/kernel/debug/tracing/trace</code>. There are also whole tree of&nbsp;traceable events at&nbsp;<code>/sys/kernel/debug/tracing/events</code> that exports control files to&nbsp;enable/disable particular event.</p>
+<p>Despite of&nbsp;it’s&nbsp;name <em>tracepoints</em> are base for <nobr>event-based</nobr> profiling because besides traceing you can do&nbsp;anything in&nbsp;callback, e.g. timestamping and measuring resource usage. Linux kernel is&nbsp;already (since <nobr>2.6.28</nobr>) instrumented with that tracepoints in&nbsp;many places. For example, <a href="http://lxr.free-electrons.com/source/mm/slab.c?v=3.12#L3714"><code>__do_kmalloc</code></a>:</p>
+<pre class="sourceCode c"><code class="sourceCode c"><span class="co">/**</span>
+<span class="co"> * __do_kmalloc - allocate memory</span>
+<span class="co"> * </span>@size:<span class="co"> how many bytes of memory are required.</span>
+<span class="co"> * </span>@flags:<span class="co"> the type of memory to allocate (see kmalloc).</span>
+<span class="co"> * </span>@caller:<span class="co"> function caller for debug tracking of the caller</span>
+<span class="co"> */</span>
+<span class="dt">static</span> __always_inline <span class="dt">void</span> *__do_kmalloc(size_t size, gfp_t flags,
+                                          <span class="dt">unsigned</span> <span class="dt">long</span> caller)
+{
+        <span class="kw">struct</span> kmem_cache *cachep;
+        <span class="dt">void</span> *ret;
+
+        <span class="co">/* If you want to save a few bytes .text space: replace</span>
+<span class="co">         * __ with kmem_.</span>
+<span class="co">         * Then kmalloc uses the uninlined functions instead of the inline</span>
+<span class="co">         * functions.</span>
+<span class="co">         */</span>
+        cachep = kmalloc_slab(size, flags);
+        <span class="kw">if</span> (unlikely(ZERO_OR_NULL_PTR(cachep)))
+                <span class="kw">return</span> cachep;
+        ret = slab_alloc(cachep, flags, caller);
+
+        trace_kmalloc(caller, ret,
+                      size, cachep-&gt;size, flags);
+
+        <span class="kw">return</span> ret;
+}</code></pre>
+<p><code>trace_kmalloc</code> is&nbsp;<em>tracepoint</em>. There are many others in&nbsp;other critical parts of&nbsp;kernel such as&nbsp;schedulers, block I/O, networking and even interrupt handlers. All of&nbsp;them are used by&nbsp;most profilers because they have minimal overhead, fires by&nbsp;event and saves you from modifying kernel.</p>
+<p>Ok, so&nbsp;by&nbsp;now you may be&nbsp;eager to&nbsp;insert in&nbsp;all of&nbsp;your kernel modules and profile it&nbsp;to&nbsp;hell, but BEWARE. If&nbsp;you want to&nbsp;add <em>tracepoints</em> you must have a&nbsp;lot of&nbsp;patience and skills because writing your own tracepoints is&nbsp;really ugly and awkward. You can see examples at&nbsp;<a href="http://lxr.free-electrons.com/source/samples/trace_events/?v=3.13"><em>samples/trace_events/</em></a>. Under the hood <em>tracepoints</em> are C&nbsp;macros black magic that only bold and fearless persons could understand.</p>
+<p>And even if&nbsp;you do&nbsp;all that crazy macro declarations and struct definitions it&nbsp;might just simply not work at&nbsp;all if&nbsp;you have <code>CONFIG_MODULE_SIG=y</code> and don’t&nbsp;sign module. It&nbsp;might seem kinda strange configuration but in&nbsp;reality it’s&nbsp;a&nbsp;default for all major distributions including Fedora and Ubuntu. That said, after 9 circles of&nbsp;hell, you will end up&nbsp;with nothing.</p>
+<p>So, just remember:</p>
+<blockquote>
+<p><strong>USE ONLY EXISTING TRACEPOINTS IN&nbsp;KERNEL, DO&nbsp;NOT CREATE YOUR OWN.</strong></p>
+</blockquote>
+<p>Now I’m&nbsp;gonna explain why it’s&nbsp;happening. So&nbsp;if&nbsp;you tired of&nbsp;<em>tracepoints</em> just skip to&nbsp;read about <a href="#kprobes"><em>kprobes</em></a>.</p>
+<p>Ok, so&nbsp;some time ago while preparing kernel 3.1<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> these code was added:</p>
+<pre class="sourceCode c"><code class="sourceCode c"><span class="dt">static</span> <span class="dt">int</span> tracepoint_module_coming(<span class="kw">struct</span> module *mod)
+{
+          <span class="kw">struct</span> tp_module *tp_mod, *iter;
+          <span class="dt">int</span> ret = <span class="dv">0</span>;
+
+          <span class="co">/*</span>
+<span class="co">           * We skip modules that tain the kernel, especially those with different</span>
+<span class="co">           * module header (for forced load), to make sure we don&#39;t cause a crash.</span>
+<span class="co">           */</span>
+          <span class="kw">if</span> (mod-&gt;taints)
+                  <span class="kw">return</span> <span class="dv">0</span>;</code></pre>
+<p>If&nbsp;module is&nbsp;tainted we&nbsp;will NOT write ANY tracepoints. Later it&nbsp;became more adequate</p>
+<pre class="sourceCode c"><code class="sourceCode c"><span class="co">/*</span>
+<span class="co"> * We skip modules that taint the kernel, especially those with different</span>
+<span class="co"> * module headers (for forced load), to make sure we don&#39;t cause a crash.</span>
+<span class="co"> * Staging and out-of-tree GPL modules are fine.</span>
+<span class="co"> */</span>
+<span class="kw">if</span> (mod-&gt;taints &amp; ~((<span class="dv">1</span> &lt;&lt; TAINT_OOT_MODULE) | (<span class="dv">1</span> &lt;&lt; TAINT_CRAP)))
+        <span class="kw">return</span> <span class="dv">0</span>;</code></pre>
+<p>Like, ok&nbsp;it&nbsp;may be&nbsp;<nobr>out-of-tree</nobr> (<code>TAINT_OOT_MODULE</code>) or&nbsp;staginig(<code>TAINT_CRAP</code>) but any others are <nobr>no-no</nobr>.</p>
+<p>Seems legit, right? Now what whould you think will be&nbsp;if&nbsp;your kernel is&nbsp;compiled with <code>CONFIG_MODULE_SIG</code> enabled and your pretty module is&nbsp;not signed? Well, module loader will set <code>TAINT_FORCES_MODULE</code> flag for it. And now your pretty module will never pass the condition in&nbsp;<code>tracepoint_module_coming</code> and never show you any tracepoints output. And as&nbsp;I&nbsp;said earlier this stupid option is&nbsp;set for all major distributions including Fedora and Ubuntu since kernel version 3.1.</p>
+<p>If&nbsp;you think&nbsp;&mdash; &laquo;Well, lets sign goddamn module!&raquo;&nbsp;&mdash; you’re&nbsp;wrong. Modules must be&nbsp;signed with kernel <strong>private</strong> key that are held by&nbsp;your Linux distro vendor and, of&nbsp;course, not available for you.</p>
+<p>The whole terrifying story is&nbsp;available in&nbsp;lkml <a href="https://lkml.org/lkml/2014/2/13/488">1</a>, <a href="https://lkml.org/lkml/2014/3/4/925">2</a>.</p>
+<p>As&nbsp;for me&nbsp;I&nbsp;just cite my&nbsp;favorite thing from Steven Rostedt (ftrace maintainer and one of&nbsp;the tracepoints developer):</p>
+<pre><code>&gt; OK, this IS a major bug and needs to be fixed. This explains a couple
+&gt; of reports I received about tracepoints not working, and I never
+&gt; figured out why. Basically, they even did this:
+&gt; 
+&gt; 
+&gt;    trace_printk(&quot;before tracepoint\n&quot;);
+&gt;    trace_some_trace_point();
+&gt;    trace_printk(&quot;after tracepoint\n&quot;);
+&gt;
+&gt; Enabled the tracepoint (it shows up as enabled and working in the
+&gt; tools, but not the trace), but in the trace they would get:
+&gt;
+&gt;    before tracepoint
+&gt;    after tracepoint
+&gt;
+&gt; and never get the actual tracepoint. But as they were debugging
+&gt; something else, it was just thought that this was their bug. But it
+&gt; baffled me to why that tracepoint wasn&#39;t working even though nothing in
+&gt; the dmesg had any errors about tracepoints.
+&gt; 
+&gt; Well, this now explains it. If you compile a kernel with the following
+&gt; options:
+&gt; 
+&gt; CONFIG_MODULE_SIG=y
+&gt; # CONFIG_MODULE_SIG_FORCE is not set
+&gt; # CONFIG_MODULE_SIG_ALL is not set
+&gt; 
+&gt; You now just disabled (silently) all tracepoints in modules. WITH NO
+&gt; FREAKING ERROR MESSAGE!!!
+&gt; 
+&gt; The tracepoints will show up in /sys/kernel/debug/tracing/events, they
+&gt; will show up in perf list, you can enable them in either perf or the
+&gt; debugfs, but they will never actually be executed. You will just get
+&gt; silence even though everything appeared to be working just fine.</code></pre>
+<p>Recap:</p>
+<ul>
+<li>Kernel tracepoints is&nbsp;a&nbsp;lightweight tracing and profiling facility.</li>
+<li>Linux kernel is&nbsp;heavy instrumented with <em>tracepoints</em> that are used by&nbsp;the most profilers and especially by&nbsp;<em>perf</em> and <em>ftrace</em>.</li>
+<li>Tracepoints are C&nbsp;marcos black magic and almost impossible for usage in&nbsp;kernel modules.</li>
+<li>It&nbsp;will NOT work in&nbsp;your LKM if:
+<ul>
+<li>Kernel version &gt;=3.1 (might be&nbsp;fixed in&nbsp;3.15)</li>
+<li><code>CONFIG_MODULE_SIG=y</code></li>
+<li>Your module is&nbsp;not signed with kernel private key.</li>
+</ul></li>
+</ul>
+<h2 id="kprobes">Kernel probes</h2>
+<p>Kernel probes is&nbsp;a&nbsp;dynamic debugging and profiling mechanism that allows you to&nbsp;break into kernel code, invoke your custom function called <strong>probe</strong> and return everything back.</p>
+<p>Basically its done by&nbsp;writing kernel module where you register handler for some address or&nbsp;symbol in&nbsp;kernel code. Also according to&nbsp;<a href="http://lxr.free-electrons.com/source/include/linux/kprobes.h?v=3.13#L73">definition of&nbsp;<code>struct kprobe</code></a> you can pass offset from address but I’m&nbsp;not sure about that. In&nbsp;your registered handler you can do&nbsp;really anything&nbsp;&mdash; write to&nbsp;log, to&nbsp;some buffer exported via sysfs, measure time and infinite amount of&nbsp;possibilities to&nbsp;do. And that’s&nbsp;really nifty contrary to&nbsp;<em>tracepoints</em> where you can only read logs from debugfs.</p>
+<p>There are 3 types of&nbsp;probes:</p>
+<ul>
+<li><em>kprobes</em>&nbsp;&mdash; basic probe that allows you to&nbsp;break into any kernel address.</li>
+<li><em>jprobes</em>&nbsp;&mdash; jump probes that inserted in&nbsp;the start of&nbsp;function and gives you handy access to&nbsp;function arguments; it’s&nbsp;something like <nobr>proxy-function</nobr>.</li>
+<li><em>kretprobes</em>&nbsp;&mdash; return probes that inserted in&nbsp;the return point of&nbsp;function.</li>
+</ul>
+<p>Last 2 types are based on&nbsp;basic <em>kprobes</em>.</p>
+<p>All of&nbsp;this generally works like this:</p>
+<ul>
+<li>We&nbsp;register probe on&nbsp;some address A.</li>
+<li><em>kprobe</em> subsystem finds A.</li>
+<li><em>kprobe</em> copies instruction at&nbsp;address A.</li>
+<li><em>kprobe</em> replaces instruction at&nbsp;A&nbsp;for breakpoint (<code>int 3</code> in&nbsp;case of&nbsp;x86).</li>
+<li>Now when execution hits probed address A, CPU trap occurs.</li>
+<li>Registers are saved.</li>
+<li>CPU transfers control to&nbsp;<em>kprobes</em> via <code>notifier_call_chain</code> mechanism.</li>
+<li>And finally <em>kprobes</em> invokes our handler.</li>
+<li>After all we&nbsp;restore registers, copies back instruction at&nbsp;A&nbsp;and continues execution.</li>
+</ul>
+<p>Our handler usually gets as&nbsp;an&nbsp;argument adress where breakpoint happened and registers values in&nbsp;<code>pt_args</code> structures. <em>kprobes</em> handler prototype:</p>
+<pre class="sourceCode c"><code class="sourceCode c">    <span class="kw">typedef</span> <span class="dt">int</span> (*kprobe_break_handler_t) (<span class="kw">struct</span> kprobe *, <span class="kw">struct</span> pt_regs *);</code></pre>
+<p>In&nbsp;most cases except debugging this info is&nbsp;useless because we&nbsp;have <em>jprobes</em>. <em>jprobes</em> handler has exactly the same prototype as&nbsp;and intercepting function. For example, this is&nbsp;handler for <code>do_fork</code>:</p>
+<pre class="sourceCode c"><code class="sourceCode c">    <span class="co">/* Proxy routine having the same arguments as actual do_fork() routine */</span>
+    <span class="dt">static</span> <span class="dt">long</span> jdo_fork(<span class="dt">unsigned</span> <span class="dt">long</span> clone_flags, <span class="dt">unsigned</span> <span class="dt">long</span> stack_start,
+              <span class="kw">struct</span> pt_regs *regs, <span class="dt">unsigned</span> <span class="dt">long</span> stack_size,
+              <span class="dt">int</span> __user *parent_tidptr, <span class="dt">int</span> __user *child_tidptr)</code></pre>
+<p>Also <em>jprobes</em> doesn’t&nbsp;causes interrupts because it&nbsp;works with help of&nbsp;<code>setjmp/longjmp</code> that are much more lightweight.</p>
+<p>And finally the most convenient tool for profiling are <em>kretprobes</em>. It&nbsp;allows you to&nbsp;register 2 handlers&nbsp;&mdash; one to&nbsp;invoke on&nbsp;function start and the other to&nbsp;invoke in&nbsp;the end. But really cool feature is&nbsp;that it&nbsp;allows you to&nbsp;save state between those 2 calls, like timestamp or&nbsp;counters.</p>
+<p>Instead of&nbsp;thousand words&nbsp;&mdash; look at&nbsp;absolutely astonishing samples at&nbsp;<a href="http://lxr.free-electrons.com/source/samples/kprobes/?v=3.13"><em>samples/kprobes</em></a>.</p>
+<p>Recap:</p>
+<ul>
+<li><em>kprobes</em> is&nbsp;a&nbsp;beatiful hack for dynamic debugging, tracing and profiling.</li>
+<li>It’s&nbsp;a&nbsp;fundamental kernel feature for <nobr>non-invasive</nobr> profiling.</li>
+</ul>
+<h2 id="perf-events">Perf events</h2>
+<p><em>perf_events</em> is&nbsp;an&nbsp;interface for hardware metrics implemented in&nbsp;PMU (Performance Monitoring Unit) which is&nbsp;part of&nbsp;CPU.</p>
+<p>Thanks to&nbsp;<em>perf_events</em> you can easily ask kernel to&nbsp;show you L1 cache misses count regardless of&nbsp;what architecture you are on&nbsp;&mdash; x86 or&nbsp;ARM. What CPUs are supported by&nbsp;perf are listed <a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/support.html">here</a>.</p>
+<p>In&nbsp;addition to&nbsp;that perf included various kernel metrics like software context swithes count (<code>PERF_COUNT_SW_CONTEXT_SWITCHES</code>).</p>
+<p>And in&nbsp;addition to&nbsp;that perf included <em>tracepoint</em> support via <code>ftrace</code>.</p>
+<p>To&nbsp;access <em>perf_events</em> there is&nbsp;a&nbsp;special syscall <a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/perf_event_open.html"><code>perf_event_open</code></a>. You are passing the type of&nbsp;event (hardware, kernel, tracepoint) and so&nbsp;called config, where you specifies what exactly you want depending on&nbsp;type. It’s&nbsp;gonna be&nbsp;function name in&nbsp;case of&nbsp;tracepoint, some CPU metric in&nbsp;case of&nbsp;hardware and so&nbsp;on.</p>
+<p>And on&nbsp;top of&nbsp;that there are a&nbsp;whole lot of&nbsp;stuff like event groups, filters, sampling, various output formats and others. And all of&nbsp;that are <a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/abi_breakage.html">constantly breaking</a><a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a>, that’s&nbsp;why the only thing you can ask for perf_events is&nbsp;special <code>perf</code> utility&nbsp;&mdash; the only userspace utility that is&nbsp;a&nbsp;part of&nbsp;kernel tree.</p>
+<p><em>perf_events and all things related to&nbsp;it&nbsp;spreads as&nbsp;a&nbsp;plague in&nbsp;kernel and now <code>ftrace</code> is&nbsp;going to&nbsp;be&nbsp;part of&nbsp;<code>perf</code> (<a href="http://thread.gmane.org/gmane.linux.kernel/1136520">1</a>, <a href="https://lkml.org/lkml/2013/10/16/15">2</a>). Some people overreacting on&nbsp;</em>perf_ related things though it’s&nbsp;useless because <em>perf</em> is&nbsp;developed by&nbsp;kernel big fishes&nbsp;&mdash; Info Molnar<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> and Peter Zijlstra.</p>
+<p>I&nbsp;really can’t&nbsp;tell anything more about <em>perf_events</em> in&nbsp;isolation of&nbsp;<code>perf</code>, so&nbsp;here I&nbsp;finish.</p>
+<h2 id="summary">Summary</h2>
+<p>There are a&nbsp;few Linux kernel features that enables profiling:</p>
+<ol style="list-style-type: decimal">
+<li><em>tracepoints</em></li>
+<li><em>kprobes</em></li>
+<li><em>perf_events</em></li>
+</ol>
+<p>All Linux kernel profilers uses combinations of&nbsp;that features, read details in&nbsp;article for particular profiler.</p>
+<h2 id="to-read">To&nbsp;read</h2>
+<ul>
+<li><a href="https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf">https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf</a></li>
+<li><a href="http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf">http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf</a></li>
+<li><em>tracepoints</em>: <ul>
+<li><a href="http://lxr.free-electrons.com/source/Documentation/trace/tracepoints.txt?v=3.13">Documentation/trace/tracepoints.txt</a></li>
+<li><a href="http://lttng.org/files/thesis/desnoyers-dissertation-2009-12-v27.pdf">http://lttng.org/files/thesis/desnoyers-dissertation-<nobr>2009-12-v27</nobr>.pdf</a></li>
+<li><a href="http://lwn.net/Articles/379903/">http://lwn.net/Articles/379903/</a></li>
+<li><a href="http://lwn.net/Articles/381064/">http://lwn.net/Articles/381064/</a></li>
+<li><a href="http://lwn.net/Articles/383362/">http://lwn.net/Articles/383362/</a></li>
+</ul></li>
+<li><em>kprobes</em>: <ul>
+<li><a href="http://lxr.free-electrons.com/source/Documentation/kprobes.txt?v=3.13">Documentation/kprobes.txt</a></li>
+<li><a href="https://lwn.net/Articles/132196/">https://lwn.net/Articles/132196/</a></li>
+</ul></li>
+<li><em>perf_events</em>: <ul>
+<li><a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/">http://web.eece.maine.edu/~vweaver/projects/perf_events/</a></li>
+<li><a href="https://lwn.net/Articles/441209/">https://lwn.net/Articles/441209/</a></li>
+</ul></li>
+</ul>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Tracepoints are improvement of&nbsp;early feature called kernel markers.<a href="#fnref1">&#8617;</a></p></li>
+<li id="fn2"><p>Namely in&nbsp;commit <a href="https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b75ef8b44b1cb95f5a26484b0e2fe37a63b12b44">b75ef8b44b1cb95f5a26484b0e2fe37a63b12b44</a><a href="#fnref2">&#8617;</a></p></li>
+<li id="fn3"><p>And that’s&nbsp;indended behaviour. Kernel <strong>ABI</strong> in&nbsp;no&nbsp;sense stable, <acronym title="Application programming interface" lang="en">API</acronym> is.<a href="#fnref3">&#8617;</a></p></li>
+<li id="fn4"><p>Author of&nbsp;current default O(1) process scheduler CFS&nbsp;&mdash; Completely Fair Scheduler.<a href="#fnref4">&#8617;</a></p></li>
+</ol>
+</div>
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>

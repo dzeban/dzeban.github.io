@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Linux profiling. Intro</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Categories</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Categories</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Linux profiling. Intro</h2>
+                            <h6 class="post-meta">
+                              30 Jan 2014, in
+                              <a class="disabled" href="/categories/linux">linux</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <h2 id="intro-to-intro">Intro to&nbsp;intro</h2>
+<p>Initially I’ve&nbsp;wanted to&nbsp;write single article with review of&nbsp;Linux profiling tools, but being very curious person I’ve&nbsp;overblew it. And so&nbsp;I’ve&nbsp;decided to&nbsp;create a&nbsp;series of&nbsp;articles that will be&nbsp;interesting from techical point of&nbsp;view and not to&nbsp;broad as&nbsp;in&nbsp;some book. So&nbsp;now, please welcome, a&nbsp;whole sequence of&nbsp;articles.</p>
+<p>TOC:</p>
+<ol style="list-style-type: decimal">
+<li>Intro</li>
+<li><a href="/linux/profiling-gprof-gcov.html">Userspace profiling: gprof, gcov</a></li>
+<li><a href="/linux/profiling-valgrind.html">Userspace profiling: Valgrind</a></li>
+<li><a href="/linux/profiling-kernel.html">Kernel profiling: Intro</a></li>
+<li>Kernel profiling: ftrace</li>
+<li>Kernel profiling: perf</li>
+<li>Kernel profiling: SystemTap</li>
+<li>Kernel profiling: ktap</li>
+<li>Vendor specific profiling: Intel VTune</li>
+</ol>
+<h2 id="faq">FAQ</h2>
+<p><strong>Profiling</strong>&nbsp;&mdash; dynamic analysis of&nbsp;software, consisting of&nbsp;gathering various metrics and calculating some statistical info from it. Usually, you do&nbsp;profiling to&nbsp;analyze performance though it’s&nbsp;not the single case, e.g. there are works about profiling for <a href="http://infoscience.epfl.ch/record/181628/files/eprof.pdf">energy consumption analysis</a>.</p>
+<p>Do&nbsp;not confuse profiling and tracing. <em>Tracing</em> is&nbsp;a&nbsp;procedure of&nbsp;saving program runtime steps to&nbsp;debug it&nbsp;&mdash; you are not gathering any metrics.</p>
+<p>Also don’t&nbsp;confuse profiling and benchmarking. Benchmarking is&nbsp;all about marketing. You launch some predefined procedure to&nbsp;get couple of&nbsp;numbers that you can print in&nbsp;your marketing brochures.</p>
+<p><strong>Profiler</strong>&nbsp;&mdash; program that do&nbsp;profiling.</p>
+<p><strong>Profile</strong>&nbsp;&mdash; result of&nbsp;profiling, some statistical info calculated from gathered metrics.</p>
+<p>There are a&nbsp;lot of&nbsp;metrics that profiler can gather and analyze and I&nbsp;won’t&nbsp;list them all but instead try to&nbsp;make some hierarchy of&nbsp;it:</p>
+<ul>
+<li>Time metrics
+<ul>
+<li>Program/function runtime</li>
+<li>I/O latency</li>
+<li>&hellip;</li>
+</ul></li>
+<li>Space metrics
+<ul>
+<li>Memory usage</li>
+<li>Open files</li>
+<li>Bandwidth</li>
+<li>&hellip;</li>
+</ul></li>
+<li>Code metrics
+<ul>
+<li>Call graph</li>
+<li>Function hit count</li>
+<li>Loops depth</li>
+<li>&hellip;</li>
+</ul></li>
+<li>Hardware metrics
+<ul>
+<li>CPU cache hit/miss ratio</li>
+<li>Interrupts count</li>
+<li>&hellip;</li>
+</ul></li>
+</ul>
+<p>Variety of&nbsp;metrics imply variety of&nbsp;methods to&nbsp;gather it. And I&nbsp;have a&nbsp;beautiful hierarchy for that, yeah:</p>
+<ul>
+<li>Invasive profiling&nbsp;&mdash; changing profiled code
+<ul>
+<li>Source code instrumentation</li>
+<li>Static binary instrumentation</li>
+<li>Dynamic binary instrumentation</li>
+</ul></li>
+<li><nobr>Non-invasive</nobr> profiling&nbsp;&mdash; without changing any code
+<ul>
+<li>Sampling</li>
+<li><nobr>Event-based</nobr></li>
+<li>Emulation</li>
+</ul></li>
+</ul>
+<p>(That’s&nbsp;all the methods I&nbsp;know. If&nbsp;you come up&nbsp;with another&nbsp;&mdash; feel free to&nbsp;contact me).</p>
+<p>Quick review of&nbsp;methods.</p>
+<p>Source code instrumentation is&nbsp;the simplest one. If&nbsp;you have source codes you can add special profiling calls to&nbsp;every function (not manually, of&nbsp;course) and then launch your program. Profiling calls will trace function graph and can also compute time spent in&nbsp;functions and also branch prediction probability and a&nbsp;lot of&nbsp;other things. But oftentimes you don’t&nbsp;have source code. And that makes me&nbsp;saaaaad panda.</p>
+<p>Binary instrumentation is&nbsp;what you can guess by&nbsp;yourself&nbsp;&mdash; you are modifying program binary image&nbsp;&mdash; either on&nbsp;disk (program.exe) or&nbsp;in&nbsp;memory. This is&nbsp;what reverse engineers love to&nbsp;do. To&nbsp;research some commercial critical software or&nbsp;analyze malware they do&nbsp;binary instrumentation and analyze program behaviour. If&nbsp;you’re&nbsp;interesting in&nbsp;this, please, call my&nbsp;good friend and uni groupmate Dima Evdokimov (<a href="https://twitter.com/evdokimovds">@evdokimovds</a>)&nbsp;&mdash; he&nbsp;is&nbsp;research director in&nbsp;Digital Security. He&nbsp;is&nbsp;really in&nbsp;this theme (see, for example, <a href="http://habrahabr.ru/company/dsec/blog/142575/">DBI in&nbsp;informational security (in&nbsp;Russian)</a>).</p>
+<p>Anyway, binary instrumentation also really useful in&nbsp;profiling&nbsp;&mdash; many modern instruments are built on&nbsp;top binary instrumentation ideas (SystemTap, ktap, dtrace).</p>
+<p>Ok, so&nbsp;sometimes you can’t&nbsp;instrument even binary code, e.g. you’re&nbsp;profiling OS&nbsp;kernel, or&nbsp;some pretty complicated system consisting of&nbsp;many tightly coupled modules that won’t&nbsp;work after instrumenting. That’s&nbsp;why you have <nobr>non-invasive</nobr> profiling.</p>
+<p>Sampling is&nbsp;the first natural idea that you can come up&nbsp;with when you can’t&nbsp;modify any code. The point is&nbsp;that profiler periodically asks CPU registers (e.g. PSW) and analyze what is&nbsp;going on. By&nbsp;the way, this is&nbsp;the only reasonable way you can get hardware metrics&nbsp;&mdash; by&nbsp;periodical polling of&nbsp;[PMU] (performance monitoring unit).</p>
+<p><nobr>Event-based</nobr> profiling is&nbsp;about gathering events that must somehow be&nbsp;prepared/preinstalled by&nbsp;vendor of&nbsp;profiling subject. Examples are inotify, kernel tracepoints in&nbsp;Linux and <a href="http://software.intel.com/sites/products/documentation/doclib/iss/2013/amplifier/lin/ug_docs/GUID-EEC5294C-5599-44F7-909D-9D617DE8AB92.htm">VTune events</a>.</p>
+<p>And finally emulation is&nbsp;just running your program in&nbsp;isolated environment like virtual machine or&nbsp;QEMU thus giving you full control over program execution but garbling behaviour.</p>
+<h2 id="problem-definition">Problem definition</h2>
+<p>I’m&nbsp;a&nbsp;big fan of&nbsp;studying something with the <nobr>real-world</nobr> examples, instead of&nbsp;thoughtless manual reading. That’s&nbsp;why I’ll&nbsp;define problem and will try to&nbsp;solve it&nbsp;using profiling.</p>
+<p>That said, I&nbsp;have a&nbsp;nice little program that checks data integrity on&nbsp;given block device. Simply put, it&nbsp;reads data blocks in&nbsp;multiple threads and computes checksums along with bandwith. Here are the <a href="https://github.com/dzeban/block_hasher">sources</a>.</p>
+<p>So, I&nbsp;use that utility to&nbsp;check my&nbsp;8 disks RAID 0 (standard Linux mdraid). This is&nbsp;how I&nbsp;do&nbsp;reading:</p>
+<pre><code>./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000</code></pre>
+<p>1000 blocks of&nbsp;size 1 MiB for each of&nbsp;10 threads.</p>
+<p><code>block_hasher</code> also computes bandwith by&nbsp;simply dividing data read on&nbsp;thread running time. And so&nbsp;I’ve&nbsp;got that bandwidth:</p>
+<pre><code>[root@simplex block_hasher]# cat bad.out 
+T06: 57.12 MB/s c86253f827c0e40a056d2afc7d6605c291e57400
+T08: 56.72 MB/s 9364a42836daa9beadf02c15777b3e1779f57b00
+T04: 54.82 MB/s d0d7c3e2faed39d83ea25e468b5714bbfe23e200
+T00: 53.06 MB/s c32caf8e5bdebeb2ffa73707e61fad50a751e800
+T02: 53.00 MB/s 34a7495fe2ccaac4afee0e7460d9dff051701900
+T07: 29.93 MB/s 95b3dc919fc4d61548a3b0737dd2ab03a0bab400
+T03: 29.93 MB/s c1228ce6d4920e3bc101f1874bd5beeeb25ec600
+T01: 29.89 MB/s 63d484d0fc2456c9a3c18d1d0ef43d60957d1200
+T05: 29.89 MB/s 5c229e2fe168fb60a0d56b22f6eaa8fc6675d700
+T09: 29.88 MB/s f6eb529ee5b59824a657fb8de43c8c6d3e29cb00</code></pre>
+<p>If&nbsp;you sum bandwidth for all threads you’ll&nbsp;get total bandwidth for whole RAID.</p>
+<pre><code>[root@simplex block_hasher]# cut -f2 -d&#39; &#39; bad.out |  paste -sd + | bc
+424.24</code></pre>
+<p>Namely, <strong>424.24 MB/s</strong> which is&nbsp;pretty bad. In&nbsp;theory, you can get<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>:</p>
+<pre><code>Speed = &lt;IOPS from 1 disk&gt; * &lt;block size&gt; * &lt;disks count&gt; 
+
+180 * 1048576 * 8 = 1509949440 Bytes/s = 1.5 GB/s</code></pre>
+<p>In&nbsp;real life you’ll&nbsp;get something about 1 GB/s.</p>
+<p>To&nbsp;determine why is&nbsp;it&nbsp;slow we’ll&nbsp;use profilers. We’ll&nbsp;profile <code>block_hasher</code> as&nbsp;much as&nbsp;everything below including Linux kernel.</p>
+<p>In&nbsp;this series of&nbsp;articles I’ll&nbsp;try to&nbsp;review next profilers:</p>
+<ul>
+<li>gprof</li>
+<li>gcov</li>
+<li>Valgrind</li>
+<li>perf</li>
+<li>SystemTap</li>
+<li>ktap</li>
+<li>VTune</li>
+<li>Block devices related tools: blktrace, etc.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="http://en.wikibooks.org/wiki/Introduction_to_Software_Engineering/Testing/Profiling">Profiling wikibook</a></li>
+</ul>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>This trivial formulae implies that block reading time is&nbsp;the same for any sizes which in&nbsp;fact is&nbsp;not. Also it’s&nbsp;applicable only for RAID level 0.<a href="#fnref1">&#8617;</a></p></li>
+</ol>
+</div>
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>

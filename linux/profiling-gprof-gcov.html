@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Profiling in Linux. gprof and gcov</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Categories</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Categories</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Profiling in Linux. gprof and gcov</h2>
+                            <h6 class="post-meta">
+                              10 Feb 2014, in
+                              <a class="disabled" href="/categories/linux">linux</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>TOC:</p>
+<ol style="list-style-type: decimal">
+<li><a href="/linux/profiling-intro.html">Intro</a></li>
+<li>Userspace profiling: gprof, gcov</li>
+<li><a href="/linux/profiling-valgrind.html">Userspace profiling: Valgrind</a></li>
+<li><a href="/linux/profiling-kernel.html">Kernel profiling: Intro</a></li>
+<li>Kernel profiling: ftrace</li>
+<li>Kernel profiling: perf</li>
+<li>Kernel profiling: SystemTap</li>
+<li>Kernel profiling: ktap</li>
+<li>Vendor specific profiling: Intel VTune</li>
+</ol>
+<p><em>gprof</em> and <em>gcov</em> is&nbsp;a&nbsp;classical profilers that are still in&nbsp;wide use. Since the dawn of&nbsp;time they were used by&nbsp;hackers though now everybody shifts their focus to&nbsp;dynamic profilers like Valgrind.</p>
+<h2 id="gprof">gprof</h2>
+<p><strong>gprof</strong> (GNU Profiler)&nbsp;&mdash; simple and easy profiler that can show how much time your program spends in&nbsp;routines in&nbsp;percents and seconds. <em>gprof</em> uses source code instrumentation by&nbsp;inserting special <code>mcount</code> function call to&nbsp;gather metrics of&nbsp;your program.</p>
+<h3 id="building-with-gprof-instrumentation">Building with gprof instrumentation</h3>
+<p>To&nbsp;gather profile you need to&nbsp;compile your program with <code>-pg</code> gcc option and then launch under <em>gprof</em>. For better results and statistical errors elimination it’s&nbsp;recommended to&nbsp;launch profiling subject several times.</p>
+<p>To&nbsp;build with <em>gprof</em> instrumentation invoke gcc like this:</p>
+<pre><code>[root@simplex block_hasher]# gcc -pg -g -lcrypto -pthread -lrt -Wall -Wextra block_hasher.c -o block_hasher</code></pre>
+<p>As&nbsp;a&nbsp;result you’ll&nbsp;get instrumented program. To&nbsp;check if&nbsp;it’s&nbsp;really instrumented just grep <code>mcount</code> symbol.</p>
+<pre><code> [root@simplex block_hasher]# nm block_hasher | grep mcount
+                  U mcount@@GLIBC_2.2.5</code></pre>
+<h3 id="profiling-block_hasher-under-gprof">Profiling block_hasher under gprof</h3>
+<p>As&nbsp;I&nbsp;said earlier to&nbsp;collect useful statistic we&nbsp;should run program several times and accumulate metrics. To&nbsp;do&nbsp;that I’ve&nbsp;written simple bash script:</p>
+<pre class="sourceCode bash"><code class="sourceCode bash"><span class="co">#!/bin/bash</span>
+
+<span class="kw">if [</span> <span class="ot">$#</span> <span class="ot">-ne</span> 1<span class="kw"> ]</span>; <span class="kw">then</span>
+    <span class="kw">echo</span> <span class="st">&quot;gprof.sh &lt;number of runs&gt;&quot;</span>
+    <span class="kw">exit</span> 1
+<span class="kw">fi</span>
+
+<span class="kw">for</span> <span class="kw">i</span> in <span class="ot">$(</span><span class="kw">seq</span> 1 <span class="ot">$1)</span><span class="kw">;</span> <span class="kw">do</span>
+
+    <span class="co"># Run profiled program</span>
+    <span class="kw">./block_hasher</span> -d /dev/md126 -b 1048576 -t 10 -n 1000
+
+    <span class="co"># Accumulate gprof statistic</span>
+    <span class="kw">if [</span> <span class="ot">-e</span> gmon.sum<span class="kw"> ]</span>; <span class="kw">then</span>
+        <span class="kw">gprof</span> -s block_hasher gmon.out gmon.sum
+    <span class="kw">else</span>
+        <span class="kw">mv</span> gmon.out gmon.sum
+    <span class="kw">fi</span>
+<span class="kw">done</span>
+
+<span class="co"># Make final profile</span>
+<span class="kw">gprof</span> block_hasher gmon.sum <span class="kw">&gt;</span> gmon.profile</code></pre>
+<p>So, each launch will create <em>gmon.out</em> that gprof will combine in&nbsp;<em>gmon.sum</em>. Finally, <em>gmon.sum</em> will be&nbsp;feed to&nbsp;<em>gprof</em> to&nbsp;get flat text profile and call graph.</p>
+<h3 id="analyzing">Analyzing</h3>
+<p>Flat profile has info about program routines and time spent in&nbsp;it.</p>
+<pre><code>Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total
+ time   seconds   seconds    calls  Ts/call  Ts/call  name
+100.24      0.01     0.01                             thread_func
+  0.00      0.01     0.00       50     0.00     0.00  time_diff
+  0.00      0.01     0.00        5     0.00     0.00  bdev_close
+  0.00      0.01     0.00        5     0.00     0.00  bdev_open</code></pre>
+<p><a name="not-application"></a> <em>gprof</em> metrics are clear from the name. As&nbsp;we&nbsp;can see almost all of&nbsp;it’s&nbsp;time our little program spent in&nbsp;thread function, <strong>BUT</strong> look at&nbsp;the actual seconds&nbsp;&mdash; only 0.01 seconds from whole program execution. It&nbsp;means that it’s&nbsp;not the thread function who is&nbsp;slowing down but something underlying. It’s&nbsp;really obvious that <code>pread</code> itself is&nbsp;unlikely to&nbsp;slack&nbsp;&mdash; the only reasonable candidate is&nbsp;I/O work that make thread functions sleep in&nbsp;waiting for I/O completion.</p>
+<p>Call graph is&nbsp;really not interesting here, so&nbsp;I&nbsp;won’t&nbsp;show you it, sorry.</p>
+<h2 id="gcov">gcov</h2>
+<p><strong>gcov</strong> (short for GNU Coverage)&nbsp;&mdash; tool to&nbsp;collect function call statistics <nobr>line-by-line</nobr>. Usually it’s&nbsp;used in&nbsp;pair with <em>gprof</em> to&nbsp;understand what exact line in&nbsp;slacking function is&nbsp;holds your program down.</p>
+<h3 id="building-with-gcov-instrumentation">Building with gcov instrumentation</h3>
+<p>Just as&nbsp;<em>gprof</em> you need to&nbsp;recompile your program with <em>gcov</em> flags</p>
+<pre><code># gcc -fprofile-arcs -ftest-coverage -lcrypto -pthread -lrt -Wall -Wextra block_hasher.c -o block_hasher</code></pre>
+<p>There are 2 <em>gcov</em> flags: <code>-<nobr>fprofile-arcs</nobr></code> и&nbsp;<code>-<nobr>ftest-coverage</nobr></code>. First will instrument your program to&nbsp;profile so&nbsp;called <em>arcs</em>&nbsp;&mdash; pathes in&nbsp;program’s&nbsp;control flow. Second option will make gcc to&nbsp;collect additional notes for arcs profiling and <em>gcov</em> itself.</p>
+<p>You can simply put <code>-coverage</code> option which implies both of&nbsp;<code>-<nobr>fprofile-arcs</nobr></code> and <code>-<nobr>ftest-coverage</nobr></code> along with linker <code>-lgcov</code> flag. See <a href="https://gcc.gnu.org/onlinedocs/gcc/Debugging-Options.html">GCC debugging options</a> for more info.</p>
+<h3 id="profiling-block_hasher-under-gcov">Profiling block_hasher under gcov</h3>
+<p>Now, after instrumenting we&nbsp;just launch program to&nbsp;get 2 files&nbsp;&mdash; <em>block_hasher.gcda</em> and <em>block_hasher.gcno</em>. Please, don’t&nbsp;look inside it&nbsp;&mdash; we&nbsp;will transform it&nbsp;to&nbsp;text profile. To&nbsp;do&nbsp;this we&nbsp;execute <em>gcov</em> passing it&nbsp;source code filename. It’s&nbsp;important to&nbsp;remember that you must have <code>&lt;filename&gt;.gcda</code> and <code>&lt;filename&gt;.gcno</code> files.</p>
+<pre><code>[root@simplex block_hasher]# gcov block_hasher.c
+File &#39;block_hasher.c&#39;
+Lines executed:77.69% of 121
+block_hasher.c:creating &#39;block_hasher.c.gcov&#39;</code></pre>
+<p>Finally we’ll&nbsp;get <em>block_hasher.c.gcov</em>.</p>
+<h3 id="analyzing-1">Analyzing</h3>
+<p><code>.gcov</code> file is&nbsp;result of&nbsp;that whole <em>gcov</em> work. Let’s&nbsp;look at&nbsp;it. For each of&nbsp;your source files gcov will create annotated source codes with runtime coverage. Here is&nbsp;excerpt from <code>thread_func</code>:</p>
+<pre><code>   10:  159:    gap = num_threads * block_size; // Multiply here to avoid integer overflow
+    -:  160:
+    -:  161:    // Initialize EVP and start reading
+   10:  162:    md = EVP_sha1();
+   10:  163:    mdctx = EVP_MD_CTX_create();
+   10:  164:    EVP_DigestInit_ex( mdctx, md, NULL );
+    -:  165:
+   10:  166:    get_clock( &amp;start );
+10010:  167:    for( i = 0; i &lt; nblocks; i++)
+    -:  168:    {
+10000:  169:        offset = j-&gt;off + gap * i;
+    -:  170:
+    -:  171:        // Read at offset without changing file pointer
+10000:  172:        err = pread( bdev-&gt;fd, buf, block_size, offset );
+ 9999:  173:        if( err == -1 )
+    -:  174:        {
+#####:  175:            fprintf(stderr, &quot;T%02d Failed to read at %llu\n&quot;, j-&gt;num, (unsigned long long)offset);
+#####:  176:            perror(&quot;pread&quot;);
+#####:  177:            pthread_exit(NULL);
+    -:  178:        }
+    -:  179:
+ 9999:  180:        bytes += err; // On success pread returns bytes read
+    -:  181:
+    -:  182:        // Update digest
+ 9999:  183:        EVP_DigestUpdate( mdctx, buf, block_size );
+    -:  184:    }
+   10:  185:    get_clock( &amp;end );
+   10:  186:    sec_diff = time_diff( start, end );
+    -:  187:
+   10:  188:    EVP_DigestFinal_ex( mdctx, j-&gt;digest, &amp;j-&gt;digest_len );
+   10:  189:    EVP_MD_CTX_destroy(mdctx);</code></pre>
+<p>The left outmost column is&nbsp;how many times this line of&nbsp;code was invoked. As&nbsp;expected, the <em>for</em> loop was executed 10000 times&nbsp;&mdash; 10 threads each reading 1000 blocks. Nothing new.</p>
+<p>Though <em>gcov</em> was not so&nbsp;much useful for me, I’d&nbsp;like to&nbsp;say that it&nbsp;has really cool feature&nbsp;&mdash; branch probabilities. If&nbsp;you’ll&nbsp;launch <em>gcov</em> with <code>-b</code> option</p>
+<pre><code>[root@simplex block_hasher]# gcov -b block_hasher.c
+File &#39;block_hasher.c&#39;
+Lines executed:77.69% of 121
+Branches executed:100.00% of 66
+Taken at least once:60.61% of 66
+Calls executed:51.47% of 68
+block_hasher.c:creating &#39;block_hasher.c.gcov&#39;</code></pre>
+<p>You’ll&nbsp;get nice branch annotation with probabilities. For example, here is&nbsp;<code>time_diff</code> function</p>
+<pre><code>113 function time_diff called 10 returned 100% blocks executed 100%
+114        10:  106:double time_diff(struct timespec start, struct timespec end)
+115         -:  107:{
+116         -:  108:    struct timespec diff;
+117         -:  109:    double sec;
+118         -:  110:
+119        10:  111:    if ( (end.tv_nsec - start.tv_nsec) &lt; 0 )
+120 branch  0 taken 60% (fallthrough)
+121 branch  1 taken 40%
+122         -:  112:    {
+123         6:  113:        diff.tv_sec  = end.tv_sec - start.tv_sec - 1;
+124         6:  114:        diff.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+125         -:  115:    }
+126         -:  116:    else
+127         -:  117:    {
+128         4:  118:        diff.tv_sec  = end.tv_sec - start.tv_sec;
+129         4:  119:        diff.tv_nsec = end.tv_nsec - start.tv_nsec;
+130         -:  120:    }
+131         -:  121:
+132        10:  122:    sec = (double)diff.tv_nsec / 1000000000 + diff.tv_sec;
+133         -:  123:
+134        10:  124:    return sec;
+135         -:  125:}</code></pre>
+<p>In&nbsp;60% of&nbsp;<code>if</code> calls we’ve&nbsp;fallen in&nbsp;branch to&nbsp;calculate time diff with borrow, that actually means we&nbsp;were executing for more than 1 second.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p><em>gprof</em> and <em>gcov</em> are really entertaining tools despite a&nbsp;lot of&nbsp;people think about them as&nbsp;obsolete. On&nbsp;one hand these utilities are simple, they implementing and automating obvious method of&nbsp;source code instrumentation to&nbsp;measure function hit count.</p>
+<p>But on&nbsp;the other hand such simple metrics won’t&nbsp;help with problems outside of&nbsp;your application. Although there are ways to&nbsp;use it&nbsp;for operating system, e.g. <a href="https://www.kernel.org/doc/Documentation/gcov.txt">for Linux kernel</a>. Anyway <em>gprof</em> and <em>gcov</em> is&nbsp;useless in&nbsp;case when your application spends most of&nbsp;it’s&nbsp;time in&nbsp;waiting for some syscall (<code>pread</code> in&nbsp;my&nbsp;case).</p>
+<h2 id="to-read">To&nbsp;read</h2>
+<ul>
+<li><a href="https://sourceware.org/binutils/docs/gprof/">gprof manual</a></li>
+<li><a href="http://www.ibm.com/developerworks/ru/library/l-gnuprof/">IBM tutorial</a></li>
+<li><a href="http://www.cs.utah.edu/dept/old/texinfo/as/gprof.html">Utah university manual</a></li>
+</ul>
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>

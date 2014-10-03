@@ -1,0 +1,932 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title type="text">Crazy rants</title>
+  <id>http://avd.reduct.ru/feed</id>
+  <updated>2014-05-12T00:00:00Z</updated>
+  <link href="http://avd.reduct.ru" />
+  <link href="http://avd.reduct.ru/feed" rel="self" />
+  <author>
+    <name>avd</name>
+  </author>
+  <generator>PyAtom</generator>
+  <entry xml:base="http://avd.reduct.ru/feed">
+    <title type="text">Linux profiling. Kernel</title>
+    <id>linux/profiling-kernel.html</id>
+    <updated>2014-05-12T00:00:00Z</updated>
+    <link href="linux/profiling-kernel.html" />
+    <author>
+      <name>Alex Dzyoba</name>
+    </author>
+    <content type="html">&lt;p&gt;TOC:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-intro.html"&gt;Intro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-gprof-gcov.html"&gt;Userspace profiling: gprof, gcov&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-valgrind.html"&gt;Userspace profiling: Valgrind&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Kernel profiling: Intro&lt;/li&gt;
+&lt;li&gt;Kernel profiling: ftrace&lt;/li&gt;
+&lt;li&gt;Kernel profiling: perf&lt;/li&gt;
+&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
+&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
+&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Quick reminder. I’m&amp;nbsp;trying to&amp;nbsp;understand why my&amp;nbsp;nice little program is&amp;nbsp;reading from RAID so&amp;nbsp;slow. I’m&amp;nbsp;using various profiling tools to&amp;nbsp;inspect my&amp;nbsp;&lt;code&gt;block_hasher&lt;/code&gt; and get a&amp;nbsp;&lt;nobr&gt;hands-on&lt;/nobr&gt; experience with profilers.&lt;/p&gt;
+&lt;p&gt;So, we&amp;nbsp;reviewed userspace profiling and arrived to&amp;nbsp;main theme of&amp;nbsp;my&amp;nbsp;article series which is&amp;nbsp;kernel profiling: tools, profilers, facilities and methods of&amp;nbsp;profiling.&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;this article I’ll&amp;nbsp;tell you about facilities that kernel provides to&amp;nbsp;profile it.&lt;/p&gt;
+&lt;h2 id="intro"&gt;Intro&lt;/h2&gt;
+&lt;p&gt;Sometimes when you’re&amp;nbsp;facing really hard performance problem it’s&amp;nbsp;not always enough to&amp;nbsp;profile your applicatiion. As&amp;nbsp;we&amp;nbsp;saw while profiling our application with &lt;a href="/linux/profiling-intro.html"&gt;gprof, gcov&lt;/a&gt; and &lt;a href="/linux/profiling-valgrind.html"&gt;Valgrind&lt;/a&gt; problem is&amp;nbsp;somewhere underneath our application&amp;nbsp;&amp;mdash; something is&amp;nbsp;holding &lt;code&gt;pread&lt;/code&gt; in&amp;nbsp;long I/O wait cycles.&lt;/p&gt;
+&lt;p&gt;How to&amp;nbsp;trace system call is&amp;nbsp;not clear at&amp;nbsp;first sight&amp;nbsp;&amp;mdash; there are various kernel profilers, all of&amp;nbsp;them works in&amp;nbsp;it’s&amp;nbsp;own way, requires unique configuration, methods, analyzis and so&amp;nbsp;on. Yes, it’s&amp;nbsp;really hard to&amp;nbsp;figure it&amp;nbsp;out. Being the biggest &lt;nobr&gt;open-source&lt;/nobr&gt; project developed by&amp;nbsp;massive community, Linux absorbed several different and sometimes conflicting profiling facilities. And it’s&amp;nbsp;in&amp;nbsp;some sense getting even worse&amp;nbsp;&amp;mdash; while some profiles tend to&amp;nbsp;merge (&lt;em&gt;ftrace&lt;/em&gt; and &lt;em&gt;perf&lt;/em&gt;) other tools emerge&amp;nbsp;&amp;mdash; last example is&amp;nbsp;&lt;em&gt;ktap&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;undertand that &lt;a href="https://ru.wikipedia.org/wiki/%D0%A1%D0%BE%D0%B1%D0%BE%D1%80_%D0%B8_%D0%91%D0%B0%D0%B7%D0%B0%D1%80"&gt;bazaar&lt;/a&gt; lets start from the bottom&amp;nbsp;&amp;mdash; what does kernel have that makes it&amp;nbsp;able profile it? Basically there are only 3 kernel facilities that enable profiling:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Kernel tracepoints&lt;/li&gt;
+&lt;li&gt;Kernel probes&lt;/li&gt;
+&lt;li&gt;Perf events&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;It’s&amp;nbsp;features that gives us&amp;nbsp;access to&amp;nbsp;kernel internals. By&amp;nbsp;using them we&amp;nbsp;can measure kernel functions execution, trace access to&amp;nbsp;devices, analyze CPU states and so&amp;nbsp;on.&lt;/p&gt;
+&lt;p&gt;This very features are really awkward for direct use and accessible only from kernel. Well, if&amp;nbsp;you really want you can write your own Linux kernel module that will utilize these facilities for your custom use, but it’s&amp;nbsp;pretty much pointless. That’s&amp;nbsp;why people have created a&amp;nbsp;few really good general purpose profilers:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;ftrace&lt;/li&gt;
+&lt;li&gt;perf&lt;/li&gt;
+&lt;li&gt;SystemTap&lt;/li&gt;
+&lt;li&gt;ktap&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;All of&amp;nbsp;them are based on&amp;nbsp;that features and will be&amp;nbsp;discussed later more thoroughly, but now let’s&amp;nbsp;review features itself.&lt;/p&gt;
+&lt;h2 id="kernel-tracepoints"&gt;Kernel tracepoints&lt;/h2&gt;
+&lt;p&gt;Kernel Tracepoints&amp;nbsp;&amp;mdash; it’s&amp;nbsp;framework for tracing kernel function via static instrumenting&lt;a href="#fn1" class="footnoteRef" id="fnref1"&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Tracepoint&amp;nbsp;&amp;mdash; it’s&amp;nbsp;a&amp;nbsp;place in&amp;nbsp;code where you can bind your callback. &lt;em&gt;Tracepoints&lt;/em&gt; can be&amp;nbsp;disabled (no&amp;nbsp;callback) and enabled (has callback). There might be&amp;nbsp;several callbacks though it’s&amp;nbsp;still lightweight&amp;nbsp;&amp;mdash; when callback disabled it’s&amp;nbsp;actually looks like &lt;code&gt;if&amp;nbsp;(unlikely(tracepoint.enabled))&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Tracepoint&lt;/em&gt; output is&amp;nbsp;written in&amp;nbsp;ring buffer that is&amp;nbsp;export through &lt;em&gt;debugfs&lt;/em&gt; at&amp;nbsp;&lt;code&gt;/sys/kernel/debug/tracing/trace&lt;/code&gt;. There are also whole tree of&amp;nbsp;traceable events at&amp;nbsp;&lt;code&gt;/sys/kernel/debug/tracing/events&lt;/code&gt; that exports control files to&amp;nbsp;enable/disable particular event.&lt;/p&gt;
+&lt;p&gt;Despite of&amp;nbsp;it’s&amp;nbsp;name &lt;em&gt;tracepoints&lt;/em&gt; are base for &lt;nobr&gt;event-based&lt;/nobr&gt; profiling because besides traceing you can do&amp;nbsp;anything in&amp;nbsp;callback, e.g. timestamping and measuring resource usage. Linux kernel is&amp;nbsp;already (since &lt;nobr&gt;2.6.28&lt;/nobr&gt;) instrumented with that tracepoints in&amp;nbsp;many places. For example, &lt;a href="http://lxr.free-electrons.com/source/mm/slab.c?v=3.12#L3714"&gt;&lt;code&gt;__do_kmalloc&lt;/code&gt;&lt;/a&gt;:&lt;/p&gt;
+&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="co"&gt;/**&lt;/span&gt;
+&lt;span class="co"&gt; * __do_kmalloc - allocate memory&lt;/span&gt;
+&lt;span class="co"&gt; * &lt;/span&gt;@size:&lt;span class="co"&gt; how many bytes of memory are required.&lt;/span&gt;
+&lt;span class="co"&gt; * &lt;/span&gt;@flags:&lt;span class="co"&gt; the type of memory to allocate (see kmalloc).&lt;/span&gt;
+&lt;span class="co"&gt; * &lt;/span&gt;@caller:&lt;span class="co"&gt; function caller for debug tracking of the caller&lt;/span&gt;
+&lt;span class="co"&gt; */&lt;/span&gt;
+&lt;span class="dt"&gt;static&lt;/span&gt; __always_inline &lt;span class="dt"&gt;void&lt;/span&gt; *__do_kmalloc(size_t size, gfp_t flags,
+                                          &lt;span class="dt"&gt;unsigned&lt;/span&gt; &lt;span class="dt"&gt;long&lt;/span&gt; caller)
+{
+        &lt;span class="kw"&gt;struct&lt;/span&gt; kmem_cache *cachep;
+        &lt;span class="dt"&gt;void&lt;/span&gt; *ret;
+
+        &lt;span class="co"&gt;/* If you want to save a few bytes .text space: replace&lt;/span&gt;
+&lt;span class="co"&gt;         * __ with kmem_.&lt;/span&gt;
+&lt;span class="co"&gt;         * Then kmalloc uses the uninlined functions instead of the inline&lt;/span&gt;
+&lt;span class="co"&gt;         * functions.&lt;/span&gt;
+&lt;span class="co"&gt;         */&lt;/span&gt;
+        cachep = kmalloc_slab(size, flags);
+        &lt;span class="kw"&gt;if&lt;/span&gt; (unlikely(ZERO_OR_NULL_PTR(cachep)))
+                &lt;span class="kw"&gt;return&lt;/span&gt; cachep;
+        ret = slab_alloc(cachep, flags, caller);
+
+        trace_kmalloc(caller, ret,
+                      size, cachep-&amp;gt;size, flags);
+
+        &lt;span class="kw"&gt;return&lt;/span&gt; ret;
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;trace_kmalloc&lt;/code&gt; is&amp;nbsp;&lt;em&gt;tracepoint&lt;/em&gt;. There are many others in&amp;nbsp;other critical parts of&amp;nbsp;kernel such as&amp;nbsp;schedulers, block I/O, networking and even interrupt handlers. All of&amp;nbsp;them are used by&amp;nbsp;most profilers because they have minimal overhead, fires by&amp;nbsp;event and saves you from modifying kernel.&lt;/p&gt;
+&lt;p&gt;Ok, so&amp;nbsp;by&amp;nbsp;now you may be&amp;nbsp;eager to&amp;nbsp;insert in&amp;nbsp;all of&amp;nbsp;your kernel modules and profile it&amp;nbsp;to&amp;nbsp;hell, but BEWARE. If&amp;nbsp;you want to&amp;nbsp;add &lt;em&gt;tracepoints&lt;/em&gt; you must have a&amp;nbsp;lot of&amp;nbsp;patience and skills because writing your own tracepoints is&amp;nbsp;really ugly and awkward. You can see examples at&amp;nbsp;&lt;a href="http://lxr.free-electrons.com/source/samples/trace_events/?v=3.13"&gt;&lt;em&gt;samples/trace_events/&lt;/em&gt;&lt;/a&gt;. Under the hood &lt;em&gt;tracepoints&lt;/em&gt; are C&amp;nbsp;macros black magic that only bold and fearless persons could understand.&lt;/p&gt;
+&lt;p&gt;And even if&amp;nbsp;you do&amp;nbsp;all that crazy macro declarations and struct definitions it&amp;nbsp;might just simply not work at&amp;nbsp;all if&amp;nbsp;you have &lt;code&gt;CONFIG_MODULE_SIG=y&lt;/code&gt; and don’t&amp;nbsp;sign module. It&amp;nbsp;might seem kinda strange configuration but in&amp;nbsp;reality it’s&amp;nbsp;a&amp;nbsp;default for all major distributions including Fedora and Ubuntu. That said, after 9 circles of&amp;nbsp;hell, you will end up&amp;nbsp;with nothing.&lt;/p&gt;
+&lt;p&gt;So, just remember:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;USE ONLY EXISTING TRACEPOINTS IN&amp;nbsp;KERNEL, DO&amp;nbsp;NOT CREATE YOUR OWN.&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Now I’m&amp;nbsp;gonna explain why it’s&amp;nbsp;happening. So&amp;nbsp;if&amp;nbsp;you tired of&amp;nbsp;&lt;em&gt;tracepoints&lt;/em&gt; just skip to&amp;nbsp;read about &lt;a href="#kprobes"&gt;&lt;em&gt;kprobes&lt;/em&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Ok, so&amp;nbsp;some time ago while preparing kernel 3.1&lt;a href="#fn2" class="footnoteRef" id="fnref2"&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt; these code was added:&lt;/p&gt;
+&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="dt"&gt;static&lt;/span&gt; &lt;span class="dt"&gt;int&lt;/span&gt; tracepoint_module_coming(&lt;span class="kw"&gt;struct&lt;/span&gt; module *mod)
+{
+          &lt;span class="kw"&gt;struct&lt;/span&gt; tp_module *tp_mod, *iter;
+          &lt;span class="dt"&gt;int&lt;/span&gt; ret = &lt;span class="dv"&gt;0&lt;/span&gt;;
+
+          &lt;span class="co"&gt;/*&lt;/span&gt;
+&lt;span class="co"&gt;           * We skip modules that tain the kernel, especially those with different&lt;/span&gt;
+&lt;span class="co"&gt;           * module header (for forced load), to make sure we don&amp;#39;t cause a crash.&lt;/span&gt;
+&lt;span class="co"&gt;           */&lt;/span&gt;
+          &lt;span class="kw"&gt;if&lt;/span&gt; (mod-&amp;gt;taints)
+                  &lt;span class="kw"&gt;return&lt;/span&gt; &lt;span class="dv"&gt;0&lt;/span&gt;;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If&amp;nbsp;module is&amp;nbsp;tainted we&amp;nbsp;will NOT write ANY tracepoints. Later it&amp;nbsp;became more adequate&lt;/p&gt;
+&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="co"&gt;/*&lt;/span&gt;
+&lt;span class="co"&gt; * We skip modules that taint the kernel, especially those with different&lt;/span&gt;
+&lt;span class="co"&gt; * module headers (for forced load), to make sure we don&amp;#39;t cause a crash.&lt;/span&gt;
+&lt;span class="co"&gt; * Staging and out-of-tree GPL modules are fine.&lt;/span&gt;
+&lt;span class="co"&gt; */&lt;/span&gt;
+&lt;span class="kw"&gt;if&lt;/span&gt; (mod-&amp;gt;taints &amp;amp; ~((&lt;span class="dv"&gt;1&lt;/span&gt; &amp;lt;&amp;lt; TAINT_OOT_MODULE) | (&lt;span class="dv"&gt;1&lt;/span&gt; &amp;lt;&amp;lt; TAINT_CRAP)))
+        &lt;span class="kw"&gt;return&lt;/span&gt; &lt;span class="dv"&gt;0&lt;/span&gt;;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Like, ok&amp;nbsp;it&amp;nbsp;may be&amp;nbsp;&lt;nobr&gt;out-of-tree&lt;/nobr&gt; (&lt;code&gt;TAINT_OOT_MODULE&lt;/code&gt;) or&amp;nbsp;staginig(&lt;code&gt;TAINT_CRAP&lt;/code&gt;) but any others are &lt;nobr&gt;no-no&lt;/nobr&gt;.&lt;/p&gt;
+&lt;p&gt;Seems legit, right? Now what whould you think will be&amp;nbsp;if&amp;nbsp;your kernel is&amp;nbsp;compiled with &lt;code&gt;CONFIG_MODULE_SIG&lt;/code&gt; enabled and your pretty module is&amp;nbsp;not signed? Well, module loader will set &lt;code&gt;TAINT_FORCES_MODULE&lt;/code&gt; flag for it. And now your pretty module will never pass the condition in&amp;nbsp;&lt;code&gt;tracepoint_module_coming&lt;/code&gt; and never show you any tracepoints output. And as&amp;nbsp;I&amp;nbsp;said earlier this stupid option is&amp;nbsp;set for all major distributions including Fedora and Ubuntu since kernel version 3.1.&lt;/p&gt;
+&lt;p&gt;If&amp;nbsp;you think&amp;nbsp;&amp;mdash; &amp;laquo;Well, lets sign goddamn module!&amp;raquo;&amp;nbsp;&amp;mdash; you’re&amp;nbsp;wrong. Modules must be&amp;nbsp;signed with kernel &lt;strong&gt;private&lt;/strong&gt; key that are held by&amp;nbsp;your Linux distro vendor and, of&amp;nbsp;course, not available for you.&lt;/p&gt;
+&lt;p&gt;The whole terrifying story is&amp;nbsp;available in&amp;nbsp;lkml &lt;a href="https://lkml.org/lkml/2014/2/13/488"&gt;1&lt;/a&gt;, &lt;a href="https://lkml.org/lkml/2014/3/4/925"&gt;2&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;As&amp;nbsp;for me&amp;nbsp;I&amp;nbsp;just cite my&amp;nbsp;favorite thing from Steven Rostedt (ftrace maintainer and one of&amp;nbsp;the tracepoints developer):&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;&amp;gt; OK, this IS a major bug and needs to be fixed. This explains a couple
+&amp;gt; of reports I received about tracepoints not working, and I never
+&amp;gt; figured out why. Basically, they even did this:
+&amp;gt; 
+&amp;gt; 
+&amp;gt;    trace_printk(&amp;quot;before tracepoint\n&amp;quot;);
+&amp;gt;    trace_some_trace_point();
+&amp;gt;    trace_printk(&amp;quot;after tracepoint\n&amp;quot;);
+&amp;gt;
+&amp;gt; Enabled the tracepoint (it shows up as enabled and working in the
+&amp;gt; tools, but not the trace), but in the trace they would get:
+&amp;gt;
+&amp;gt;    before tracepoint
+&amp;gt;    after tracepoint
+&amp;gt;
+&amp;gt; and never get the actual tracepoint. But as they were debugging
+&amp;gt; something else, it was just thought that this was their bug. But it
+&amp;gt; baffled me to why that tracepoint wasn&amp;#39;t working even though nothing in
+&amp;gt; the dmesg had any errors about tracepoints.
+&amp;gt; 
+&amp;gt; Well, this now explains it. If you compile a kernel with the following
+&amp;gt; options:
+&amp;gt; 
+&amp;gt; CONFIG_MODULE_SIG=y
+&amp;gt; # CONFIG_MODULE_SIG_FORCE is not set
+&amp;gt; # CONFIG_MODULE_SIG_ALL is not set
+&amp;gt; 
+&amp;gt; You now just disabled (silently) all tracepoints in modules. WITH NO
+&amp;gt; FREAKING ERROR MESSAGE!!!
+&amp;gt; 
+&amp;gt; The tracepoints will show up in /sys/kernel/debug/tracing/events, they
+&amp;gt; will show up in perf list, you can enable them in either perf or the
+&amp;gt; debugfs, but they will never actually be executed. You will just get
+&amp;gt; silence even though everything appeared to be working just fine.&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Recap:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Kernel tracepoints is&amp;nbsp;a&amp;nbsp;lightweight tracing and profiling facility.&lt;/li&gt;
+&lt;li&gt;Linux kernel is&amp;nbsp;heavy instrumented with &lt;em&gt;tracepoints&lt;/em&gt; that are used by&amp;nbsp;the most profilers and especially by&amp;nbsp;&lt;em&gt;perf&lt;/em&gt; and &lt;em&gt;ftrace&lt;/em&gt;.&lt;/li&gt;
+&lt;li&gt;Tracepoints are C&amp;nbsp;marcos black magic and almost impossible for usage in&amp;nbsp;kernel modules.&lt;/li&gt;
+&lt;li&gt;It&amp;nbsp;will NOT work in&amp;nbsp;your LKM if:
+&lt;ul&gt;
+&lt;li&gt;Kernel version &amp;gt;=3.1 (might be&amp;nbsp;fixed in&amp;nbsp;3.15)&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;CONFIG_MODULE_SIG=y&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Your module is&amp;nbsp;not signed with kernel private key.&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="kprobes"&gt;Kernel probes&lt;/h2&gt;
+&lt;p&gt;Kernel probes is&amp;nbsp;a&amp;nbsp;dynamic debugging and profiling mechanism that allows you to&amp;nbsp;break into kernel code, invoke your custom function called &lt;strong&gt;probe&lt;/strong&gt; and return everything back.&lt;/p&gt;
+&lt;p&gt;Basically its done by&amp;nbsp;writing kernel module where you register handler for some address or&amp;nbsp;symbol in&amp;nbsp;kernel code. Also according to&amp;nbsp;&lt;a href="http://lxr.free-electrons.com/source/include/linux/kprobes.h?v=3.13#L73"&gt;definition of&amp;nbsp;&lt;code&gt;struct kprobe&lt;/code&gt;&lt;/a&gt; you can pass offset from address but I’m&amp;nbsp;not sure about that. In&amp;nbsp;your registered handler you can do&amp;nbsp;really anything&amp;nbsp;&amp;mdash; write to&amp;nbsp;log, to&amp;nbsp;some buffer exported via sysfs, measure time and infinite amount of&amp;nbsp;possibilities to&amp;nbsp;do. And that’s&amp;nbsp;really nifty contrary to&amp;nbsp;&lt;em&gt;tracepoints&lt;/em&gt; where you can only read logs from debugfs.&lt;/p&gt;
+&lt;p&gt;There are 3 types of&amp;nbsp;probes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;em&gt;kprobes&lt;/em&gt;&amp;nbsp;&amp;mdash; basic probe that allows you to&amp;nbsp;break into any kernel address.&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;jprobes&lt;/em&gt;&amp;nbsp;&amp;mdash; jump probes that inserted in&amp;nbsp;the start of&amp;nbsp;function and gives you handy access to&amp;nbsp;function arguments; it’s&amp;nbsp;something like &lt;nobr&gt;proxy-function&lt;/nobr&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;kretprobes&lt;/em&gt;&amp;nbsp;&amp;mdash; return probes that inserted in&amp;nbsp;the return point of&amp;nbsp;function.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Last 2 types are based on&amp;nbsp;basic &lt;em&gt;kprobes&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;All of&amp;nbsp;this generally works like this:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;We&amp;nbsp;register probe on&amp;nbsp;some address A.&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;kprobe&lt;/em&gt; subsystem finds A.&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;kprobe&lt;/em&gt; copies instruction at&amp;nbsp;address A.&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;kprobe&lt;/em&gt; replaces instruction at&amp;nbsp;A&amp;nbsp;for breakpoint (&lt;code&gt;int 3&lt;/code&gt; in&amp;nbsp;case of&amp;nbsp;x86).&lt;/li&gt;
+&lt;li&gt;Now when execution hits probed address A, CPU trap occurs.&lt;/li&gt;
+&lt;li&gt;Registers are saved.&lt;/li&gt;
+&lt;li&gt;CPU transfers control to&amp;nbsp;&lt;em&gt;kprobes&lt;/em&gt; via &lt;code&gt;notifier_call_chain&lt;/code&gt; mechanism.&lt;/li&gt;
+&lt;li&gt;And finally &lt;em&gt;kprobes&lt;/em&gt; invokes our handler.&lt;/li&gt;
+&lt;li&gt;After all we&amp;nbsp;restore registers, copies back instruction at&amp;nbsp;A&amp;nbsp;and continues execution.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Our handler usually gets as&amp;nbsp;an&amp;nbsp;argument adress where breakpoint happened and registers values in&amp;nbsp;&lt;code&gt;pt_args&lt;/code&gt; structures. &lt;em&gt;kprobes&lt;/em&gt; handler prototype:&lt;/p&gt;
+&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;    &lt;span class="kw"&gt;typedef&lt;/span&gt; &lt;span class="dt"&gt;int&lt;/span&gt; (*kprobe_break_handler_t) (&lt;span class="kw"&gt;struct&lt;/span&gt; kprobe *, &lt;span class="kw"&gt;struct&lt;/span&gt; pt_regs *);&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In&amp;nbsp;most cases except debugging this info is&amp;nbsp;useless because we&amp;nbsp;have &lt;em&gt;jprobes&lt;/em&gt;. &lt;em&gt;jprobes&lt;/em&gt; handler has exactly the same prototype as&amp;nbsp;and intercepting function. For example, this is&amp;nbsp;handler for &lt;code&gt;do_fork&lt;/code&gt;:&lt;/p&gt;
+&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;    &lt;span class="co"&gt;/* Proxy routine having the same arguments as actual do_fork() routine */&lt;/span&gt;
+    &lt;span class="dt"&gt;static&lt;/span&gt; &lt;span class="dt"&gt;long&lt;/span&gt; jdo_fork(&lt;span class="dt"&gt;unsigned&lt;/span&gt; &lt;span class="dt"&gt;long&lt;/span&gt; clone_flags, &lt;span class="dt"&gt;unsigned&lt;/span&gt; &lt;span class="dt"&gt;long&lt;/span&gt; stack_start,
+              &lt;span class="kw"&gt;struct&lt;/span&gt; pt_regs *regs, &lt;span class="dt"&gt;unsigned&lt;/span&gt; &lt;span class="dt"&gt;long&lt;/span&gt; stack_size,
+              &lt;span class="dt"&gt;int&lt;/span&gt; __user *parent_tidptr, &lt;span class="dt"&gt;int&lt;/span&gt; __user *child_tidptr)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Also &lt;em&gt;jprobes&lt;/em&gt; doesn’t&amp;nbsp;causes interrupts because it&amp;nbsp;works with help of&amp;nbsp;&lt;code&gt;setjmp/longjmp&lt;/code&gt; that are much more lightweight.&lt;/p&gt;
+&lt;p&gt;And finally the most convenient tool for profiling are &lt;em&gt;kretprobes&lt;/em&gt;. It&amp;nbsp;allows you to&amp;nbsp;register 2 handlers&amp;nbsp;&amp;mdash; one to&amp;nbsp;invoke on&amp;nbsp;function start and the other to&amp;nbsp;invoke in&amp;nbsp;the end. But really cool feature is&amp;nbsp;that it&amp;nbsp;allows you to&amp;nbsp;save state between those 2 calls, like timestamp or&amp;nbsp;counters.&lt;/p&gt;
+&lt;p&gt;Instead of&amp;nbsp;thousand words&amp;nbsp;&amp;mdash; look at&amp;nbsp;absolutely astonishing samples at&amp;nbsp;&lt;a href="http://lxr.free-electrons.com/source/samples/kprobes/?v=3.13"&gt;&lt;em&gt;samples/kprobes&lt;/em&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Recap:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;em&gt;kprobes&lt;/em&gt; is&amp;nbsp;a&amp;nbsp;beatiful hack for dynamic debugging, tracing and profiling.&lt;/li&gt;
+&lt;li&gt;It’s&amp;nbsp;a&amp;nbsp;fundamental kernel feature for &lt;nobr&gt;non-invasive&lt;/nobr&gt; profiling.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="perf-events"&gt;Perf events&lt;/h2&gt;
+&lt;p&gt;&lt;em&gt;perf_events&lt;/em&gt; is&amp;nbsp;an&amp;nbsp;interface for hardware metrics implemented in&amp;nbsp;PMU (Performance Monitoring Unit) which is&amp;nbsp;part of&amp;nbsp;CPU.&lt;/p&gt;
+&lt;p&gt;Thanks to&amp;nbsp;&lt;em&gt;perf_events&lt;/em&gt; you can easily ask kernel to&amp;nbsp;show you L1 cache misses count regardless of&amp;nbsp;what architecture you are on&amp;nbsp;&amp;mdash; x86 or&amp;nbsp;ARM. What CPUs are supported by&amp;nbsp;perf are listed &lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/support.html"&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;addition to&amp;nbsp;that perf included various kernel metrics like software context swithes count (&lt;code&gt;PERF_COUNT_SW_CONTEXT_SWITCHES&lt;/code&gt;).&lt;/p&gt;
+&lt;p&gt;And in&amp;nbsp;addition to&amp;nbsp;that perf included &lt;em&gt;tracepoint&lt;/em&gt; support via &lt;code&gt;ftrace&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;access &lt;em&gt;perf_events&lt;/em&gt; there is&amp;nbsp;a&amp;nbsp;special syscall &lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/perf_event_open.html"&gt;&lt;code&gt;perf_event_open&lt;/code&gt;&lt;/a&gt;. You are passing the type of&amp;nbsp;event (hardware, kernel, tracepoint) and so&amp;nbsp;called config, where you specifies what exactly you want depending on&amp;nbsp;type. It’s&amp;nbsp;gonna be&amp;nbsp;function name in&amp;nbsp;case of&amp;nbsp;tracepoint, some CPU metric in&amp;nbsp;case of&amp;nbsp;hardware and so&amp;nbsp;on.&lt;/p&gt;
+&lt;p&gt;And on&amp;nbsp;top of&amp;nbsp;that there are a&amp;nbsp;whole lot of&amp;nbsp;stuff like event groups, filters, sampling, various output formats and others. And all of&amp;nbsp;that are &lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/abi_breakage.html"&gt;constantly breaking&lt;/a&gt;&lt;a href="#fn3" class="footnoteRef" id="fnref3"&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt;, that’s&amp;nbsp;why the only thing you can ask for perf_events is&amp;nbsp;special &lt;code&gt;perf&lt;/code&gt; utility&amp;nbsp;&amp;mdash; the only userspace utility that is&amp;nbsp;a&amp;nbsp;part of&amp;nbsp;kernel tree.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;perf_events and all things related to&amp;nbsp;it&amp;nbsp;spreads as&amp;nbsp;a&amp;nbsp;plague in&amp;nbsp;kernel and now &lt;code&gt;ftrace&lt;/code&gt; is&amp;nbsp;going to&amp;nbsp;be&amp;nbsp;part of&amp;nbsp;&lt;code&gt;perf&lt;/code&gt; (&lt;a href="http://thread.gmane.org/gmane.linux.kernel/1136520"&gt;1&lt;/a&gt;, &lt;a href="https://lkml.org/lkml/2013/10/16/15"&gt;2&lt;/a&gt;). Some people overreacting on&amp;nbsp;&lt;/em&gt;perf_ related things though it’s&amp;nbsp;useless because &lt;em&gt;perf&lt;/em&gt; is&amp;nbsp;developed by&amp;nbsp;kernel big fishes&amp;nbsp;&amp;mdash; Info Molnar&lt;a href="#fn4" class="footnoteRef" id="fnref4"&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt; and Peter Zijlstra.&lt;/p&gt;
+&lt;p&gt;I&amp;nbsp;really can’t&amp;nbsp;tell anything more about &lt;em&gt;perf_events&lt;/em&gt; in&amp;nbsp;isolation of&amp;nbsp;&lt;code&gt;perf&lt;/code&gt;, so&amp;nbsp;here I&amp;nbsp;finish.&lt;/p&gt;
+&lt;h2 id="summary"&gt;Summary&lt;/h2&gt;
+&lt;p&gt;There are a&amp;nbsp;few Linux kernel features that enables profiling:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;&lt;em&gt;tracepoints&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;kprobes&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;perf_events&lt;/em&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;All Linux kernel profilers uses combinations of&amp;nbsp;that features, read details in&amp;nbsp;article for particular profiler.&lt;/p&gt;
+&lt;h2 id="to-read"&gt;To&amp;nbsp;read&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf"&gt;https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf"&gt;http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;tracepoints&lt;/em&gt;: &lt;ul&gt;
+&lt;li&gt;&lt;a href="http://lxr.free-electrons.com/source/Documentation/trace/tracepoints.txt?v=3.13"&gt;Documentation/trace/tracepoints.txt&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lttng.org/files/thesis/desnoyers-dissertation-2009-12-v27.pdf"&gt;http://lttng.org/files/thesis/desnoyers-dissertation-&lt;nobr&gt;2009-12-v27&lt;/nobr&gt;.pdf&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lwn.net/Articles/379903/"&gt;http://lwn.net/Articles/379903/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lwn.net/Articles/381064/"&gt;http://lwn.net/Articles/381064/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lwn.net/Articles/383362/"&gt;http://lwn.net/Articles/383362/&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;kprobes&lt;/em&gt;: &lt;ul&gt;
+&lt;li&gt;&lt;a href="http://lxr.free-electrons.com/source/Documentation/kprobes.txt?v=3.13"&gt;Documentation/kprobes.txt&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://lwn.net/Articles/132196/"&gt;https://lwn.net/Articles/132196/&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;perf_events&lt;/em&gt;: &lt;ul&gt;
+&lt;li&gt;&lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/"&gt;http://web.eece.maine.edu/~vweaver/projects/perf_events/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://lwn.net/Articles/441209/"&gt;https://lwn.net/Articles/441209/&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="footnotes"&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id="fn1"&gt;&lt;p&gt;Tracepoints are improvement of&amp;nbsp;early feature called kernel markers.&lt;a href="#fnref1"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn2"&gt;&lt;p&gt;Namely in&amp;nbsp;commit &lt;a href="https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b75ef8b44b1cb95f5a26484b0e2fe37a63b12b44"&gt;b75ef8b44b1cb95f5a26484b0e2fe37a63b12b44&lt;/a&gt;&lt;a href="#fnref2"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn3"&gt;&lt;p&gt;And that’s&amp;nbsp;indended behaviour. Kernel &lt;strong&gt;ABI&lt;/strong&gt; in&amp;nbsp;no&amp;nbsp;sense stable, &lt;acronym title="Application programming interface" lang="en"&gt;API&lt;/acronym&gt; is.&lt;a href="#fnref3"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn4"&gt;&lt;p&gt;Author of&amp;nbsp;current default O(1) process scheduler CFS&amp;nbsp;&amp;mdash; Completely Fair Scheduler.&lt;a href="#fnref4"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;</content>
+  </entry>
+  <entry xml:base="http://avd.reduct.ru/feed">
+    <title type="text">Profiling in Linux. Valgrind</title>
+    <id>linux/profiling-valgrind.html</id>
+    <updated>2014-03-15T00:00:00Z</updated>
+    <link href="linux/profiling-valgrind.html" />
+    <author>
+      <name>Alex Dzyoba</name>
+    </author>
+    <content type="html">&lt;p&gt;TOC:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-intro.html"&gt;Intro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-gprof-gcov.html"&gt;Userspace profiling: gprof, gcov&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Userspace profiling: Valgrind&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Kernel profiling: ftrace&lt;/li&gt;
+&lt;li&gt;Kernel profiling: perf&lt;/li&gt;
+&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
+&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
+&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Quick reminder. I’m&amp;nbsp;trying to&amp;nbsp;understand why my&amp;nbsp;nice little program is&amp;nbsp;doing reading from RAID so&amp;nbsp;slow. I’m&amp;nbsp;using various profiling tools to&amp;nbsp;inspect my&amp;nbsp;&lt;code&gt;block_hasher&lt;/code&gt; and get a&amp;nbsp;&lt;nobr&gt;hands-on&lt;/nobr&gt; experience with profilers.&lt;/p&gt;
+&lt;h2 id="valgrind"&gt;Valgrind&lt;/h2&gt;
+&lt;p&gt;Countrary to&amp;nbsp;popular belief, &lt;em&gt;Valgrind is&amp;nbsp;not a&amp;nbsp;single tool, but a&amp;nbsp;suite of&amp;nbsp;such tools, with &lt;/em&gt;Memcheck_ as&amp;nbsp;default. By&amp;nbsp;the time of&amp;nbsp;writing &lt;em&gt;Valgrind&lt;/em&gt; consists of:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Memcheck&amp;nbsp;&amp;mdash; memory management errors detection.&lt;/li&gt;
+&lt;li&gt;Cachegrind&amp;nbsp;&amp;mdash; CPU cache access profiling tool.&lt;/li&gt;
+&lt;li&gt;Massif&amp;nbsp;&amp;mdash; sampling heap profiler.&lt;/li&gt;
+&lt;li&gt;Helgrind&amp;nbsp;&amp;mdash; race condition detector.&lt;/li&gt;
+&lt;li&gt;DRD&amp;nbsp;&amp;mdash; tool to&amp;nbsp;detect error in&amp;nbsp;multithreading applications.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Plus there are unofficial tools not included in&amp;nbsp;&lt;em&gt;Valgrind&lt;/em&gt; and distributed as&amp;nbsp;&lt;a href="http://valgrind.org/downloads/variants.html"&gt;patches&lt;/a&gt; .&lt;/p&gt;
+&lt;p&gt;Despite some of&amp;nbsp;the tools are not profilers per se&amp;nbsp;(e.g. &lt;em&gt;Memcheck&lt;/em&gt; is&amp;nbsp;more like debugger) I&amp;nbsp;will use all of&amp;nbsp;them just because it’s&amp;nbsp;incredibly useful for every single programmer.&lt;/p&gt;
+&lt;p&gt;We&amp;nbsp;don’t&amp;nbsp;need to&amp;nbsp;recompile or&amp;nbsp;modify our program in&amp;nbsp;any way because &lt;em&gt;Valgrind&lt;/em&gt; tools use emulation as&amp;nbsp;a&amp;nbsp;method of&amp;nbsp;profiling. All of&amp;nbsp;that tools are using common infrastructure that emulates application runtime&amp;nbsp;&amp;mdash; memory management function, CPU caches, threading primitives, etc. That’s&amp;nbsp;where our program is&amp;nbsp;executing and being analyzed by&amp;nbsp;&lt;em&gt;Valgrind&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Now let’s&amp;nbsp;look at&amp;nbsp;what &lt;em&gt;Valgrind&lt;/em&gt; can do.&lt;/p&gt;
+&lt;h2 id="memcheck"&gt;Memcheck&lt;/h2&gt;
+&lt;p&gt;Ok, so&amp;nbsp;&lt;em&gt;Memcheck&lt;/em&gt; is&amp;nbsp;memory errors detector. Though it’s&amp;nbsp;not profile it’s&amp;nbsp;one of&amp;nbsp;most useful tools in&amp;nbsp;programmer’s&amp;nbsp;toolbox.&lt;/p&gt;
+&lt;p&gt;Let’s&amp;nbsp;launch our hasher under &lt;em&gt;Memcheck&lt;/em&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# valgrind --leak-check=full ./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000
+==4323== Memcheck, a memory error detector
+==4323== Copyright (C) 2002-2010, and GNU GPL&amp;#39;d, by Julian Seward et al.
+==4323== Using Valgrind-3.6.0 and LibVEX; rerun with -h for copyright info
+==4323== Command: ./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000
+==4323== 
+==4323== 
+==4323== HEAP SUMMARY:
+==4323==     in use at exit: 16 bytes in 1 blocks
+==4323==   total heap usage: 43 allocs, 42 frees, 10,491,624 bytes allocated
+==4323== 
+==4323== LEAK SUMMARY:
+==4323==    definitely lost: 0 bytes in 0 blocks
+==4323==    indirectly lost: 0 bytes in 0 blocks
+==4323==      possibly lost: 0 bytes in 0 blocks
+==4323==    still reachable: 16 bytes in 1 blocks
+==4323==         suppressed: 0 bytes in 0 blocks
+==4323== Reachable blocks (those to which a pointer was found) are not shown.
+==4323== To see them, rerun with: --leak-check=full --show-reachable=yes
+==4323== 
+==4323== For counts of detected and suppressed errors, rerun with: -v
+==4323== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 6 from 6)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;I&amp;nbsp;won’t&amp;nbsp;explain what is&amp;nbsp;&lt;em&gt;definitely lost&lt;/em&gt;, &lt;em&gt;indirectly lost&lt;/em&gt; and other&amp;nbsp;&amp;mdash; that’s&amp;nbsp;what is&amp;nbsp;&lt;a href="http://valgrind.org/docs/manual/mc-manual.html"&gt;documentaion&lt;/a&gt; for.&lt;/p&gt;
+&lt;p&gt;From &lt;em&gt;Memcheck&lt;/em&gt; profile we&amp;nbsp;can say that there are no&amp;nbsp;errors except little leak, 1 block is&amp;nbsp;&lt;em&gt;still reachable&lt;/em&gt;. From the message&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;total heap usage: 43 allocs, 42 frees, 10,491,624 bytes allocated&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;I&amp;nbsp;have somewhere forgotten to&amp;nbsp;call &lt;code&gt;free&lt;/code&gt;. And that’s&amp;nbsp;true, in&amp;nbsp;&lt;code&gt;bdev_open&lt;/code&gt; I’m&amp;nbsp;allocating struct for &lt;code&gt;block_device&lt;/code&gt; but in&amp;nbsp;&lt;code&gt;bdev_close&lt;/code&gt; it’s&amp;nbsp;not freeing. By&amp;nbsp;the way, it’s&amp;nbsp;interesting that &lt;em&gt;Memcheck&lt;/em&gt; reports about 16 bytes loss, while &lt;code&gt;block_device&lt;/code&gt; is&amp;nbsp;&lt;code&gt;int&lt;/code&gt; and &lt;code&gt;off_t&lt;/code&gt; that should occupy &lt;code&gt;4 + 8 = 12&lt;/code&gt; bytes. Where are 4 more bytes? Structs are 8 byte aligned (for 64 bit system), that’s&amp;nbsp;why &lt;code&gt;int&lt;/code&gt; field are padded with 4 bytes.&lt;/p&gt;
+&lt;p&gt;Anyway, I’ve&amp;nbsp;&lt;a href="https://github.com/dzeban/block_hasher/commit/f86fa71c45c3a59ced99b74b44a30cb8d94ba72d"&gt;fixed&lt;/a&gt; memory leak:&lt;/p&gt;
+&lt;pre class="sourceCode diff"&gt;&lt;code class="sourceCode diff"&gt;&lt;span class="dt"&gt;@@ -240,6 +241,9 @@ void bdev_close( struct block_device *dev )&lt;/span&gt;
+         perror(&amp;quot;close&amp;quot;);
+     }
+ 
+&lt;span class="ot"&gt;+    free(dev);&lt;/span&gt;
+&lt;span class="ot"&gt;+    dev = NULL;&lt;/span&gt;
+&lt;span class="ot"&gt;+&lt;/span&gt;
+     return;
+ }&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Check:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# valgrind --leak-check=full ./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000
+==15178== Memcheck, a memory error detector
+==15178== Copyright (C) 2002-2010, and GNU GPL&amp;#39;d, by Julian Seward et al.
+==15178== Using Valgrind-3.6.0 and LibVEX; rerun with -h for copyright info
+==15178== Command: ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000
+==15178== 
+==15178== 
+==15178== HEAP SUMMARY:
+==15178==     in use at exit: 0 bytes in 0 blocks
+==15178==   total heap usage: 43 allocs, 43 frees, 10,491,624 bytes allocated
+==15178== 
+==15178== All heap blocks were freed -- no leaks are possible
+==15178== 
+==15178== For counts of detected and suppressed errors, rerun with: -v
+==15178== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 6 from 6)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Real pleasure to&amp;nbsp;see.&lt;/p&gt;
+&lt;p&gt;As&amp;nbsp;a&amp;nbsp;resume I’d&amp;nbsp;like to&amp;nbsp;say that &lt;em&gt;Memcheck&lt;/em&gt; can do&amp;nbsp;a&amp;nbsp;lot. Not only in&amp;nbsp;detection of&amp;nbsp;memory errors, but also in&amp;nbsp;explaining. It’s&amp;nbsp;understatement to&amp;nbsp;say &amp;laquo;Hey, you’ve&amp;nbsp;got some error here!&amp;raquo;&amp;nbsp;&amp;mdash; to&amp;nbsp;fix error it’s&amp;nbsp;better to&amp;nbsp;know what is&amp;nbsp;the reason. And &lt;em&gt;Memcheck&lt;/em&gt; does it. It’s&amp;nbsp;so&amp;nbsp;good that it’s&amp;nbsp;even listed as&amp;nbsp;a&amp;nbsp;skill for system programmers positions.&lt;/p&gt;
+&lt;h2 id="cachegrind"&gt;CacheGrind&lt;/h2&gt;
+&lt;p&gt;&lt;em&gt;Cachegrind&lt;/em&gt;&amp;nbsp;&amp;mdash; CPU cache access profiler. What amazed me&amp;nbsp;is&amp;nbsp;that how it&amp;nbsp;trace cache accesses&amp;nbsp;&amp;mdash; &lt;em&gt;Cachegrind&lt;/em&gt; simulates it, see excerpt from documentation:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;It&amp;nbsp;performs detailed simulation of&amp;nbsp;the I1, D1 and L2 caches in&amp;nbsp;your CPU and so&amp;nbsp;can accurately pinpoint the sources of&amp;nbsp;cache misses in&amp;nbsp;your code.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;If&amp;nbsp;you think it’s&amp;nbsp;easy, please spend 90 minutes to&amp;nbsp;read &lt;a href="http://www.lighterra.com/papers/modernmicroprocessors/"&gt;this great article&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Let’s&amp;nbsp;collect profile!&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# valgrind --tool=cachegrind ./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000
+==9408== Cachegrind, a cache and branch-prediction profiler
+==9408== Copyright (C) 2002-2010, and GNU GPL&amp;#39;d, by Nicholas Nethercote et al.
+==9408== Using Valgrind-3.6.0 and LibVEX; rerun with -h for copyright info
+==9408== Command: ./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000
+==9408== 
+--9408-- warning: Unknown Intel cache config value (0xff), ignoring
+--9408-- warning: L2 cache not installed, ignore LL results.
+==9408== 
+==9408== I   refs:      167,774,548,454
+==9408== I1  misses:              1,482
+==9408== LLi misses:              1,479
+==9408== I1  miss rate:            0.00%
+==9408== LLi miss rate:            0.00%
+==9408== 
+==9408== D   refs:       19,989,520,856  (15,893,212,838 rd   + 4,096,308,018 wr)
+==9408== D1  misses:        163,354,097  (   163,350,059 rd   +         4,038 wr)
+==9408== LLd misses:         74,749,207  (    74,745,179 rd   +         4,028 wr)
+==9408== D1  miss rate:             0.8% (           1.0%     +           0.0%  )
+==9408== LLd miss rate:             0.3% (           0.4%     +           0.0%  )
+==9408== 
+==9408== LL refs:           163,355,579  (   163,351,541 rd   +         4,038 wr)
+==9408== LL misses:          74,750,686  (    74,746,658 rd   +         4,028 wr)
+==9408== LL miss rate:              0.0% (           0.0%     +           0.0%  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;First thing, I&amp;nbsp;look at&amp;nbsp;&amp;mdash; cache misses. But here it’s&amp;nbsp;less then 1% so&amp;nbsp;it&amp;nbsp;can’t&amp;nbsp;be&amp;nbsp;the problem.&lt;/p&gt;
+&lt;p&gt;If&amp;nbsp;you asking yourself how &lt;em&gt;Cachegrind&lt;/em&gt; can be&amp;nbsp;useful, I’ll&amp;nbsp;tell you one of&amp;nbsp;the work stories. To&amp;nbsp;accelerate some of&amp;nbsp;RAID calculation algorithm my&amp;nbsp;collegue has reduced multiplications for the price of&amp;nbsp;increased additions and complicated data structure. In&amp;nbsp;theory it&amp;nbsp;should’ve&amp;nbsp;worked better like in&amp;nbsp;Karatsuba multiplication. But in&amp;nbsp;reality it&amp;nbsp;became much worse. After few days of&amp;nbsp;hard debugging we&amp;nbsp;launched it&amp;nbsp;under &lt;em&gt;Cachegrind&lt;/em&gt; and saw cache miss rate about 80%. More additions invoked more memory accesses and reduced locality. So&amp;nbsp;we&amp;nbsp;abandoned the idea.&lt;/p&gt;
+&lt;h2 id="massif"&gt;Massif&lt;/h2&gt;
+&lt;p&gt;&lt;em&gt;Massif&lt;/em&gt;&amp;nbsp;&amp;mdash; heap profiler, in&amp;nbsp;the sense that it&amp;nbsp;shows dynamic of&amp;nbsp;heap allocations, i.e. how much memory your applications were using in&amp;nbsp;some moment.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;do&amp;nbsp;that &lt;em&gt;Massif&lt;/em&gt; samples heap state, generating file that later transformed to&amp;nbsp;report with help of&amp;nbsp;&lt;code&gt;ms_print&lt;/code&gt; tool.&lt;/p&gt;
+&lt;p&gt;Ok, launch it&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# valgrind --tool=massif ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 100
+==29856== Massif, a heap profiler
+==29856== Copyright (C) 2003-2010, and GNU GPL&amp;#39;d, by Nicholas Nethercote
+==29856== Using Valgrind-3.6.0 and LibVEX; rerun with -h for copyright info
+==29856== Command: ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 100
+==29856== 
+==29856== &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Got a&amp;nbsp;&lt;em&gt;massif.out.29856&lt;/em&gt; file. Convert it&amp;nbsp;to&amp;nbsp;text profile:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# ms_print massif.out.29856 &amp;gt; massif.profile&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Profile conteins histogram of&amp;nbsp;heap allocations&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;    MB
+10.01^::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::#
+     |:                                                                 #
+     |@                                                                 #::
+     |@                                                                 # :
+     |@                                                                 # ::
+     |@                                                                 # ::
+     |@                                                                 # ::@
+     |@                                                                 # ::@
+     |@                                                                 # ::@
+     |@                                                                 # ::@
+     |@                                                                 # ::@
+     |@                                                                 # ::@
+     |@                                                                 # ::@@
+     |@                                                                 # ::@@
+     |@                                                                 # ::@@
+     |@                                                                 # ::@@
+     |@                                                                 # ::@@
+     |@                                                                 # ::@@
+     |@                                                                 # ::@@
+     |@                                                                 # ::@@
+   0 +-----------------------------------------------------------------------&amp;gt;Gi
+     0                                                                   15.63&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;and summary table of&amp;nbsp;most noticable allocations. Example:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;--------------------------------------------------------------------------------
+  n        time(i)         total(B)   useful-heap(B) extra-heap(B)    stacks(B)
+--------------------------------------------------------------------------------
+ 40        344,706        9,443,296        9,442,896           400            0
+ 41        346,448       10,491,880       10,491,472           408            0
+ 42        346,527       10,491,936       10,491,520           416            0
+ 43        346,723       10,492,056       10,491,624           432            0
+ 44 15,509,791,074       10,492,056       10,491,624           432            0
+100.00% (10,491,624B) (heap allocation functions) malloc/new/new[], --alloc-fns, etc.
+-&amp;gt;99.94% (10,485,760B) 0x401169: thread_func (block_hasher.c:142)
+| -&amp;gt;99.94% (10,485,760B) 0x54189CF: start_thread (in /lib64/libpthread-2.12.so)
+|   -&amp;gt;09.99% (1,048,576B) 0x6BDC6FE: ???
+|   |
+|   -&amp;gt;09.99% (1,048,576B) 0x7FDE6FE: ???
+|   |
+|   -&amp;gt;09.99% (1,048,576B) 0x75DD6FE: ???
+|   |
+|   -&amp;gt;09.99% (1,048,576B) 0x93E06FE: ???
+|   |
+|   -&amp;gt;09.99% (1,048,576B) 0x89DF6FE: ???
+|   |
+|   -&amp;gt;09.99% (1,048,576B) 0xA1E16FE: ???
+|   |
+|   -&amp;gt;09.99% (1,048,576B) 0xABE26FE: ???
+|   |
+|   -&amp;gt;09.99% (1,048,576B) 0xB9E36FE: ???
+|   |
+|   -&amp;gt;09.99% (1,048,576B) 0xC3E46FE: ???
+|   |
+|   -&amp;gt;09.99% (1,048,576B) 0xCDE56FE: ???
+|
+-&amp;gt;00.06% (5,864B) in 1+ places, all below ms_print&amp;#39;s threshold (01.00%)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In&amp;nbsp;the table above we&amp;nbsp;can see that we&amp;nbsp;usually allocate in&amp;nbsp;10 MiB portions that is&amp;nbsp;really just a&amp;nbsp;10 blocks of&amp;nbsp;1 MiB (our block size). Nothing special but it&amp;nbsp;was interesting.&lt;/p&gt;
+&lt;p&gt;Of&amp;nbsp;course, &lt;em&gt;Massif&lt;/em&gt; is&amp;nbsp;useful, because it&amp;nbsp;can show you a&amp;nbsp;history of&amp;nbsp;allocation, how much memory was allocated with all the alignment and also what code pieces allocated most. Too bad I&amp;nbsp;don’t&amp;nbsp;have heap errors.&lt;/p&gt;
+&lt;h2 id="helgrind"&gt;Helgrind&lt;/h2&gt;
+&lt;p&gt;&lt;em&gt;Helgrind&lt;/em&gt; is&amp;nbsp;not a&amp;nbsp;profiler but a&amp;nbsp;tool to&amp;nbsp;detect threading errors. It’s&amp;nbsp;a&amp;nbsp;thread debugger.&lt;/p&gt;
+&lt;p&gt;I&amp;nbsp;just show how I’ve&amp;nbsp;fixed bug in&amp;nbsp;my&amp;nbsp;code with &lt;em&gt;Helgrind&lt;/em&gt; help.&lt;/p&gt;
+&lt;p&gt;When I’ve&amp;nbsp;launched my&amp;nbsp;&lt;code&gt;block_hasher&lt;/code&gt; under it&amp;nbsp;I&amp;nbsp;was sure that I&amp;nbsp;will have 0 errors, but stuck in&amp;nbsp;debugging for couple of&amp;nbsp;days.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# valgrind --tool=helgrind ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 100
+==3930== Helgrind, a thread error detector
+==3930== Copyright (C) 2007-2010, and GNU GPL&amp;#39;d, by OpenWorks LLP et al.
+==3930== Using Valgrind-3.6.0 and LibVEX; rerun with -h for copyright info
+==3930== Command: ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 100
+==3930== 
+==3930== Thread #3 was created
+==3930==    at 0x571DB2E: clone (in /lib64/libc-2.12.so)
+==3930==    by 0x541E8BF: do_clone.clone.0 (in /lib64/libpthread-2.12.so)
+==3930==    by 0x541EDA1: pthread_create@@GLIBC_2.2.5 (in /lib64/libpthread-2.12.so)
+==3930==    by 0x4C2CE76: pthread_create_WRK (hg_intercepts.c:257)
+==3930==    by 0x4019F0: main (block_hasher.c:350)
+==3930== 
+==3930== Thread #2 was created
+==3930==    at 0x571DB2E: clone (in /lib64/libc-2.12.so)
+==3930==    by 0x541E8BF: do_clone.clone.0 (in /lib64/libpthread-2.12.so)
+==3930==    by 0x541EDA1: pthread_create@@GLIBC_2.2.5 (in /lib64/libpthread-2.12.so)
+==3930==    by 0x4C2CE76: pthread_create_WRK (hg_intercepts.c:257)
+==3930==    by 0x4019F0: main (block_hasher.c:350)
+==3930== 
+==3930== Possible data race during write of size 4 at 0x5200380 by thread #3
+==3930==    at 0x4E98AF8: CRYPTO_malloc (in /usr/lib64/libcrypto.so.1.0.1e)
+==3930==    by 0x4F16FF6: EVP_MD_CTX_create (in /usr/lib64/libcrypto.so.1.0.1e)
+==3930==    by 0x401231: thread_func (block_hasher.c:163)
+==3930==    by 0x4C2D01D: mythread_wrapper (hg_intercepts.c:221)
+==3930==    by 0x541F9D0: start_thread (in /lib64/libpthread-2.12.so)
+==3930==    by 0x75E46FF: ???
+==3930==  This conflicts with a previous write of size 4 by thread #2
+==3930==    at 0x4E98AF8: CRYPTO_malloc (in /usr/lib64/libcrypto.so.1.0.1e)
+==3930==    by 0x4F16FF6: EVP_MD_CTX_create (in /usr/lib64/libcrypto.so.1.0.1e)
+==3930==    by 0x401231: thread_func (block_hasher.c:163)
+==3930==    by 0x4C2D01D: mythread_wrapper (hg_intercepts.c:221)
+==3930==    by 0x541F9D0: start_thread (in /lib64/libpthread-2.12.so)
+==3930==    by 0x6BE36FF: ???
+==3930== 
+==3930== 
+==3930== For counts of detected and suppressed errors, rerun with: -v
+==3930== Use --history-level=approx or =none to gain increased speed, at
+==3930== the cost of reduced accuracy of conflicting-access information
+==3930== ERROR SUMMARY: 9 errors from 1 contexts (suppressed: 955 from 9)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;As&amp;nbsp;we&amp;nbsp;see, &lt;code&gt;EVP_MD_CTX_create&lt;/code&gt; leads to&amp;nbsp;data race. This is&amp;nbsp;an&amp;nbsp;openssl’s&amp;nbsp;&lt;a href="#fn1" class="footnoteRef" id="fnref1"&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; function that initializes context for hash calculation. I&amp;nbsp;calculate hash for blocks read in&amp;nbsp;each thread with &lt;code&gt;EVP_DigestUpdate&lt;/code&gt; and then write it&amp;nbsp;to&amp;nbsp;file after final &lt;code&gt;EVP_DigesFinal_ex&lt;/code&gt;. So&amp;nbsp;this &lt;em&gt;Helgrind&lt;/em&gt; errors are related to&amp;nbsp;openssl functions. And I&amp;nbsp;asked myself&amp;nbsp;&amp;mdash; &amp;laquo;Is&amp;nbsp;libcrypto &lt;nobr&gt;thread-safe&lt;/nobr&gt;?&amp;raquo;. So&amp;nbsp;I&amp;nbsp;used my&amp;nbsp;&lt;nobr&gt;google-fu&lt;/nobr&gt; and the answer is&amp;nbsp;&amp;mdash; &lt;a href="http://wiki.openssl.org/index.php/Libcrypto_API#Thread_Safety"&gt;&lt;strong&gt;by&amp;nbsp;default&lt;/strong&gt; no&lt;/a&gt;. To&amp;nbsp;use EVP functions in&amp;nbsp;multithreaded applications openssl recommends to&amp;nbsp;either register 2 crazy callbacks or&amp;nbsp;use dynamic locks (see &lt;a href="http://www.openssl.org/docs/crypto/threads.html"&gt;here&lt;/a&gt;). As&amp;nbsp;for me, I’ve&amp;nbsp;just wrapped context initialization in&amp;nbsp;pthread mutex and &lt;a href="https://github.com/dzeban/block_hasher/commit/c1994f763d4fce8bb41e97af45eac6e2ad0dc3b7"&gt;that’s&amp;nbsp;it&lt;/a&gt;.&lt;/p&gt;
+&lt;pre class="sourceCode diff"&gt;&lt;code class="sourceCode diff"&gt;
+&lt;span class="dt"&gt;@@ -159,9 +159,11 @@ void *thread_func(void *arg)&lt;/span&gt;
+     gap = num_threads * block_size; // Multiply here to avoid integer overflow
+ 
+     // Initialize EVP and start reading
+&lt;span class="ot"&gt;+    pthread_mutex_lock( &amp;amp;mutex );&lt;/span&gt;
+     md = EVP_sha1();
+     mdctx = EVP_MD_CTX_create();
+     EVP_DigestInit_ex( mdctx, md, NULL );
+&lt;span class="ot"&gt;+    pthread_mutex_unlock( &amp;amp;mutex );&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If&amp;nbsp;anyone knows something about this&amp;nbsp;&amp;mdash; please, tell me.&lt;/p&gt;
+&lt;h2 id="drd"&gt;DRD&lt;/h2&gt;
+&lt;p&gt;&lt;em&gt;DRD&lt;/em&gt; is&amp;nbsp;one more tool in&amp;nbsp;&lt;em&gt;Valgrind&lt;/em&gt; suite that can detect thread errors. It’s&amp;nbsp;more thorough and has more features while less memory hungry.&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;my&amp;nbsp;case it&amp;nbsp;has detected some mysterious &lt;code&gt;pread&lt;/code&gt; data race.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;==16358== Thread 3:
+==16358== Conflicting load by thread 3 at 0x0563e398 size 4
+==16358==    at 0x5431030: pread (in /lib64/libpthread-2.12.so)
+==16358==    by 0x4012D9: thread_func (block_hasher.c:174)
+==16358==    by 0x4C33470: vgDrd_thread_wrapper (drd_pthread_intercepts.c:281)
+==16358==    by 0x54299D0: start_thread (in /lib64/libpthread-2.12.so)
+==16358==    by 0x75EE6FF: ???&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;pread&lt;/code&gt; itself is&amp;nbsp;&lt;nobr&gt;thread-safe&lt;/nobr&gt; in&amp;nbsp;the sense that it&amp;nbsp;can be&amp;nbsp;called from multiple threads, but &lt;em&gt;access&lt;/em&gt; to&amp;nbsp;data might be&amp;nbsp;not synchronized. For example, you can call &lt;code&gt;pread&lt;/code&gt; in&amp;nbsp;one thread while calling &lt;code&gt;pwrite&lt;/code&gt; in&amp;nbsp;another and that’s&amp;nbsp;where you got &lt;em&gt;data&lt;/em&gt; race. But in&amp;nbsp;my&amp;nbsp;case data blocks do&amp;nbsp;not overlap, so&amp;nbsp;I&amp;nbsp;can’t&amp;nbsp;tell what’s&amp;nbsp;a&amp;nbsp;real problem here.&lt;/p&gt;
+&lt;h2 id="conclusion"&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;Conclusion will be&amp;nbsp;dead simple&amp;nbsp;&amp;mdash; learn how to&amp;nbsp;use Valgrind, it’s&amp;nbsp;extremely useful.&lt;/p&gt;
+&lt;h2 id="to-read"&gt;To&amp;nbsp;read&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Success stories:
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="http://blog.gerhards.net/2009/01/rsyslog-data-race-analysis.html"&gt;rsyslog data race analysis&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://blog.evanweaver.com/2008/02/05/valgrind-and-ruby/"&gt;valgrind and ruby&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://sql.dzone.com/articles/profiling-mysql-memory-usage"&gt;Profiling MySQL Memory Usage With Valgrind Massif&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://courses.cs.washington.edu/courses/cse326/05wi/valgrind-doc/mc_techdocs.html"&gt;The design and implementation of&amp;nbsp;Valgrind. Detailed technical notes for hackers, maintainers and the &lt;nobr&gt;overly-curious&lt;/nobr&gt;&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="footnotes"&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id="fn1"&gt;&lt;p&gt;libcrypto is&amp;nbsp;a&amp;nbsp;library of&amp;nbsp;cryptography functions and primitives that’s&amp;nbsp;openssl is&amp;nbsp;based on.&lt;a href="#fnref1"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;</content>
+  </entry>
+  <entry xml:base="http://avd.reduct.ru/feed">
+    <title type="text">Profiling in Linux. gprof and gcov</title>
+    <id>linux/profiling-gprof-gcov.html</id>
+    <updated>2014-02-10T00:00:00Z</updated>
+    <link href="linux/profiling-gprof-gcov.html" />
+    <author>
+      <name>Alex Dzyoba</name>
+    </author>
+    <content type="html">&lt;p&gt;TOC:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-intro.html"&gt;Intro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Userspace profiling: gprof, gcov&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-valgrind.html"&gt;Userspace profiling: Valgrind&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Kernel profiling: ftrace&lt;/li&gt;
+&lt;li&gt;Kernel profiling: perf&lt;/li&gt;
+&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
+&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
+&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;em&gt;gprof&lt;/em&gt; and &lt;em&gt;gcov&lt;/em&gt; is&amp;nbsp;a&amp;nbsp;classical profilers that are still in&amp;nbsp;wide use. Since the dawn of&amp;nbsp;time they were used by&amp;nbsp;hackers though now everybody shifts their focus to&amp;nbsp;dynamic profilers like Valgrind.&lt;/p&gt;
+&lt;h2 id="gprof"&gt;gprof&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;gprof&lt;/strong&gt; (GNU Profiler)&amp;nbsp;&amp;mdash; simple and easy profiler that can show how much time your program spends in&amp;nbsp;routines in&amp;nbsp;percents and seconds. &lt;em&gt;gprof&lt;/em&gt; uses source code instrumentation by&amp;nbsp;inserting special &lt;code&gt;mcount&lt;/code&gt; function call to&amp;nbsp;gather metrics of&amp;nbsp;your program.&lt;/p&gt;
+&lt;h3 id="building-with-gprof-instrumentation"&gt;Building with gprof instrumentation&lt;/h3&gt;
+&lt;p&gt;To&amp;nbsp;gather profile you need to&amp;nbsp;compile your program with &lt;code&gt;-pg&lt;/code&gt; gcc option and then launch under &lt;em&gt;gprof&lt;/em&gt;. For better results and statistical errors elimination it’s&amp;nbsp;recommended to&amp;nbsp;launch profiling subject several times.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;build with &lt;em&gt;gprof&lt;/em&gt; instrumentation invoke gcc like this:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# gcc -pg -g -lcrypto -pthread -lrt -Wall -Wextra block_hasher.c -o block_hasher&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;As&amp;nbsp;a&amp;nbsp;result you’ll&amp;nbsp;get instrumented program. To&amp;nbsp;check if&amp;nbsp;it’s&amp;nbsp;really instrumented just grep &lt;code&gt;mcount&lt;/code&gt; symbol.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt; [root@simplex block_hasher]# nm block_hasher | grep mcount
+                  U mcount@@GLIBC_2.2.5&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="profiling-block_hasher-under-gprof"&gt;Profiling block_hasher under gprof&lt;/h3&gt;
+&lt;p&gt;As&amp;nbsp;I&amp;nbsp;said earlier to&amp;nbsp;collect useful statistic we&amp;nbsp;should run program several times and accumulate metrics. To&amp;nbsp;do&amp;nbsp;that I’ve&amp;nbsp;written simple bash script:&lt;/p&gt;
+&lt;pre class="sourceCode bash"&gt;&lt;code class="sourceCode bash"&gt;&lt;span class="co"&gt;#!/bin/bash&lt;/span&gt;
+
+&lt;span class="kw"&gt;if [&lt;/span&gt; &lt;span class="ot"&gt;$#&lt;/span&gt; &lt;span class="ot"&gt;-ne&lt;/span&gt; 1&lt;span class="kw"&gt; ]&lt;/span&gt;; &lt;span class="kw"&gt;then&lt;/span&gt;
+    &lt;span class="kw"&gt;echo&lt;/span&gt; &lt;span class="st"&gt;&amp;quot;gprof.sh &amp;lt;number of runs&amp;gt;&amp;quot;&lt;/span&gt;
+    &lt;span class="kw"&gt;exit&lt;/span&gt; 1
+&lt;span class="kw"&gt;fi&lt;/span&gt;
+
+&lt;span class="kw"&gt;for&lt;/span&gt; &lt;span class="kw"&gt;i&lt;/span&gt; in &lt;span class="ot"&gt;$(&lt;/span&gt;&lt;span class="kw"&gt;seq&lt;/span&gt; 1 &lt;span class="ot"&gt;$1)&lt;/span&gt;&lt;span class="kw"&gt;;&lt;/span&gt; &lt;span class="kw"&gt;do&lt;/span&gt;
+
+    &lt;span class="co"&gt;# Run profiled program&lt;/span&gt;
+    &lt;span class="kw"&gt;./block_hasher&lt;/span&gt; -d /dev/md126 -b 1048576 -t 10 -n 1000
+
+    &lt;span class="co"&gt;# Accumulate gprof statistic&lt;/span&gt;
+    &lt;span class="kw"&gt;if [&lt;/span&gt; &lt;span class="ot"&gt;-e&lt;/span&gt; gmon.sum&lt;span class="kw"&gt; ]&lt;/span&gt;; &lt;span class="kw"&gt;then&lt;/span&gt;
+        &lt;span class="kw"&gt;gprof&lt;/span&gt; -s block_hasher gmon.out gmon.sum
+    &lt;span class="kw"&gt;else&lt;/span&gt;
+        &lt;span class="kw"&gt;mv&lt;/span&gt; gmon.out gmon.sum
+    &lt;span class="kw"&gt;fi&lt;/span&gt;
+&lt;span class="kw"&gt;done&lt;/span&gt;
+
+&lt;span class="co"&gt;# Make final profile&lt;/span&gt;
+&lt;span class="kw"&gt;gprof&lt;/span&gt; block_hasher gmon.sum &lt;span class="kw"&gt;&amp;gt;&lt;/span&gt; gmon.profile&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;So, each launch will create &lt;em&gt;gmon.out&lt;/em&gt; that gprof will combine in&amp;nbsp;&lt;em&gt;gmon.sum&lt;/em&gt;. Finally, &lt;em&gt;gmon.sum&lt;/em&gt; will be&amp;nbsp;feed to&amp;nbsp;&lt;em&gt;gprof&lt;/em&gt; to&amp;nbsp;get flat text profile and call graph.&lt;/p&gt;
+&lt;h3 id="analyzing"&gt;Analyzing&lt;/h3&gt;
+&lt;p&gt;Flat profile has info about program routines and time spent in&amp;nbsp;it.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total
+ time   seconds   seconds    calls  Ts/call  Ts/call  name
+100.24      0.01     0.01                             thread_func
+  0.00      0.01     0.00       50     0.00     0.00  time_diff
+  0.00      0.01     0.00        5     0.00     0.00  bdev_close
+  0.00      0.01     0.00        5     0.00     0.00  bdev_open&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;a name="not-application"&gt;&lt;/a&gt; &lt;em&gt;gprof&lt;/em&gt; metrics are clear from the name. As&amp;nbsp;we&amp;nbsp;can see almost all of&amp;nbsp;it’s&amp;nbsp;time our little program spent in&amp;nbsp;thread function, &lt;strong&gt;BUT&lt;/strong&gt; look at&amp;nbsp;the actual seconds&amp;nbsp;&amp;mdash; only 0.01 seconds from whole program execution. It&amp;nbsp;means that it’s&amp;nbsp;not the thread function who is&amp;nbsp;slowing down but something underlying. It’s&amp;nbsp;really obvious that &lt;code&gt;pread&lt;/code&gt; itself is&amp;nbsp;unlikely to&amp;nbsp;slack&amp;nbsp;&amp;mdash; the only reasonable candidate is&amp;nbsp;I/O work that make thread functions sleep in&amp;nbsp;waiting for I/O completion.&lt;/p&gt;
+&lt;p&gt;Call graph is&amp;nbsp;really not interesting here, so&amp;nbsp;I&amp;nbsp;won’t&amp;nbsp;show you it, sorry.&lt;/p&gt;
+&lt;h2 id="gcov"&gt;gcov&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;gcov&lt;/strong&gt; (short for GNU Coverage)&amp;nbsp;&amp;mdash; tool to&amp;nbsp;collect function call statistics &lt;nobr&gt;line-by-line&lt;/nobr&gt;. Usually it’s&amp;nbsp;used in&amp;nbsp;pair with &lt;em&gt;gprof&lt;/em&gt; to&amp;nbsp;understand what exact line in&amp;nbsp;slacking function is&amp;nbsp;holds your program down.&lt;/p&gt;
+&lt;h3 id="building-with-gcov-instrumentation"&gt;Building with gcov instrumentation&lt;/h3&gt;
+&lt;p&gt;Just as&amp;nbsp;&lt;em&gt;gprof&lt;/em&gt; you need to&amp;nbsp;recompile your program with &lt;em&gt;gcov&lt;/em&gt; flags&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# gcc -fprofile-arcs -ftest-coverage -lcrypto -pthread -lrt -Wall -Wextra block_hasher.c -o block_hasher&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;There are 2 &lt;em&gt;gcov&lt;/em&gt; flags: &lt;code&gt;-&lt;nobr&gt;fprofile-arcs&lt;/nobr&gt;&lt;/code&gt; и&amp;nbsp;&lt;code&gt;-&lt;nobr&gt;ftest-coverage&lt;/nobr&gt;&lt;/code&gt;. First will instrument your program to&amp;nbsp;profile so&amp;nbsp;called &lt;em&gt;arcs&lt;/em&gt;&amp;nbsp;&amp;mdash; pathes in&amp;nbsp;program’s&amp;nbsp;control flow. Second option will make gcc to&amp;nbsp;collect additional notes for arcs profiling and &lt;em&gt;gcov&lt;/em&gt; itself.&lt;/p&gt;
+&lt;p&gt;You can simply put &lt;code&gt;-coverage&lt;/code&gt; option which implies both of&amp;nbsp;&lt;code&gt;-&lt;nobr&gt;fprofile-arcs&lt;/nobr&gt;&lt;/code&gt; and &lt;code&gt;-&lt;nobr&gt;ftest-coverage&lt;/nobr&gt;&lt;/code&gt; along with linker &lt;code&gt;-lgcov&lt;/code&gt; flag. See &lt;a href="https://gcc.gnu.org/onlinedocs/gcc/Debugging-Options.html"&gt;GCC debugging options&lt;/a&gt; for more info.&lt;/p&gt;
+&lt;h3 id="profiling-block_hasher-under-gcov"&gt;Profiling block_hasher under gcov&lt;/h3&gt;
+&lt;p&gt;Now, after instrumenting we&amp;nbsp;just launch program to&amp;nbsp;get 2 files&amp;nbsp;&amp;mdash; &lt;em&gt;block_hasher.gcda&lt;/em&gt; and &lt;em&gt;block_hasher.gcno&lt;/em&gt;. Please, don’t&amp;nbsp;look inside it&amp;nbsp;&amp;mdash; we&amp;nbsp;will transform it&amp;nbsp;to&amp;nbsp;text profile. To&amp;nbsp;do&amp;nbsp;this we&amp;nbsp;execute &lt;em&gt;gcov&lt;/em&gt; passing it&amp;nbsp;source code filename. It’s&amp;nbsp;important to&amp;nbsp;remember that you must have &lt;code&gt;&amp;lt;filename&amp;gt;.gcda&lt;/code&gt; and &lt;code&gt;&amp;lt;filename&amp;gt;.gcno&lt;/code&gt; files.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# gcov block_hasher.c
+File &amp;#39;block_hasher.c&amp;#39;
+Lines executed:77.69% of 121
+block_hasher.c:creating &amp;#39;block_hasher.c.gcov&amp;#39;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally we’ll&amp;nbsp;get &lt;em&gt;block_hasher.c.gcov&lt;/em&gt;.&lt;/p&gt;
+&lt;h3 id="analyzing-1"&gt;Analyzing&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;.gcov&lt;/code&gt; file is&amp;nbsp;result of&amp;nbsp;that whole &lt;em&gt;gcov&lt;/em&gt; work. Let’s&amp;nbsp;look at&amp;nbsp;it. For each of&amp;nbsp;your source files gcov will create annotated source codes with runtime coverage. Here is&amp;nbsp;excerpt from &lt;code&gt;thread_func&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;   10:  159:    gap = num_threads * block_size; // Multiply here to avoid integer overflow
+    -:  160:
+    -:  161:    // Initialize EVP and start reading
+   10:  162:    md = EVP_sha1();
+   10:  163:    mdctx = EVP_MD_CTX_create();
+   10:  164:    EVP_DigestInit_ex( mdctx, md, NULL );
+    -:  165:
+   10:  166:    get_clock( &amp;amp;start );
+10010:  167:    for( i = 0; i &amp;lt; nblocks; i++)
+    -:  168:    {
+10000:  169:        offset = j-&amp;gt;off + gap * i;
+    -:  170:
+    -:  171:        // Read at offset without changing file pointer
+10000:  172:        err = pread( bdev-&amp;gt;fd, buf, block_size, offset );
+ 9999:  173:        if( err == -1 )
+    -:  174:        {
+#####:  175:            fprintf(stderr, &amp;quot;T%02d Failed to read at %llu\n&amp;quot;, j-&amp;gt;num, (unsigned long long)offset);
+#####:  176:            perror(&amp;quot;pread&amp;quot;);
+#####:  177:            pthread_exit(NULL);
+    -:  178:        }
+    -:  179:
+ 9999:  180:        bytes += err; // On success pread returns bytes read
+    -:  181:
+    -:  182:        // Update digest
+ 9999:  183:        EVP_DigestUpdate( mdctx, buf, block_size );
+    -:  184:    }
+   10:  185:    get_clock( &amp;amp;end );
+   10:  186:    sec_diff = time_diff( start, end );
+    -:  187:
+   10:  188:    EVP_DigestFinal_ex( mdctx, j-&amp;gt;digest, &amp;amp;j-&amp;gt;digest_len );
+   10:  189:    EVP_MD_CTX_destroy(mdctx);&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The left outmost column is&amp;nbsp;how many times this line of&amp;nbsp;code was invoked. As&amp;nbsp;expected, the &lt;em&gt;for&lt;/em&gt; loop was executed 10000 times&amp;nbsp;&amp;mdash; 10 threads each reading 1000 blocks. Nothing new.&lt;/p&gt;
+&lt;p&gt;Though &lt;em&gt;gcov&lt;/em&gt; was not so&amp;nbsp;much useful for me, I’d&amp;nbsp;like to&amp;nbsp;say that it&amp;nbsp;has really cool feature&amp;nbsp;&amp;mdash; branch probabilities. If&amp;nbsp;you’ll&amp;nbsp;launch &lt;em&gt;gcov&lt;/em&gt; with &lt;code&gt;-b&lt;/code&gt; option&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# gcov -b block_hasher.c
+File &amp;#39;block_hasher.c&amp;#39;
+Lines executed:77.69% of 121
+Branches executed:100.00% of 66
+Taken at least once:60.61% of 66
+Calls executed:51.47% of 68
+block_hasher.c:creating &amp;#39;block_hasher.c.gcov&amp;#39;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You’ll&amp;nbsp;get nice branch annotation with probabilities. For example, here is&amp;nbsp;&lt;code&gt;time_diff&lt;/code&gt; function&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;113 function time_diff called 10 returned 100% blocks executed 100%
+114        10:  106:double time_diff(struct timespec start, struct timespec end)
+115         -:  107:{
+116         -:  108:    struct timespec diff;
+117         -:  109:    double sec;
+118         -:  110:
+119        10:  111:    if ( (end.tv_nsec - start.tv_nsec) &amp;lt; 0 )
+120 branch  0 taken 60% (fallthrough)
+121 branch  1 taken 40%
+122         -:  112:    {
+123         6:  113:        diff.tv_sec  = end.tv_sec - start.tv_sec - 1;
+124         6:  114:        diff.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+125         -:  115:    }
+126         -:  116:    else
+127         -:  117:    {
+128         4:  118:        diff.tv_sec  = end.tv_sec - start.tv_sec;
+129         4:  119:        diff.tv_nsec = end.tv_nsec - start.tv_nsec;
+130         -:  120:    }
+131         -:  121:
+132        10:  122:    sec = (double)diff.tv_nsec / 1000000000 + diff.tv_sec;
+133         -:  123:
+134        10:  124:    return sec;
+135         -:  125:}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In&amp;nbsp;60% of&amp;nbsp;&lt;code&gt;if&lt;/code&gt; calls we’ve&amp;nbsp;fallen in&amp;nbsp;branch to&amp;nbsp;calculate time diff with borrow, that actually means we&amp;nbsp;were executing for more than 1 second.&lt;/p&gt;
+&lt;h2 id="conclusion"&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;&lt;em&gt;gprof&lt;/em&gt; and &lt;em&gt;gcov&lt;/em&gt; are really entertaining tools despite a&amp;nbsp;lot of&amp;nbsp;people think about them as&amp;nbsp;obsolete. On&amp;nbsp;one hand these utilities are simple, they implementing and automating obvious method of&amp;nbsp;source code instrumentation to&amp;nbsp;measure function hit count.&lt;/p&gt;
+&lt;p&gt;But on&amp;nbsp;the other hand such simple metrics won’t&amp;nbsp;help with problems outside of&amp;nbsp;your application. Although there are ways to&amp;nbsp;use it&amp;nbsp;for operating system, e.g. &lt;a href="https://www.kernel.org/doc/Documentation/gcov.txt"&gt;for Linux kernel&lt;/a&gt;. Anyway &lt;em&gt;gprof&lt;/em&gt; and &lt;em&gt;gcov&lt;/em&gt; is&amp;nbsp;useless in&amp;nbsp;case when your application spends most of&amp;nbsp;it’s&amp;nbsp;time in&amp;nbsp;waiting for some syscall (&lt;code&gt;pread&lt;/code&gt; in&amp;nbsp;my&amp;nbsp;case).&lt;/p&gt;
+&lt;h2 id="to-read"&gt;To&amp;nbsp;read&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://sourceware.org/binutils/docs/gprof/"&gt;gprof manual&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://www.ibm.com/developerworks/ru/library/l-gnuprof/"&gt;IBM tutorial&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://www.cs.utah.edu/dept/old/texinfo/as/gprof.html"&gt;Utah university manual&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</content>
+  </entry>
+  <entry xml:base="http://avd.reduct.ru/feed">
+    <title type="text">Linux profiling. Intro</title>
+    <id>linux/profiling-intro.html</id>
+    <updated>2014-01-30T00:00:00Z</updated>
+    <link href="linux/profiling-intro.html" />
+    <author>
+      <name>Alex Dzyoba</name>
+    </author>
+    <content type="html">&lt;h2 id="intro-to-intro"&gt;Intro to&amp;nbsp;intro&lt;/h2&gt;
+&lt;p&gt;Initially I’ve&amp;nbsp;wanted to&amp;nbsp;write single article with review of&amp;nbsp;Linux profiling tools, but being very curious person I’ve&amp;nbsp;overblew it. And so&amp;nbsp;I’ve&amp;nbsp;decided to&amp;nbsp;create a&amp;nbsp;series of&amp;nbsp;articles that will be&amp;nbsp;interesting from techical point of&amp;nbsp;view and not to&amp;nbsp;broad as&amp;nbsp;in&amp;nbsp;some book. So&amp;nbsp;now, please welcome, a&amp;nbsp;whole sequence of&amp;nbsp;articles.&lt;/p&gt;
+&lt;p&gt;TOC:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;Intro&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-gprof-gcov.html"&gt;Userspace profiling: gprof, gcov&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-valgrind.html"&gt;Userspace profiling: Valgrind&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Kernel profiling: ftrace&lt;/li&gt;
+&lt;li&gt;Kernel profiling: perf&lt;/li&gt;
+&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
+&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
+&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="faq"&gt;FAQ&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;Profiling&lt;/strong&gt;&amp;nbsp;&amp;mdash; dynamic analysis of&amp;nbsp;software, consisting of&amp;nbsp;gathering various metrics and calculating some statistical info from it. Usually, you do&amp;nbsp;profiling to&amp;nbsp;analyze performance though it’s&amp;nbsp;not the single case, e.g. there are works about profiling for &lt;a href="http://infoscience.epfl.ch/record/181628/files/eprof.pdf"&gt;energy consumption analysis&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Do&amp;nbsp;not confuse profiling and tracing. &lt;em&gt;Tracing&lt;/em&gt; is&amp;nbsp;a&amp;nbsp;procedure of&amp;nbsp;saving program runtime steps to&amp;nbsp;debug it&amp;nbsp;&amp;mdash; you are not gathering any metrics.&lt;/p&gt;
+&lt;p&gt;Also don’t&amp;nbsp;confuse profiling and benchmarking. Benchmarking is&amp;nbsp;all about marketing. You launch some predefined procedure to&amp;nbsp;get couple of&amp;nbsp;numbers that you can print in&amp;nbsp;your marketing brochures.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Profiler&lt;/strong&gt;&amp;nbsp;&amp;mdash; program that do&amp;nbsp;profiling.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Profile&lt;/strong&gt;&amp;nbsp;&amp;mdash; result of&amp;nbsp;profiling, some statistical info calculated from gathered metrics.&lt;/p&gt;
+&lt;p&gt;There are a&amp;nbsp;lot of&amp;nbsp;metrics that profiler can gather and analyze and I&amp;nbsp;won’t&amp;nbsp;list them all but instead try to&amp;nbsp;make some hierarchy of&amp;nbsp;it:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Time metrics
+&lt;ul&gt;
+&lt;li&gt;Program/function runtime&lt;/li&gt;
+&lt;li&gt;I/O latency&lt;/li&gt;
+&lt;li&gt;&amp;hellip;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;Space metrics
+&lt;ul&gt;
+&lt;li&gt;Memory usage&lt;/li&gt;
+&lt;li&gt;Open files&lt;/li&gt;
+&lt;li&gt;Bandwidth&lt;/li&gt;
+&lt;li&gt;&amp;hellip;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;Code metrics
+&lt;ul&gt;
+&lt;li&gt;Call graph&lt;/li&gt;
+&lt;li&gt;Function hit count&lt;/li&gt;
+&lt;li&gt;Loops depth&lt;/li&gt;
+&lt;li&gt;&amp;hellip;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;Hardware metrics
+&lt;ul&gt;
+&lt;li&gt;CPU cache hit/miss ratio&lt;/li&gt;
+&lt;li&gt;Interrupts count&lt;/li&gt;
+&lt;li&gt;&amp;hellip;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Variety of&amp;nbsp;metrics imply variety of&amp;nbsp;methods to&amp;nbsp;gather it. And I&amp;nbsp;have a&amp;nbsp;beautiful hierarchy for that, yeah:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Invasive profiling&amp;nbsp;&amp;mdash; changing profiled code
+&lt;ul&gt;
+&lt;li&gt;Source code instrumentation&lt;/li&gt;
+&lt;li&gt;Static binary instrumentation&lt;/li&gt;
+&lt;li&gt;Dynamic binary instrumentation&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;&lt;nobr&gt;Non-invasive&lt;/nobr&gt; profiling&amp;nbsp;&amp;mdash; without changing any code
+&lt;ul&gt;
+&lt;li&gt;Sampling&lt;/li&gt;
+&lt;li&gt;&lt;nobr&gt;Event-based&lt;/nobr&gt;&lt;/li&gt;
+&lt;li&gt;Emulation&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;(That’s&amp;nbsp;all the methods I&amp;nbsp;know. If&amp;nbsp;you come up&amp;nbsp;with another&amp;nbsp;&amp;mdash; feel free to&amp;nbsp;contact me).&lt;/p&gt;
+&lt;p&gt;Quick review of&amp;nbsp;methods.&lt;/p&gt;
+&lt;p&gt;Source code instrumentation is&amp;nbsp;the simplest one. If&amp;nbsp;you have source codes you can add special profiling calls to&amp;nbsp;every function (not manually, of&amp;nbsp;course) and then launch your program. Profiling calls will trace function graph and can also compute time spent in&amp;nbsp;functions and also branch prediction probability and a&amp;nbsp;lot of&amp;nbsp;other things. But oftentimes you don’t&amp;nbsp;have source code. And that makes me&amp;nbsp;saaaaad panda.&lt;/p&gt;
+&lt;p&gt;Binary instrumentation is&amp;nbsp;what you can guess by&amp;nbsp;yourself&amp;nbsp;&amp;mdash; you are modifying program binary image&amp;nbsp;&amp;mdash; either on&amp;nbsp;disk (program.exe) or&amp;nbsp;in&amp;nbsp;memory. This is&amp;nbsp;what reverse engineers love to&amp;nbsp;do. To&amp;nbsp;research some commercial critical software or&amp;nbsp;analyze malware they do&amp;nbsp;binary instrumentation and analyze program behaviour. If&amp;nbsp;you’re&amp;nbsp;interesting in&amp;nbsp;this, please, call my&amp;nbsp;good friend and uni groupmate Dima Evdokimov (&lt;a href="https://twitter.com/evdokimovds"&gt;@evdokimovds&lt;/a&gt;)&amp;nbsp;&amp;mdash; he&amp;nbsp;is&amp;nbsp;research director in&amp;nbsp;Digital Security. He&amp;nbsp;is&amp;nbsp;really in&amp;nbsp;this theme (see, for example, &lt;a href="http://habrahabr.ru/company/dsec/blog/142575/"&gt;DBI in&amp;nbsp;informational security (in&amp;nbsp;Russian)&lt;/a&gt;).&lt;/p&gt;
+&lt;p&gt;Anyway, binary instrumentation also really useful in&amp;nbsp;profiling&amp;nbsp;&amp;mdash; many modern instruments are built on&amp;nbsp;top binary instrumentation ideas (SystemTap, ktap, dtrace).&lt;/p&gt;
+&lt;p&gt;Ok, so&amp;nbsp;sometimes you can’t&amp;nbsp;instrument even binary code, e.g. you’re&amp;nbsp;profiling OS&amp;nbsp;kernel, or&amp;nbsp;some pretty complicated system consisting of&amp;nbsp;many tightly coupled modules that won’t&amp;nbsp;work after instrumenting. That’s&amp;nbsp;why you have &lt;nobr&gt;non-invasive&lt;/nobr&gt; profiling.&lt;/p&gt;
+&lt;p&gt;Sampling is&amp;nbsp;the first natural idea that you can come up&amp;nbsp;with when you can’t&amp;nbsp;modify any code. The point is&amp;nbsp;that profiler periodically asks CPU registers (e.g. PSW) and analyze what is&amp;nbsp;going on. By&amp;nbsp;the way, this is&amp;nbsp;the only reasonable way you can get hardware metrics&amp;nbsp;&amp;mdash; by&amp;nbsp;periodical polling of&amp;nbsp;[PMU] (performance monitoring unit).&lt;/p&gt;
+&lt;p&gt;&lt;nobr&gt;Event-based&lt;/nobr&gt; profiling is&amp;nbsp;about gathering events that must somehow be&amp;nbsp;prepared/preinstalled by&amp;nbsp;vendor of&amp;nbsp;profiling subject. Examples are inotify, kernel tracepoints in&amp;nbsp;Linux and &lt;a href="http://software.intel.com/sites/products/documentation/doclib/iss/2013/amplifier/lin/ug_docs/GUID-EEC5294C-5599-44F7-909D-9D617DE8AB92.htm"&gt;VTune events&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;And finally emulation is&amp;nbsp;just running your program in&amp;nbsp;isolated environment like virtual machine or&amp;nbsp;QEMU thus giving you full control over program execution but garbling behaviour.&lt;/p&gt;
+&lt;h2 id="problem-definition"&gt;Problem definition&lt;/h2&gt;
+&lt;p&gt;I’m&amp;nbsp;a&amp;nbsp;big fan of&amp;nbsp;studying something with the &lt;nobr&gt;real-world&lt;/nobr&gt; examples, instead of&amp;nbsp;thoughtless manual reading. That’s&amp;nbsp;why I’ll&amp;nbsp;define problem and will try to&amp;nbsp;solve it&amp;nbsp;using profiling.&lt;/p&gt;
+&lt;p&gt;That said, I&amp;nbsp;have a&amp;nbsp;nice little program that checks data integrity on&amp;nbsp;given block device. Simply put, it&amp;nbsp;reads data blocks in&amp;nbsp;multiple threads and computes checksums along with bandwith. Here are the &lt;a href="https://github.com/dzeban/block_hasher"&gt;sources&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;So, I&amp;nbsp;use that utility to&amp;nbsp;check my&amp;nbsp;8 disks RAID 0 (standard Linux mdraid). This is&amp;nbsp;how I&amp;nbsp;do&amp;nbsp;reading:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;1000 blocks of&amp;nbsp;size 1 MiB for each of&amp;nbsp;10 threads.&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;block_hasher&lt;/code&gt; also computes bandwith by&amp;nbsp;simply dividing data read on&amp;nbsp;thread running time. And so&amp;nbsp;I’ve&amp;nbsp;got that bandwidth:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# cat bad.out 
+T06: 57.12 MB/s c86253f827c0e40a056d2afc7d6605c291e57400
+T08: 56.72 MB/s 9364a42836daa9beadf02c15777b3e1779f57b00
+T04: 54.82 MB/s d0d7c3e2faed39d83ea25e468b5714bbfe23e200
+T00: 53.06 MB/s c32caf8e5bdebeb2ffa73707e61fad50a751e800
+T02: 53.00 MB/s 34a7495fe2ccaac4afee0e7460d9dff051701900
+T07: 29.93 MB/s 95b3dc919fc4d61548a3b0737dd2ab03a0bab400
+T03: 29.93 MB/s c1228ce6d4920e3bc101f1874bd5beeeb25ec600
+T01: 29.89 MB/s 63d484d0fc2456c9a3c18d1d0ef43d60957d1200
+T05: 29.89 MB/s 5c229e2fe168fb60a0d56b22f6eaa8fc6675d700
+T09: 29.88 MB/s f6eb529ee5b59824a657fb8de43c8c6d3e29cb00&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If&amp;nbsp;you sum bandwidth for all threads you’ll&amp;nbsp;get total bandwidth for whole RAID.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# cut -f2 -d&amp;#39; &amp;#39; bad.out |  paste -sd + | bc
+424.24&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Namely, &lt;strong&gt;424.24 MB/s&lt;/strong&gt; which is&amp;nbsp;pretty bad. In&amp;nbsp;theory, you can get&lt;a href="#fn1" class="footnoteRef" id="fnref1"&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;Speed = &amp;lt;IOPS from 1 disk&amp;gt; * &amp;lt;block size&amp;gt; * &amp;lt;disks count&amp;gt; 
+
+180 * 1048576 * 8 = 1509949440 Bytes/s = 1.5 GB/s&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In&amp;nbsp;real life you’ll&amp;nbsp;get something about 1 GB/s.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;determine why is&amp;nbsp;it&amp;nbsp;slow we’ll&amp;nbsp;use profilers. We’ll&amp;nbsp;profile &lt;code&gt;block_hasher&lt;/code&gt; as&amp;nbsp;much as&amp;nbsp;everything below including Linux kernel.&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;this series of&amp;nbsp;articles I’ll&amp;nbsp;try to&amp;nbsp;review next profilers:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;gprof&lt;/li&gt;
+&lt;li&gt;gcov&lt;/li&gt;
+&lt;li&gt;Valgrind&lt;/li&gt;
+&lt;li&gt;perf&lt;/li&gt;
+&lt;li&gt;SystemTap&lt;/li&gt;
+&lt;li&gt;ktap&lt;/li&gt;
+&lt;li&gt;VTune&lt;/li&gt;
+&lt;li&gt;Block devices related tools: blktrace, etc.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="references"&gt;References&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="http://en.wikibooks.org/wiki/Introduction_to_Software_Engineering/Testing/Profiling"&gt;Profiling wikibook&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="footnotes"&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id="fn1"&gt;&lt;p&gt;This trivial formulae implies that block reading time is&amp;nbsp;the same for any sizes which in&amp;nbsp;fact is&amp;nbsp;not. Also it’s&amp;nbsp;applicable only for RAID level 0.&lt;a href="#fnref1"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;</content>
+  </entry>
+  <entry xml:base="http://avd.reduct.ru/feed">
+    <title type="text">Tale about data corruption, stack and red zone</title>
+    <id>programming/redzone.html</id>
+    <updated>2014-01-27T00:00:00Z</updated>
+    <link href="programming/redzone.html" />
+    <author>
+      <name>avd</name>
+    </author>
+    <content type="html">&lt;p&gt;It&amp;nbsp;was a&amp;nbsp;nice and calm work day when suddenly a&amp;nbsp;wild collegue appeared in&amp;nbsp;front of&amp;nbsp;my&amp;nbsp;desk and asked:&lt;/p&gt;
+&lt;p&gt;&amp;mdash;&amp;nbsp;Hey, uhmm, could you help me&amp;nbsp;with some strange thing?&lt;br /&gt;
+&amp;mdash;&amp;nbsp;Yeah, sure, what’s&amp;nbsp;matter?&lt;br /&gt;
+&amp;mdash;&amp;nbsp;I&amp;nbsp;have data corruption and it’s&amp;nbsp;happening in&amp;nbsp;a&amp;nbsp;really crazy manner.&lt;/p&gt;
+&lt;p&gt;If&amp;nbsp;you don’t&amp;nbsp;know, data/memory corruption is&amp;nbsp;the single most nasty and awful bug that can happen in&amp;nbsp;your program. Especially, when you are storage developer.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;here was the case. We&amp;nbsp;have RAID calculation algorithm. Nothing fancy&amp;nbsp;&amp;mdash; just a&amp;nbsp;bunch of&amp;nbsp;functions that gets pointer to&amp;nbsp;buffer, do&amp;nbsp;some math over that buffer and then return it. Initially, calculation algorithm was written in&amp;nbsp;userspace for simpler debugging, correctness proof and profiling and then ported to&amp;nbsp;kernel space. And that’s&amp;nbsp;where the problem started.&lt;/p&gt;
+&lt;p&gt;Firstly, when building from &lt;a href="http://www.linuxjournal.com/content/kbuild-linux-kernel-build-system"&gt;kbuild&lt;/a&gt;, gcc was just crashing&lt;a href="#fn1" class="footnoteRef" id="fnref1"&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; eating all the memory available. But I&amp;nbsp;was not surprized at&amp;nbsp;all considering files size&amp;nbsp;&amp;mdash; dozen of&amp;nbsp;files each about 10 megabytes. Yes, 10 MB. Though that was not surprizing for me, too. That sources was generated from assembly and were actually a&amp;nbsp;bunch of&amp;nbsp;&lt;a href="http://en.wikipedia.org/wiki/Intrinsic_function"&gt;intrinsics&lt;/a&gt;. Anyway, it&amp;nbsp;would be&amp;nbsp;much better if&amp;nbsp;gcc would not just crash.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;we’ve&amp;nbsp;just written separate Makefile to&amp;nbsp;build object files that will later be&amp;nbsp;linked in&amp;nbsp;kernel module.&lt;/p&gt;
+&lt;p&gt;Secondly, data was not corrupted every time. When you were reading 1 GB&amp;nbsp;from disks it&amp;nbsp;was fine. And when you were reading 2 GB&amp;nbsp;sometimes it&amp;nbsp;was ok&amp;nbsp;and sometimes not.&lt;/p&gt;
+&lt;p&gt;Thorough source code reading had led to&amp;nbsp;nothing. We&amp;nbsp;saw that memory buffer was corrupted exactly in&amp;nbsp;calculation functions. But that functions was pure math: just a&amp;nbsp;calculation with no&amp;nbsp;side effects&amp;nbsp;&amp;mdash; it&amp;nbsp;didn’t&amp;nbsp;call any library functions, it&amp;nbsp;didn’t&amp;nbsp;change anything except passed buffer and local variables. And that changes to&amp;nbsp;buffer were right, while corruption was really corruption&amp;nbsp;&amp;mdash; calc functions just cannot generate such data.&lt;/p&gt;
+&lt;p&gt;And then we&amp;nbsp;saw a&amp;nbsp;pure magic. If&amp;nbsp;we&amp;nbsp;added to&amp;nbsp;calc function single&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;printk(&amp;quot;&amp;quot;);&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;then data was not corrupted at&amp;nbsp;all. I&amp;nbsp;thought such things were only subject of&amp;nbsp;DailyWTF stories or&amp;nbsp;developers jokes. We&amp;nbsp;checked everything several times on&amp;nbsp;different hosts&amp;nbsp;&amp;mdash; data was correct. Well, there were nothing left for us&amp;nbsp;except disassemble object files to&amp;nbsp;determine what was so&amp;nbsp;special about &lt;code&gt;printk&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;we&amp;nbsp;did a&amp;nbsp;diff between 2 object files with and without &lt;code&gt;printk&lt;/code&gt;.&lt;/p&gt;
+&lt;pre class="sourceCode diff"&gt;&lt;code class="sourceCode diff"&gt;&lt;span class="kw"&gt;--- Calculation.s    2014-01-27 15:52:11.581387291 +0300&lt;/span&gt;
+&lt;span class="dt"&gt;+++ Calculation_printk.s 2014-01-27 15:51:50.109512524 +0300&lt;/span&gt;
+&lt;span class="dt"&gt;@@ -1,10 +1,15 @@&lt;/span&gt;
+    .file   &amp;quot;Calculation.c&amp;quot;
+&lt;span class="ot"&gt;+   .section    .rodata.str1.1,&amp;quot;aMS&amp;quot;,@progbits,1&lt;/span&gt;
+&lt;span class="ot"&gt;+.LC0:&lt;/span&gt;
+&lt;span class="ot"&gt;+   .string &amp;quot;&amp;quot;&lt;/span&gt;
+    .text
+    .p2align 4,,15
+ .globl Calculation_5d
+    .type   Calculation_5d, @function
+ Calculation_5d:
+ .LFB20:
+&lt;span class="ot"&gt;+   subq    $24, %rsp&lt;/span&gt;
+&lt;span class="ot"&gt;+.LCFI0:&lt;/span&gt;
+    movq    (%rdi), %rax
+    movslq  %ecx, %rcx
+    movdqa  (%rax,%rcx), %xmm4
+&lt;span class="dt"&gt;@@ -46,7 +51,7 @@&lt;/span&gt;
+    pxor    %xmm2, %xmm6
+    movdqa  96(%rax,%rcx), %xmm2
+    pxor    %xmm5, %xmm1
+&lt;span class="st"&gt;-   movdqa  %xmm14, -24(%rsp)&lt;/span&gt;
+&lt;span class="ot"&gt;+   movdqa  %xmm14, (%rsp)&lt;/span&gt;
+    pxor    %xmm15, %xmm2
+    pxor    %xmm5, %xmm0
+    movdqa  112(%rax,%rcx), %xmm14
+&lt;span class="dt"&gt;@@ -108,11 +113,16 @@&lt;/span&gt;
+    movq    24(%rdi), %rax
+    movdqa  %xmm6, 80(%rax,%rcx)
+    movq    24(%rdi), %rax
+&lt;span class="st"&gt;-   movdqa  -24(%rsp), %xmm0&lt;/span&gt;
+&lt;span class="ot"&gt;+   movdqa  (%rsp), %xmm0&lt;/span&gt;
+    movdqa  %xmm0, 96(%rax,%rcx)
+    movq    24(%rdi), %rax
+&lt;span class="ot"&gt;+   movl    $.LC0, %edi&lt;/span&gt;
+    movdqa  %xmm14, 112(%rax,%rcx)
+&lt;span class="ot"&gt;+   xorl    %eax, %eax&lt;/span&gt;
+&lt;span class="ot"&gt;+   call    printk&lt;/span&gt;
+    movl    $128, %eax
+&lt;span class="ot"&gt;+   addq    $24, %rsp&lt;/span&gt;
+&lt;span class="ot"&gt;+.LCFI1:&lt;/span&gt;
+    ret
+ .LFE20:
+    .size   Calculation_5d, .-Calculation_5d
+&lt;span class="dt"&gt;@@ -143,6 +153,14 @@&lt;/span&gt;
+    .long   .LFB20
+    .long   .LFE20-.LFB20
+    .uleb128 0x0
+&lt;span class="ot"&gt;+   .byte   0x4&lt;/span&gt;
+&lt;span class="ot"&gt;+   .long   .LCFI0-.LFB20&lt;/span&gt;
+&lt;span class="ot"&gt;+   .byte   0xe&lt;/span&gt;
+&lt;span class="ot"&gt;+   .uleb128 0x20&lt;/span&gt;
+&lt;span class="ot"&gt;+   .byte   0x4&lt;/span&gt;
+&lt;span class="ot"&gt;+   .long   .LCFI1-.LCFI0&lt;/span&gt;
+&lt;span class="ot"&gt;+   .byte   0xe&lt;/span&gt;
+&lt;span class="ot"&gt;+   .uleb128 0x8&lt;/span&gt;
+    .align 8
+ .LEFDE1:
+    .ident  &amp;quot;GCC: (GNU) 4.4.5 20110214 (Red Hat 4.4.5-6)&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Ok, looks like nothing changed much. String declaration in&amp;nbsp;&lt;code&gt;.rodata&lt;/code&gt; section, call to&amp;nbsp;&lt;code&gt;printk&lt;/code&gt; in&amp;nbsp;the end. But what looked really strange to&amp;nbsp;me&amp;nbsp;is&amp;nbsp;changes in&amp;nbsp;&lt;code&gt;%rsp&lt;/code&gt; manipulations. Seems like there were doing the same, but in&amp;nbsp;the printk version they shifted in&amp;nbsp;24 bytes because in&amp;nbsp;the start it&amp;nbsp;does &lt;code&gt;subq $24, %rsp&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;We&amp;nbsp;didn’t&amp;nbsp;care much about it&amp;nbsp;at&amp;nbsp;first. On&amp;nbsp;x86 architecture stack grows down, i.e. to&amp;nbsp;smaller addresses. So&amp;nbsp;to&amp;nbsp;access local variables (these are on&amp;nbsp;stack) you create new stack frame by&amp;nbsp;saving current &lt;code&gt;%rsp&lt;/code&gt; in&amp;nbsp;&lt;code&gt;%rbp&lt;/code&gt; and shifting &lt;code&gt;%rsp&lt;/code&gt; thus allocating space on&amp;nbsp;stack. This is&amp;nbsp;called function prologue and it&amp;nbsp;was absent in&amp;nbsp;our assembly function without printk.&lt;/p&gt;
+&lt;p&gt;You need this stack manipulation later to&amp;nbsp;access your local vars by&amp;nbsp;subtracting from &lt;code&gt;%rbp&lt;/code&gt;. But we&amp;nbsp;were subtratcting from &lt;code&gt;%rsp&lt;/code&gt;, isn’t&amp;nbsp;it&amp;nbsp;strange?&lt;/p&gt;
+&lt;p&gt;Wait a&amp;nbsp;minute&amp;hellip; I&amp;nbsp;decided to&amp;nbsp;draw stack frame and got it!&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/red-zone.png" alt="Stack" /&gt;&lt;p class="caption"&gt;Stack&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;Holy shucks! We&amp;nbsp;are processing undefined memory. All instructions like this&lt;/p&gt;
+&lt;pre class="asm"&gt;&lt;code&gt;movdqa  -24(%rsp), %xmm0&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;moving aligned data from &lt;code&gt;xmm0&lt;/code&gt; to&amp;nbsp;address &lt;code&gt;&lt;nobr&gt;rsp-24&lt;/nobr&gt;&lt;/code&gt; is&amp;nbsp;actually the access over the top of&amp;nbsp;the stack!&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="https://mlpforums.com/uploads/monthly_03_2012/post-2103-0-68261500-1332210132.png" /&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;strong&gt;WHY?&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;I&amp;nbsp;was really shocked. So&amp;nbsp;shocked that I&amp;nbsp;even asked &lt;a href="http://stackoverflow.com/questions/20661190/gcc-access-memory-above-stack-top"&gt;on&amp;nbsp;stackoverflow&lt;/a&gt;. And the answer was&lt;/p&gt;
+&lt;p&gt;&lt;span style="text-decoration:underline;color:red"&gt;&lt;a href="http://eli.thegreenplace.net/2011/09/06/stack-frame-layout-on-x86-64/"&gt;&lt;strong&gt;Red Zone&lt;/strong&gt;&lt;/a&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;short, &lt;em&gt;red zone&lt;/em&gt; is&amp;nbsp;a&amp;nbsp;memory piece of&amp;nbsp;size 128 bytes &lt;strong&gt;over stack top&lt;/strong&gt;, that according to&amp;nbsp;&lt;a href="http://www.x86-64.org/documentation/abi.pdf"&gt;amd64 ABI&lt;/a&gt; should not be&amp;nbsp;accessed by&amp;nbsp;any interrupt or&amp;nbsp;signal handlers. And it&amp;nbsp;was rock solid true, but for userspace. When you are in&amp;nbsp;kernel space leave the hope for extra memory&amp;nbsp;&amp;mdash; stack is&amp;nbsp;worth its weight in&amp;nbsp;gold here. And you got a&amp;nbsp;whole lot of&amp;nbsp;interrupt handling here.&lt;/p&gt;
+&lt;p&gt;When interruption occurs, the interrupt handler uses stack frame of&amp;nbsp;current kernel thread, but to&amp;nbsp;avoid thread data corruption it&amp;nbsp;holds it’s&amp;nbsp;own data over stack top. And when our own code were compiled with red zone support the thread data were located over stack top as&amp;nbsp;much as&amp;nbsp;interrupt handlers data.&lt;/p&gt;
+&lt;p&gt;That’s&amp;nbsp;why kernel compilation is&amp;nbsp;done with &lt;code&gt;-&lt;nobr&gt;mno-red-zone&lt;/nobr&gt;&lt;/code&gt; gcc flag. It’s&amp;nbsp;set implicitly by&amp;nbsp;&lt;code&gt;kbuild&lt;/code&gt;&lt;a href="#fn2" class="footnoteRef" id="fnref2"&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;But remember that we&amp;nbsp;weren’t&amp;nbsp;be&amp;nbsp;able to&amp;nbsp;build with &lt;code&gt;kbuild&lt;/code&gt; because it&amp;nbsp;was crashing every time due to&amp;nbsp;huge files.&lt;/p&gt;
+&lt;p&gt;Anyway, we&amp;nbsp;just added in&amp;nbsp;our Makefile &lt;code&gt;EXTRA_CFLAGS += -&lt;nobr&gt;mno-red-zone&lt;/nobr&gt;&lt;/code&gt; and it’s&amp;nbsp;working now. But still I&amp;nbsp;have a&amp;nbsp;question why adding &lt;code&gt;printk(&amp;laquo;&amp;laquo;)&lt;/code&gt; leads to&amp;nbsp;preventing using red zone and space allocation for local variables with &lt;code&gt;subq $24, %rsp&lt;/code&gt;?&lt;/p&gt;
+&lt;p&gt;So, that day I&amp;nbsp;learned a&amp;nbsp;&lt;a href="http://programmers.stackexchange.com/questions/230089/what-is-the-purpose-of-red-zone"&gt;really tricky optimization&lt;/a&gt; that at&amp;nbsp;the cost of&amp;nbsp;potential memory corruption could save you couple of&amp;nbsp;instructions for every leaf function.&lt;/p&gt;
+&lt;p&gt;That’s&amp;nbsp;all, folks!&lt;/p&gt;
+&lt;div class="footnotes"&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id="fn1"&gt;&lt;p&gt;Crashed only as&amp;nbsp;part of&amp;nbsp;kbuild and only on&amp;nbsp;version 4.4.&lt;a href="#fnref1"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn2"&gt;&lt;p&gt;To&amp;nbsp;get all flags that kbuild set one can simply look at&amp;nbsp;&lt;code&gt;.&amp;lt;source&amp;gt;.o.cmd&lt;/code&gt;.&lt;a href="#fnref2"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;</content>
+  </entry>
+</feed>
