@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Linux profiling. Ftrace</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Categories</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a class="disabled" href="/categories"><i class="fi-list"></i>&nbsp;&nbsp;Categories</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Linux profiling. Ftrace</h2>
+                            <h6 class="post-meta">
+                              27 Oct 2014, in
+                              <a class="disabled" href="/categories/linux">linux</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>TOC:</p>
+<ol style="list-style-type: decimal">
+<li><a href="/linux/profiling-intro.html">Intro</a></li>
+<li><a href="/linux/profiling-gprof-gcov.html">Userspace profiling: gprof, gcov</a></li>
+<li><a href="/linux/profiling-valgrind.html">Userspace profiling: Valgrind</a></li>
+<li><a href="/linux/profiling-kernel.html">Kernel profiling: Intro</a></li>
+<li>Kernel profiling: ftrace</li>
+<li>Kernel profiling: perf</li>
+<li>Kernel profiling: SystemTap</li>
+<li>Kernel profiling: ktap</li>
+<li>Vendor specific profiling: Intel VTune</li>
+</ol>
+<h2 id="ftrace">ftrace</h2>
+<p><strong>Ftrace</strong> is&nbsp;a&nbsp;framework for tracing and profiling Linux kernel with features like that:</p>
+<ul>
+<li>Kernel functions tracing</li>
+<li>Call graph tracing</li>
+<li>Tracepoints support</li>
+<li>Dynamic tracing via kprobes</li>
+<li>Statistics for kernel functions</li>
+<li>Statistics for kernel events</li>
+</ul>
+<p>Essentially, <em>ftrace</em> built around smart lockless ring buffer implementation (see <a href="http://lxr.free-electrons.com/source/Documentation/trace/ring-buffer-design.txt?v=3.15">Documentation/trace/<nobr>ring-buffer-design</nobr>.txt/</a>). That buffer stores all <em>ftrace</em> info and imported via debugfs<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> in&nbsp;<code>/sys/kernel/debug/tracing/</code>. All maninpulations are done with simple manipulations with files in&nbsp;this directory.</p>
+<h2 id="how-ftrace-works">How ftrace works</h2>
+<p>As&nbsp;I’ve&nbsp;just said, <em>ftrace</em> is&nbsp;a&nbsp;framework meaning that it&nbsp;provides only ring buffer, all real work is&nbsp;done by&nbsp;so&nbsp;called <strong>tracers</strong>. Currently, <em>ftrace</em> includes next tracers:</p>
+<ul>
+<li><em>function</em>&nbsp;&mdash; default tracer;</li>
+<li><em>function_graph</em>&nbsp;&mdash; constructs call graph;</li>
+<li><em>irqsoff</em>, <em>preempoff</em>, <em>preemptirqsoff</em>, <em>wakeup</em>, <em>wakeup_rt</em>&nbsp;&mdash; latency tracers. These are origins of&nbsp;<em>ftrace</em>, they were presented in&nbsp;-rt kernel. I&nbsp;won’t&nbsp;give you lot of&nbsp;info on&nbsp;this topic cause it’s&nbsp;more about realtime, scheduling and hardware stuff;</li>
+<li><em>nop</em>&nbsp;&mdash; you guess.</li>
+</ul>
+<p>Also, as&nbsp;additional features you’ll&nbsp;get:</p>
+<ul>
+<li>kernel tracepoints support;</li>
+<li>kprobes support;</li>
+<li>blktrace support, though it’s&nbsp;going to&nbsp;be&nbsp;deleted.</li>
+</ul>
+<p>Now let’s&nbsp;look at&nbsp;specific tracers.</p>
+<h3 id="function-tracing">Function tracing</h3>
+<p>Main <em>ftrace</em> function is, well, functions tracing (<code>function</code> and <code>function_graph</code> tracers). To&nbsp;archieve this, kernel function instrumented with <code>mcount</code> calls, just like with <a href="/linux/profiling-gprof-gcov.html"><em>gcov</em></a>. But kernel <code>mcount</code>, of&nbsp;course, totally differs from userspace, because it’s&nbsp;architecture dependent. This dependency is&nbsp;required to&nbsp;be&nbsp;able to&nbsp;build call graphs, and more specific to&nbsp;get caller address from previous stack frame.</p>
+<p>This <code>mcount</code> is&nbsp;inserted in&nbsp;function prologue and if&nbsp;it’s&nbsp;turned off it’s&nbsp;doing nothing. But if&nbsp;it’s&nbsp;turned on&nbsp;then it’s&nbsp;calling <em>ftrace</em> function that depending on&nbsp;current tracer writes different data to&nbsp;ring buffer.</p>
+<h3 id="events-tracing">Events tracing</h3>
+<p>Events tracing is&nbsp;done with help of&nbsp;<a href="http://lxr.free-electrons.com/source/Documentation/trace/events.txt?v=3.15">tracepoints</a>. You set event via <code>set_event</code> file in&nbsp;<code>/sys/kernel/debug/tracing</code> and then it&nbsp;will be&nbsp;traced in&nbsp;ring buffer. For example, to&nbsp;trace <code>kmalloc</code>, just issue</p>
+<pre><code>echo kmalloc &gt; /sys/kernel/debug/tracing/set_event</code></pre>
+<p>and now you can see in&nbsp;<code>trace</code>:</p>
+<pre><code>tail-7747  [000] .... 12584.876544: kmalloc: call_site=c06c56da ptr=e9cf9eb0 bytes_req=4 bytes_alloc=8 gfp_flags=GFP_KERNEL|GFP_ZERO</code></pre>
+<p>and it’s&nbsp;the same as&nbsp;in&nbsp;<code>include/trace/events/kmem.h</code>, meaining it’s&nbsp;just a&nbsp;<em>tracepoint</em>.</p>
+<h3 id="kprobes-tracing">kprobes tracing</h3>
+<p>In&nbsp;kernel 3.10 there was added support for <a href="http://lwn.net/Articles/343766/">kprobes and kretprobes</a> for <em>ftrace</em>. Now you can do&nbsp;dynamic tracing without writing your own kernel module. But, unfortunately, there is&nbsp;nothing much to&nbsp;do&nbsp;with it, just</p>
+<ul>
+<li>Registers values</li>
+<li>Memory dumps</li>
+<li>Symbols values</li>
+<li>Stack values</li>
+<li>Return values (kretprobes)</li>
+</ul>
+<p>And again, this output is&nbsp;written to&nbsp;ring buffer. Also, you can calculate some statistic over it.</p>
+<p>Let’s&nbsp;trace something that doesn’t&nbsp;have tracepoint like something not from kernel but from kernel module.</p>
+<p>On&nbsp;my&nbsp;Samsung N210 laptop I&nbsp;have <em>ath9k</em> WiFi module that’s&nbsp;most likely doesn’t&nbsp;have any tracepoints. To&nbsp;check this just grep <em>available_events</em>:</p>
+<pre><code>[tracing]# grep ath available_events 
+cfg80211:rdev_del_mpath
+cfg80211:rdev_add_mpath
+cfg80211:rdev_change_mpath
+cfg80211:rdev_get_mpath
+cfg80211:rdev_dump_mpath
+cfg80211:rdev_return_int_mpath_info
+ext4:ext4_ext_convert_to_initialized_fastpath</code></pre>
+<p>Lets see what functions can we&nbsp;put probe on:</p>
+<pre><code>[tracing]# grep &quot;\[ath9k\]&quot; /proc/kallsyms | grep &#39; t &#39; | grep rx
+f82e6ed0 t ath_rx_remove_buffer [ath9k]
+f82e6f60 t ath_rx_buf_link.isra.25  [ath9k]
+f82e6ff0 t ath_get_next_rx_buf  [ath9k]
+f82e7130 t ath_rx_edma_buf_link [ath9k]
+f82e7200 t ath_rx_addbuffer_edma    [ath9k]
+f82e7250 t ath_rx_edma_cleanup  [ath9k]
+f82f3720 t ath_debug_stat_rx    [ath9k]
+f82e7a70 t ath_rx_tasklet   [ath9k]
+f82e7310 t ath_rx_cleanup   [ath9k]
+f82e7800 t ath_calcrxfilter [ath9k]
+f82e73e0 t ath_rx_init  [ath9k]</code></pre>
+<p>(First grep filters symbols from <em>ath9k</em> module, second grep filters functions which resides in&nbsp;text section and last grep filters receiver functions).</p>
+<p>For example, we&nbsp;will trace <a href="http://lxr.free-electrons.com/source/drivers/net/wireless/ath/ath9k/recv.c#L678"><code>ath_get_next_rx_buf</code></a> function.</p>
+<pre><code>[tracing]# echo &#39;r:ath_probe ath9k:ath_get_next_rx_buf $retval&#39; &gt;&gt; kprobe_events</code></pre>
+<p>This command is&nbsp;not from top of&nbsp;my&nbsp;head&nbsp;&mdash; check Documentation/tracing/kprobetrace.txt</p>
+<p>This puts retprobe on&nbsp;our function and fetches return value (it’s&nbsp;just a&nbsp;pointer).</p>
+<p>After we’ve&nbsp;put probe we&nbsp;must enable it:</p>
+<pre><code>[tracing]# echo 1 &gt; events/kprobes/enable </code></pre>
+<p>And then we&nbsp;can look for output in&nbsp;<code>trace</code> file and here it&nbsp;is:</p>
+<pre><code>midori-6741  [000] d.s.  3011.304724: ath_probe: (ath_rx_tasklet+0x35a/0xc30 [ath9k] &lt;- ath_get_next_rx_buf) arg1=0xf6ae39f4</code></pre>
+<h2 id="profiling-block_hasher">Profiling block_hasher</h2>
+<p>Now we&nbsp;gonna apply our <em>ftrace</em> knowledge to&nbsp;solve mysterious performance problem. If&nbsp;you need to&nbsp;refresh, refer to&nbsp;<a href="/linux/profiling-intro.html">introductionary article</a>.</p>
+<p>As&nbsp;we&nbsp;already know, <a href="/linux/profiling-gprof-gcov.html#not-application">it’s&nbsp;not a&nbsp;application problem</a>. So&nbsp;now we’ll&nbsp;try to&nbsp;see what’s&nbsp;happening after <code>pread</code> syscall.</p>
+<p>By&nbsp;default, <em>ftrace</em> is&nbsp;collecting info about all kernel functions and that’s&nbsp;huge. But, being a&nbsp;sophisticated kernel mechanism, <em>ftrace</em> has a&nbsp;lot of&nbsp;features, many kinds of&nbsp;options, tunable params and so&nbsp;on&nbsp;for which I&nbsp;don’t&nbsp;have a&nbsp;feeling to&nbsp;talk about because there are plenty of&nbsp;manuals and articles on&nbsp;lwn (see <a href="#ref">To&nbsp;read</a> section). Hence, it’s&nbsp;no&nbsp;wonder that we&nbsp;can, for example, filter by&nbsp;PID. Here is&nbsp;the script:</p>
+<pre><code>#!/bin/sh
+
+DEBUGFS=`grep debugfs /proc/mounts | awk &#39;{ print $2; }&#39;`
+
+# Reset trace stat
+echo 0 &gt; $DEBUGFS/tracing/function_profile_enabled
+echo 1 &gt; $DEBUGFS/tracing/function_profile_enabled
+
+echo $$ &gt; $DEBUGFS/tracing/set_ftrace_pid
+echo function &gt; $DEBUGFS/tracing/current_tracer
+
+exec $*</code></pre>
+<p><code>function_profile_enabled</code> configures collecting statistical info.</p>
+<p>Launch our magic script</p>
+<pre><code>./ftrace-me ./block_hasher -d /dev/md127 -b 1048576 -t10 -n10000</code></pre>
+<p>get <nobr>per-processor</nobr> statistics from files in&nbsp;<code>tracing/trace_stat/</code></p>
+<pre><code>head -n50 tracing/trace_stat/function* &gt; ~/trace_stat</code></pre>
+<p>and see top 5</p>
+<pre><code>==&gt; function0 &lt;==
+  Function                               Hit    Time            Avg
+  --------                               ---    ----            ---
+  schedule                            444425    8653900277 us     19472.12 us 
+  schedule_timeout                     36019    813403521 us     22582.62 us 
+  do_IRQ                             8161576    796860573 us     97.635 us
+  do_softirq                          486268    791706643 us     1628.128 us 
+  __do_softirq                        486251    790968923 us     1626.667 us 
+
+==&gt; function1 &lt;==
+  Function                               Hit    Time            Avg
+  --------                               ---    ----            ---
+  schedule                           1352233    13378644495 us     9893.742 us 
+  schedule_hrtimeout_range             11853    2708879282 us     228539.5 us 
+  poll_schedule_timeout                 7733    2366753802 us     306058.9 us 
+  schedule_timeout                    176343    1857637026 us     10534.22 us 
+  schedule_timeout_interruptible          95    1637633935 us     17238251 us 
+
+==&gt; function2 &lt;==
+  Function                               Hit    Time            Avg
+  --------                               ---    ----            ---
+  schedule                           1260239    9324003483 us     7398.599 us 
+  vfs_read                            215859    884716012 us     4098.582 us 
+  do_sync_read                        214950    851281498 us     3960.369 us 
+  sys_pread64                          13136    830103896 us     63193.04 us 
+  generic_file_aio_read                14955    830034649 us     55502.14 us </code></pre>
+<p>(Don’t&nbsp;pay attention to&nbsp;<code>schedule</code>&nbsp;&mdash; it’s&nbsp;just calls of&nbsp;scheduler).</p>
+<p>Most of&nbsp;the time we&nbsp;are spending in&nbsp;<code>schedule</code>, <code>do_IRQ</code>, <code>schedule_hrimeout_range</code> and <code>vfs_read</code> meaning that we&nbsp;either waiting for reading (Screw me&nbsp;dead!) or&nbsp;waiting for some timeout. Now that’s&nbsp;a&nbsp;strange! To&nbsp;make it&nbsp;clearer we&nbsp;can disable so&nbsp;called graph time so&nbsp;that child functions wouldn’t&nbsp;be&nbsp;counted. Let me&nbsp;explain, by&nbsp;default <em>ftrace</em> counting function time as&nbsp;a&nbsp;time of&nbsp;function itself plus all subroutines calls. That’s&nbsp;and <code>graph_time</code> option in&nbsp;<em>ftrace</em>.</p>
+<p>Tell</p>
+<pre><code>echo 0 &gt; options/graph_time</code></pre>
+<p>And collect profile againg</p>
+<pre><code>==&gt; function0 &lt;==
+  Function                               Hit    Time            Avg
+  --------                               ---    ----            ---
+  schedule                             34129    6762529800 us     198146.1 us 
+  mwait_idle                           50428    235821243 us     4676.394 us 
+  mempool_free                      59292718    27764202 us     0.468 us    
+  mempool_free_slab                 59292717    26628794 us     0.449 us    
+  bio_endio                         49761249    24374630 us     0.489 us    
+
+==&gt; function1 &lt;==
+  Function                               Hit    Time            Avg
+  --------                               ---    ----            ---
+  schedule                            958708    9075670846 us     9466.564 us 
+  mwait_idle                          406700    391923605 us     963.667 us  
+  _spin_lock_irq                    22164884    15064205 us     0.679 us    
+  __make_request                     3890969    14825567 us     3.810 us    
+  get_page_from_freelist             7165243    14063386 us     1.962 us    </code></pre>
+<p>Now we&nbsp;see amusing <code>mwait_idle</code> that somebody is&nbsp;somehow calling. We&nbsp;can’t&nbsp;say how does it&nbsp;happen.</p>
+<p>Maybe, we&nbsp;should get a&nbsp;function graph! We&nbsp;know that it&nbsp;all starts with <code>pread</code> so&nbsp;lets try to&nbsp;trace down function calls from <code>pread</code>.</p>
+<p>By&nbsp;that moment, I&nbsp;had tired to&nbsp;read/write to&nbsp;debugfs files and started to&nbsp;use CLI interface to&nbsp;<em>ftrace</em> which is&nbsp;<a href="http://git.kernel.org/cgit/linux/kernel/git/rostedt/trace-cmd.git"><code><nobr>trace-cmd</nobr></code></a>.</p>
+<p>Using <code><nobr>trace-cmd</nobr></code> is&nbsp;dead simple&nbsp;&mdash; first, you’re&nbsp;recording with <code><nobr>trace-cmd</nobr> record</code> and then analyze it&nbsp;with <code><nobr>trace-cmd</nobr> report</code>.</p>
+<p>Record:</p>
+<pre><code>trace-cmd record -p function_graph -o graph_pread.dat -g sys_pread64 \
+        ./block_hasher -d /dev/md127 -b 1048576 -t10 -n100</code></pre>
+<p>Look:</p>
+<pre><code>trace-cmd report -i graph_pread.dat | less</code></pre>
+<p>And it’s&nbsp;disappointing.</p>
+<pre><code>block_hasher-4102  [001]  2764.516562: funcgraph_entry:                   |                  __page_cache_alloc() {
+block_hasher-4102  [001]  2764.516562: funcgraph_entry:                   |                    alloc_pages_current() {
+block_hasher-4102  [001]  2764.516562: funcgraph_entry:        0.052 us   |                      policy_nodemask();
+block_hasher-4102  [001]  2764.516563: funcgraph_entry:        0.058 us   |                      policy_zonelist();
+block_hasher-4102  [001]  2764.516563: funcgraph_entry:                   |                      __alloc_pages_nodemask() {
+block_hasher-4102  [001]  2764.516564: funcgraph_entry:        0.054 us   |                        _cond_resched();
+block_hasher-4102  [001]  2764.516564: funcgraph_entry:        0.063 us   |                        next_zones_zonelist();
+block_hasher-4109  [000]  2764.516564: funcgraph_entry:                   |  SyS_pread64() {
+block_hasher-4102  [001]  2764.516564: funcgraph_entry:                   |                        get_page_from_freelist() {
+block_hasher-4109  [000]  2764.516564: funcgraph_entry:                   |    __fdget() {
+block_hasher-4102  [001]  2764.516565: funcgraph_entry:        0.052 us   |                          next_zones_zonelist();
+block_hasher-4109  [000]  2764.516565: funcgraph_entry:                   |      __fget_light() {
+block_hasher-4109  [000]  2764.516565: funcgraph_entry:        0.217 us   |        __fget();
+block_hasher-4102  [001]  2764.516565: funcgraph_entry:        0.046 us   |                          __zone_watermark_ok();
+block_hasher-4102  [001]  2764.516566: funcgraph_entry:        0.057 us   |                          __mod_zone_page_state();
+block_hasher-4109  [000]  2764.516566: funcgraph_exit:         0.745 us   |      }
+block_hasher-4109  [000]  2764.516566: funcgraph_exit:         1.229 us   |    }
+block_hasher-4102  [001]  2764.516566: funcgraph_entry:                   |                          zone_statistics() {
+block_hasher-4109  [000]  2764.516566: funcgraph_entry:                   |    vfs_read() {
+block_hasher-4102  [001]  2764.516566: funcgraph_entry:        0.064 us   |                            __inc_zone_state();
+block_hasher-4109  [000]  2764.516566: funcgraph_entry:                   |      rw_verify_area() {
+block_hasher-4109  [000]  2764.516567: funcgraph_entry:                   |        security_file_permission() {
+block_hasher-4102  [001]  2764.516567: funcgraph_entry:        0.057 us   |                            __inc_zone_state();
+block_hasher-4109  [000]  2764.516567: funcgraph_entry:        0.048 us   |          cap_file_permission();
+block_hasher-4102  [001]  2764.516567: funcgraph_exit:         0.907 us   |                          }
+block_hasher-4102  [001]  2764.516567: funcgraph_entry:        0.056 us   |                          bad_range();
+block_hasher-4109  [000]  2764.516567: funcgraph_entry:        0.115 us   |          __fsnotify_parent();
+block_hasher-4109  [000]  2764.516568: funcgraph_entry:        0.159 us   |          fsnotify();
+block_hasher-4102  [001]  2764.516568: funcgraph_entry:                   |                          mem_cgroup_bad_page_check() {
+block_hasher-4102  [001]  2764.516568: funcgraph_entry:                   |                            lookup_page_cgroup_used() {
+block_hasher-4102  [001]  2764.516568: funcgraph_entry:        0.052 us   |                              lookup_page_cgroup();
+block_hasher-4109  [000]  2764.516569: funcgraph_exit:         1.958 us   |        }
+block_hasher-4102  [001]  2764.516569: funcgraph_exit:         0.435 us   |                            }
+block_hasher-4109  [000]  2764.516569: funcgraph_exit:         2.487 us   |      }
+block_hasher-4102  [001]  2764.516569: funcgraph_exit:         0.813 us   |                          }
+block_hasher-4102  [001]  2764.516569: funcgraph_exit:         4.666 us   |                        }</code></pre>
+<p>First of&nbsp;all, there is&nbsp;no&nbsp;straight function call chain, it’s&nbsp;constantly interrupted and transfered to&nbsp;another CPU. Secondly, there are a&nbsp;lot of&nbsp;noise e.g. <code>inc_zone_state</code> and <code>__page_cache_alloc</code> calls. And finally, there are neither <em>mdraid</em> function nor <code>mwait_idle</code> calls!</p>
+<p>And the reasons are <em>ftrace</em> default sources (tracepoints) and async/callback nature of&nbsp;kernel code. You won’t&nbsp;see direct functions call chain from <code>sys_pread64</code>, kernel doesn’t&nbsp;work this way.</p>
+<p>But what if&nbsp;we&nbsp;setup kprobes on&nbsp;mdraid functions? No&nbsp;problem! Just add return probes for <code>mwait_idle</code> and <code>md_make_request</code>:</p>
+<pre><code># echo &#39;r:md_make_request_probe md_make_request $retval&#39; &gt;&gt; kprobe_events 
+# echo &#39;r:mwait_probe mwait_idle $retval&#39; &gt;&gt; kprobe_events</code></pre>
+<p>Repeat the routine with <code><nobr>trace-cmd</nobr></code> to&nbsp;get function graph:</p>
+<pre><code># trace-cmd record -p function_graph -o graph_md.dat -g md_make_request -e md_make_request_probe -e mwait_probe -F \
+            ./block_hasher -d /dev/md0 -b 1048576 -t10 -n100</code></pre>
+<p><code>-e</code> enables particular event. Now, look at&nbsp;function graph:</p>
+<pre><code>block_hasher-28990 [000] 10235.125319: funcgraph_entry:                   |  md_make_request() {
+block_hasher-28990 [000] 10235.125321: funcgraph_entry:                   |    make_request() {
+block_hasher-28990 [000] 10235.125322: funcgraph_entry:        0.367 us   |      md_write_start();
+block_hasher-28990 [000] 10235.125323: funcgraph_entry:                   |      bio_clone_mddev() {
+block_hasher-28990 [000] 10235.125323: funcgraph_entry:                   |        bio_alloc_bioset() {
+block_hasher-28990 [000] 10235.125323: funcgraph_entry:                   |          mempool_alloc() {
+block_hasher-28990 [000] 10235.125323: funcgraph_entry:        0.178 us   |            _cond_resched();
+block_hasher-28990 [000] 10235.125324: funcgraph_entry:                   |            mempool_alloc_slab() {
+block_hasher-28990 [000] 10235.125324: funcgraph_entry:                   |              kmem_cache_alloc() {
+block_hasher-28990 [000] 10235.125324: funcgraph_entry:                   |                cache_alloc_refill() {
+block_hasher-28990 [000] 10235.125325: funcgraph_entry:        0.275 us   |                  _spin_lock();
+block_hasher-28990 [000] 10235.125326: funcgraph_exit:         1.072 us   |                }
+block_hasher-28990 [000] 10235.125326: funcgraph_exit:         1.721 us   |              }
+block_hasher-28990 [000] 10235.125326: funcgraph_exit:         2.085 us   |            }
+block_hasher-28990 [000] 10235.125326: funcgraph_exit:         2.865 us   |          }
+block_hasher-28990 [000] 10235.125326: funcgraph_entry:        0.187 us   |          bio_init();
+block_hasher-28990 [000] 10235.125327: funcgraph_exit:         3.665 us   |        }
+block_hasher-28990 [000] 10235.125327: funcgraph_entry:        0.229 us   |        __bio_clone();
+block_hasher-28990 [000] 10235.125327: funcgraph_exit:         4.584 us   |      }
+block_hasher-28990 [000] 10235.125328: funcgraph_entry:        1.093 us   |      raid5_compute_sector();
+block_hasher-28990 [000] 10235.125330: funcgraph_entry:                   |      blk_recount_segments() {
+block_hasher-28990 [000] 10235.125330: funcgraph_entry:        0.340 us   |        __blk_recalc_rq_segments();
+block_hasher-28990 [000] 10235.125331: funcgraph_exit:         0.769 us   |      }
+block_hasher-28990 [000] 10235.125331: funcgraph_entry:        0.202 us   |      _spin_lock_irq();
+block_hasher-28990 [000] 10235.125331: funcgraph_entry:        0.194 us   |      generic_make_request();
+block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 10.613 us  |    }
+block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }</code></pre>
+<p>Much better! But for some reason it&nbsp;doesn’t&nbsp;have <code>mwait_idle</code> calls. And it&nbsp;just calls <code>generic_make_request</code>. I’ve&nbsp;tried and record function graph for <code>generic_make_request</code> (<code>-g</code> option). Still no&nbsp;luck. I’ve&nbsp;extracted all function containing <em>wait</em> and here is&nbsp;the result:</p>
+<pre><code># grep &#39;wait&#39; graph_md.graph | cut -f 2 -d&#39;|&#39; | awk &#39;{print $1}&#39; | sort -n | uniq -c
+     18 add_wait_queue()
+   2064 bit_waitqueue()
+      1 bit_waitqueue();
+   1194 finish_wait()
+     28 page_waitqueue()
+   2033 page_waitqueue();
+   1222 prepare_to_wait()
+     25 remove_wait_queue()
+      4 update_stats_wait_end()
+    213 update_stats_wait_end();</code></pre>
+<p>(<code>cut</code> will separate function names, <code>awk</code> will print only function names, <code>uniq</code> with <code>sort</code> will reduce it&nbsp;to&nbsp;unique names)</p>
+<p>Nothing related to&nbsp;timeouts. I’ve&nbsp;tried to&nbsp;grep for <em>timeout</em> and, damn, nothing suspicious.</p>
+<p>So, right now I’m&nbsp;going to&nbsp;stop because it’s&nbsp;not going anywhere.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Well, it&nbsp;was really fun! <em>ftrace</em> is&nbsp;such a&nbsp;powerful tool but it’s&nbsp;made for debugging, not profiling. I&nbsp;was able to&nbsp;get kernel function call graph, get statistics for kernel execution on&nbsp;source code level (can you beleive it?), trace some unknown function and all that happened thanks to&nbsp;<em>ftrace</em>. Bless it!</p>
+<h2 id="ref">To&nbsp;read</h2>
+<ul>
+<li>Debugging the kernel using Ftrace&nbsp;&mdash; <a href="http://lwn.net/Articles/365835/">part 1</a>, <a href="http://lwn.net/Articles/366796/">part 2</a></li>
+<li><a href="http://lwn.net/Articles/370423/">Secrets of&nbsp;the Ftrace function tracer</a></li>
+<li><a href="http://lwn.net/Articles/410200/"><code><nobr>trace-cmd</nobr></code></a></li>
+<li><a href="http://lwn.net/Articles/343766/">Dynamic probes with ftrace</a></li>
+<li><a href="https://events.linuxfoundation.org/slides/lfcs2010_hiramatsu.pdf">Dynamic event tracing in&nbsp;Linux kernel</a></li>
+</ul>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>This is&nbsp;how debugfs mounted: <code>mount -t debugfs none /sys/kernel/debug</code><a href="#fnref1">&#8617;</a></p></li>
+</ol>
+</div>
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2014 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>
