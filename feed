@@ -2,13 +2,566 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title type="text">Crazy rants</title>
   <id>http://avd.reduct.ru/feed</id>
-  <updated>2014-10-27T00:00:00Z</updated>
+  <updated>2014-11-25T00:00:00Z</updated>
   <link href="http://avd.reduct.ru" />
   <link href="http://avd.reduct.ru/feed" rel="self" />
   <author>
     <name>avd</name>
   </author>
   <generator>PyAtom</generator>
+  <entry xml:base="http://avd.reduct.ru/feed">
+    <title type="text">Restricting program memory</title>
+    <id>programming/restrict-memory.html</id>
+    <updated>2014-11-25T00:00:00Z</updated>
+    <link href="programming/restrict-memory.html" />
+    <author>
+      <name>avd</name>
+    </author>
+    <content type="html">&lt;p&gt;On&amp;nbsp;the other day I’ve&amp;nbsp;decided to&amp;nbsp;solve popular problem: how to&amp;nbsp;sort 1 million of&amp;nbsp;integers in&amp;nbsp;1 MiB?&lt;/p&gt;
+&lt;p&gt;But before I’ve&amp;nbsp;even started to&amp;nbsp;do&amp;nbsp;anything I&amp;nbsp;thought&amp;nbsp;&amp;mdash; how can I&amp;nbsp;restrict process memory to&amp;nbsp;1 MiB? Will it&amp;nbsp;work? So, here is&amp;nbsp;the answers.&lt;/p&gt;
+&lt;h2 id="process-virtual-memory"&gt;Process virtual memory&lt;/h2&gt;
+&lt;p&gt;What you have to&amp;nbsp;know before diving in&amp;nbsp;various methods is&amp;nbsp;how process’s&amp;nbsp;virtual memory is&amp;nbsp;structured. There is&amp;nbsp;a, hands down, the best article you could ever find about that is&amp;nbsp;&lt;a href="http://duartes.org/gustavo/blog/post/anatomy-of-a-program-in-memory/"&gt;Gustavo Duarte’s&amp;nbsp;&amp;laquo;Anatomy of&amp;nbsp;a&amp;nbsp;Program in&amp;nbsp;Memory&amp;raquo;&lt;/a&gt;. His whole blog is&amp;nbsp;a&amp;nbsp;treasure.&lt;/p&gt;
+&lt;p&gt;After reading Gustavo’s&amp;nbsp;article I&amp;nbsp;can propose 2 possible options for restricting memory&amp;nbsp;&amp;mdash; reduce virtual address space and restict heap size.&lt;/p&gt;
+&lt;p&gt;First is&amp;nbsp;to&amp;nbsp;limit whole virtual address space for process. This is&amp;nbsp;nice and easy but not fully correct. We&amp;nbsp;can’t&amp;nbsp;limit whole virtual address space of&amp;nbsp;process to&amp;nbsp;1 MB&amp;nbsp;&amp;mdash; we&amp;nbsp;won’t&amp;nbsp;be&amp;nbsp;able to&amp;nbsp;map kernel and libs.&lt;/p&gt;
+&lt;p&gt;Second is&amp;nbsp;to&amp;nbsp;limit &lt;em&gt;heap&lt;/em&gt; size. This is&amp;nbsp;not so&amp;nbsp;easy and seems like nobody tries to&amp;nbsp;do&amp;nbsp;this because the only reasonable way to&amp;nbsp;do&amp;nbsp;this is&amp;nbsp;playing with linker. But for limiting available memory to&amp;nbsp;such small values like 1 MiB it&amp;nbsp;will be&amp;nbsp;absolutely correct.&lt;/p&gt;
+&lt;p&gt;Also, I&amp;nbsp;will look at&amp;nbsp;other methods like monitoring memory consumption with intercepting library and system calls related to&amp;nbsp;memory management and changing program environment with emulation and sandboxing.&lt;/p&gt;
+&lt;p&gt;For testing and illustrating I&amp;nbsp;will use this little program &lt;code&gt;big_alloc&lt;/code&gt; that allocates (and frees) 100 MiB.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;#include &amp;lt;stdio.h&amp;gt;
+#include &amp;lt;stdlib.h&amp;gt;
+#include &amp;lt;string.h&amp;gt;
+#include &amp;lt;stdbool.h&amp;gt;
+
+// 1000 allocation per 100 KiB = 100 000 KiB = 100 MiB
+#define NALLOCS 1000
+#define ALLOC_SIZE 1024*100 // 100 KiB
+
+int main(int argc, const char *argv[])
+{
+    int i = 0;
+    int **pp;
+    bool failed = false;
+
+    pp = malloc(NALLOCS * sizeof(int *));
+    for(i = 0; i &amp;lt; NALLOCS; i++)
+    {
+        pp[i] = malloc(ALLOC_SIZE);
+        if (!pp[i])
+        {
+            perror(&amp;quot;malloc&amp;quot;);
+            printf(&amp;quot;Failed after %d allocations\n&amp;quot;, i);
+            failed = true;
+            break;
+        }
+        // Touch some bytes in memory to trick copy-on-write.
+        memset(pp[i], 0xA, 100);
+        printf(&amp;quot;pp[%d] = %p\n&amp;quot;, i, pp[i]);
+    }
+
+    if (!failed)
+        printf(&amp;quot;Successfully allocated %d bytes\n&amp;quot;, NALLOCS * ALLOC_SIZE);
+
+    for(i = 0; i &amp;lt; NALLOCS; i++)
+    {
+        if (pp[i])
+            free(pp[i]);
+    }
+    free(pp);
+
+    return 0;
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;All the sources are &lt;a href="https://github.com/dzeban/restrict-memory"&gt;on&amp;nbsp;github&lt;/a&gt;.&lt;/p&gt;
+&lt;h2 id="ulimit"&gt;ulimit&lt;/h2&gt;
+&lt;p&gt;It’s&amp;nbsp;first thing that old unix hacker can think of&amp;nbsp;when asked to&amp;nbsp;limit program memory. &lt;code&gt;ulimit&lt;/code&gt; is&amp;nbsp;bash utility that allows you to&amp;nbsp;restrict program resources, and is&amp;nbsp;just interface for &lt;a href="http://linux.die.net/man/2/setrlimit"&gt;&lt;code&gt;setrlimit&lt;/code&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;We&amp;nbsp;can set the limit to&amp;nbsp;resident memory size.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ulimit -m 1024&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now check:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ulimit -a
+core file size          (blocks, -c) 0
+data seg size           (kbytes, -d) unlimited
+scheduling priority             (-e) 0
+file size               (blocks, -f) unlimited
+pending signals                 (-i) 7802
+max locked memory       (kbytes, -l) 64
+max memory size         (kbytes, -m) 1024
+open files                      (-n) 1024
+pipe size            (512 bytes, -p) 8
+POSIX message queues     (bytes, -q) 819200
+real-time priority              (-r) 0
+stack size              (kbytes, -s) 8192
+cpu time               (seconds, -t) unlimited
+max user processes              (-u) 1024
+virtual memory          (kbytes, -v) unlimited
+file locks                      (-x) unlimited&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We&amp;nbsp;set limit to&amp;nbsp;1024 kbytes (-m) thus 1 MiB. But when we&amp;nbsp;try to&amp;nbsp;run our program it&amp;nbsp;won’t&amp;nbsp;fail. Setting limit to&amp;nbsp;something more reasonable like 30 MiB will anyway let our program allocate 100 MB. &lt;code&gt;ulimit&lt;/code&gt; simply doesn’t&amp;nbsp;work. Despite setting resident set size to&amp;nbsp;1024 kbytes, I&amp;nbsp;can see in&amp;nbsp;top that resident memory for my&amp;nbsp;program is&amp;nbsp;4872.&lt;/p&gt;
+&lt;p&gt;The reason is&amp;nbsp;that Linux doesn’t&amp;nbsp;respect this and &lt;code&gt;man ulimit&lt;/code&gt; tells it&amp;nbsp;directly:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;ulimit [-HSTabcdefilmnpqrstuvx [limit]]
+    ...
+    -m     The maximum resident set size (many systems do not honor this limit)
+    ...&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;There is&amp;nbsp;also &lt;code&gt;ulimit -d&lt;/code&gt; that is&amp;nbsp;respected &lt;a href="http://lxr.free-electrons.com/source/mm/mmap.c?v=3.16#L290"&gt;according to&amp;nbsp;kernel&lt;/a&gt;, but it’s&amp;nbsp;still work because of&amp;nbsp;mmap (see &lt;a href="#Linker"&gt;Linker&lt;/a&gt; chapter).&lt;/p&gt;
+&lt;h2 id="qemu"&gt;QEMU&lt;/h2&gt;
+&lt;p&gt;When you want to&amp;nbsp;modify program environment QEMU is&amp;nbsp;the natural way for this kind of&amp;nbsp;tasks. It&amp;nbsp;has &lt;code&gt;-R&lt;/code&gt; option to&amp;nbsp;limit virtual address space. But like I&amp;nbsp;said earlier you can’t&amp;nbsp;restrict address space to&amp;nbsp;small values&amp;nbsp;&amp;mdash; there will be&amp;nbsp;no&amp;nbsp;space to&amp;nbsp;map libc and kernel.&lt;/p&gt;
+&lt;p&gt;Look:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ qemu-i386 -R 1048576 ./big_alloc
+big_alloc: error while loading shared libraries: libc.so.6: failed to map segment from shared object: Cannot allocate memory&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here, &lt;code&gt;-R 1048576&lt;/code&gt; reserves 1 MiB for guest virtual address space.&lt;/p&gt;
+&lt;p&gt;For whole virtual address space we&amp;nbsp;have to&amp;nbsp;set something more reasonable like 20 MB. Look:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ qemu-i386 -R 20M ./big_alloc
+malloc: Cannot allocate memory
+Failed after 100 allocations&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It&amp;nbsp;successfully fails&lt;a href="#fn1" class="footnoteRef" id="fnref1"&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; after 100 allocations (10 MB).&lt;/p&gt;
+&lt;p&gt;So, QEMU is&amp;nbsp;the first winner in&amp;nbsp;restricting program’s&amp;nbsp;memory size though you have to&amp;nbsp;play with &lt;code&gt;-R&lt;/code&gt; value to&amp;nbsp;get correct limit.&lt;/p&gt;
+&lt;h2 id="container"&gt;Container&lt;/h2&gt;
+&lt;p&gt;Another option after QEMU is&amp;nbsp;to&amp;nbsp;launch application in&amp;nbsp;container, restricting it’s&amp;nbsp;resources. To&amp;nbsp;do&amp;nbsp;this you have several options:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;Use fancy &lt;nobr&gt;high-level&lt;/nobr&gt; &lt;em&gt;docker&lt;/em&gt;.&lt;/li&gt;
+&lt;li&gt;Use regular usermode tools from &lt;em&gt;lxc&lt;/em&gt; package.&lt;/li&gt;
+&lt;li&gt;Go&amp;nbsp;hardcore and write your own script with &lt;em&gt;libvirt&lt;/em&gt;.&lt;/li&gt;
+&lt;li&gt;Name it&amp;hellip;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;But after all resources will be&amp;nbsp;restricted with native Linux subsystem called &lt;em&gt;cgroups&lt;/em&gt;. You can try to&amp;nbsp;poke it&amp;nbsp;directly but I&amp;nbsp;suggest using &lt;em&gt;lxc&lt;/em&gt;. I&amp;nbsp;would like to&amp;nbsp;use docker but it&amp;nbsp;works only on&amp;nbsp;&lt;nobr&gt;64-bit&lt;/nobr&gt; machines and my&amp;nbsp;box is&amp;nbsp;small Intel Atom netbook which is&amp;nbsp;i386.&lt;/p&gt;
+&lt;p&gt;Ok, quick info. &lt;em&gt;LXC&lt;/em&gt; is&amp;nbsp;&lt;em&gt;LinuX Containers&lt;/em&gt;. It’s&amp;nbsp;a&amp;nbsp;collection of&amp;nbsp;userspace tools and libs for managing kernel facilities to&amp;nbsp;create containers&amp;nbsp;&amp;mdash; isolated and secure environment for application or&amp;nbsp;whole system.&lt;/p&gt;
+&lt;p&gt;Kernel facilities that provides such environment are:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Control groups (cgroups)&lt;/li&gt;
+&lt;li&gt;Kernel namespaces&lt;/li&gt;
+&lt;li&gt;chroot&lt;/li&gt;
+&lt;li&gt;Kernel capabilities&lt;/li&gt;
+&lt;li&gt;SELinux, AppArmor&lt;/li&gt;
+&lt;li&gt;Seccomp policies&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;You can find nice documentation on&amp;nbsp;&lt;a href="https://linuxcontainers.org/"&gt;official site&lt;/a&gt;, on&amp;nbsp;&lt;a href="https://www.stgraber.org/2013/12/20/lxc-1-0-blog-post-series/"&gt;author’s&amp;nbsp;blog&lt;/a&gt; and all over the internet.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;simply run application in&amp;nbsp;container you have to&amp;nbsp;provide config to&amp;nbsp;&lt;code&gt;&lt;nobr&gt;lxc-execute&lt;/nobr&gt;&lt;/code&gt; where you will configure your container. Every sane person should start from examples in&amp;nbsp;&lt;code&gt;/usr/share/doc/lxc/examples&lt;/code&gt;. Man pages recommends to&amp;nbsp;start with &lt;code&gt;&lt;nobr&gt;lxc-macvlan&lt;/nobr&gt;.conf&lt;/code&gt;. Ok, let’s&amp;nbsp;do&amp;nbsp;this:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# cp /usr/share/doc/lxc/examples/lxc-macvlan.conf lxc-my.conf
+# lxc-execute -n foo -f ./lxc-my.conf ./big_alloc
+Successfully allocated 102400000 bytes&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It&amp;nbsp;works!&lt;/p&gt;
+&lt;p&gt;Now lets limit memory. This is&amp;nbsp;what cgroup for. LXC allows you to&amp;nbsp;configure memory subsystem for container’s&amp;nbsp;cgroup by&amp;nbsp;setting memory limits.&lt;/p&gt;
+&lt;p&gt;You can find available tunable parameters for memory subsystem in&amp;nbsp;this &lt;a href="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Resource_Management_Guide/sec-memory.html"&gt;fine RedHat manual&lt;/a&gt;. I’ve&amp;nbsp;found 2:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;memory.limit_in_bytes&lt;/code&gt;&amp;nbsp;&amp;mdash; sets the maximum amount of&amp;nbsp;user memory (including file cache)&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;memory.memsw.limit_in_bytes&lt;/code&gt;&amp;nbsp;&amp;mdash; sets the maximum amount for the sum of&amp;nbsp;memory and swap usage&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Here is&amp;nbsp;what I&amp;nbsp;added to&amp;nbsp;&lt;em&gt;&lt;nobr&gt;lxc-my&lt;/nobr&gt;.conf&lt;/em&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;lxc.cgroup.memory.limit_in_bytes = 2M
+lxc.cgroup.memory.memsw.limit_in_bytes = 2M&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Launch again:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# lxc-execute -n foo -f ./lxc-my.conf ./big_alloc
+#&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Nothing happened, looks like it’s&amp;nbsp;way to&amp;nbsp;small memory. Lets try to&amp;nbsp;launch it&amp;nbsp;from shell in&amp;nbsp;container.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# lxc-execute -n foo -f ./lxc-my.conf /bin/bash
+#&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Looks like bash failed to&amp;nbsp;launch. Lets try &lt;code&gt;/bin/sh&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# lxc-execute -n foo -f ./lxc-my.conf -l DEBUG -o log /bin/sh
+sh-4.2# ./dev/big_alloc/big_alloc 
+Killed&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Yay! We&amp;nbsp;can see this nice act of&amp;nbsp;killing in&amp;nbsp;&lt;code&gt;dmesg&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[15447.035569] big_alloc invoked oom-killer: gfp_mask=0xd0, order=0, oom_score_adj=0
+...
+[15447.035779] Task in /lxc/foo
+[15447.035785]  killed as a result of limit of 
+[15447.035789] /lxc/foo
+
+[15447.035795] memory: usage 3072kB, limit 3072kB, failcnt 127
+[15447.035800] memory+swap: usage 3072kB, limit 3072kB, failcnt 0
+[15447.035805] kmem: usage 0kB, limit 18014398509481983kB, failcnt 0
+[15447.035808] Memory cgroup stats for /lxc/foo: cache:32KB rss:3040KB rss_huge:0KB mapped_file:0KB writeback:0KB swap:0KB inactive_anon:1588KB active_anon:1448KB inactive_file:16KB active_file:16KB unevictable:0KB
+[15447.035836] [ pid ]   uid  tgid total_vm      rss nr_ptes swapents oom_score_adj name
+[15447.035963] [ 9225]     0  9225      942      308      10        0 0 init.lxc
+[15447.035971] [ 9228]     0  9228      833      698       6        0 0 sh
+[15447.035978] [ 9252]     0  9252    16106      843      36        0 0 big_alloc
+[15447.035983] Memory cgroup out of memory: Kill process 9252 (big_alloc) score 1110 or sacrifice child
+[15447.035990] Killed process 9252 (big_alloc) total-vm:64424kB, anon-rss:2396kB, file-rss:976kB&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Though we&amp;nbsp;haven’t&amp;nbsp;seen error message from &lt;code&gt;big_alloc&lt;/code&gt; about malloc failure and how much memory we&amp;nbsp;were able to&amp;nbsp;get, I&amp;nbsp;think we’ve&amp;nbsp;successfully restricted memory via container technology and can stop with it&amp;nbsp;for now.&lt;/p&gt;
+&lt;h2 id="Linker"&gt;Linker&lt;/h2&gt;
+&lt;p&gt;Now lets try to&amp;nbsp;modify binary image limiting space available for heap.&lt;/p&gt;
+&lt;p&gt;Linking is&amp;nbsp;the final part of&amp;nbsp;building program and it&amp;nbsp;implies using linker and linker script. Linker script is&amp;nbsp;description of&amp;nbsp;program sections in&amp;nbsp;memory along with it’s&amp;nbsp;attributes and stuff.&lt;/p&gt;
+&lt;p&gt;Here is&amp;nbsp;a&amp;nbsp;simple linker script:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;ENTRY(main)
+
+SECTIONS
+{
+  . = 0x10000;
+  .text : { *(.text) }
+  . = 0x8000000;
+  .data : { *(.data) }
+  .bss : { *(.bss) }
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Dot is&amp;nbsp;&lt;em&gt;current&lt;/em&gt; location. What that script tells us&amp;nbsp;is&amp;nbsp;that &lt;code&gt;.text&lt;/code&gt; section starts at&amp;nbsp;address 0&amp;times;10000, and then starting from 0&amp;times;8000000 we&amp;nbsp;have 2 subsequent sections &lt;code&gt;.data&lt;/code&gt; and &lt;code&gt;.bss&lt;/code&gt;. Entry point is&amp;nbsp;&lt;code&gt;main&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Nice and sweet but it&amp;nbsp;will not work for any useful applications. And the reason is&amp;nbsp;that &lt;code&gt;main&lt;/code&gt; function that you write in&amp;nbsp;C&amp;nbsp;programs is&amp;nbsp;not actually first function being called. There is&amp;nbsp;a&amp;nbsp;whole lot of&amp;nbsp;initialization and cleanup code. That code is&amp;nbsp;provided with C&amp;nbsp;runtime (also shorthanded to&amp;nbsp;&lt;em&gt;crt&lt;/em&gt;) and spread into &lt;em&gt;crt#.o&lt;/em&gt; libraries in&amp;nbsp;&lt;code&gt;/usr/lib&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;You can see exact details if&amp;nbsp;you launch &lt;code&gt;gcc&lt;/code&gt; with &lt;code&gt;-v&lt;/code&gt; option. You’ll&amp;nbsp;see that at&amp;nbsp;first it&amp;nbsp;invokes &lt;code&gt;cc1&lt;/code&gt; and creates assembly, then translate it&amp;nbsp;to&amp;nbsp;object file with &lt;code&gt;as&lt;/code&gt; and finally combines everything in&amp;nbsp;ELF file with &lt;code&gt;collect2&lt;/code&gt;. That &lt;code&gt;collect2&lt;/code&gt; is&amp;nbsp;&lt;code&gt;ld&lt;/code&gt; wrapper. It&amp;nbsp;takes your object file and 5 additional libs to&amp;nbsp;create final binary image:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;/usr/lib/gcc/&lt;nobr&gt;i686-redhat-linux&lt;/nobr&gt;/4.8.3/./././crt1.o&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;/usr/lib/gcc/&lt;nobr&gt;i686-redhat-linux&lt;/nobr&gt;/4.8.3/./././crti.o&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;/usr/lib/gcc/&lt;nobr&gt;i686-redhat-linux&lt;/nobr&gt;/4.8.3/crtbegin.o&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;/tmp/ccEZwSgF.o&lt;/code&gt; &lt;code&gt;&amp;lt;-&lt;/code&gt; This one is&amp;nbsp;our program object file&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;/usr/lib/gcc/&lt;nobr&gt;i686-redhat-linux&lt;/nobr&gt;/4.8.3/crtend.o&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;/usr/lib/gcc/&lt;nobr&gt;i686-redhat-linux&lt;/nobr&gt;/4.8.3/./././crtn.o&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;It’s&amp;nbsp;&lt;strong&gt;really&lt;/strong&gt; complicated so&amp;nbsp;instead of&amp;nbsp;writing my&amp;nbsp;own script I’ll&amp;nbsp;modify default linker script. Get default linker script passing &lt;code&gt;-Wl,-verbose&lt;/code&gt; to&amp;nbsp;&lt;code&gt;gcc&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;gcc big_alloc.c -o big_alloc -Wl,-verbose&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now let’s&amp;nbsp;figure out how to&amp;nbsp;modify it. Lets see how our binary is&amp;nbsp;built by&amp;nbsp;default. Compile it&amp;nbsp;and look for &lt;code&gt;.data&lt;/code&gt; section address. Here is&amp;nbsp;&lt;code&gt;objdump -h big_alloc&lt;/code&gt; output&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+...
+12 .text         000002e4  080483e0  080483e0  000003e0  2**4
+                 CONTENTS, ALLOC, LOAD, READONLY, CODE
+...
+23 .data         00000004  0804a028  0804a028  00001028  2**2
+                 CONTENTS, ALLOC, LOAD, DATA
+24 .bss          00000004  0804a02c  0804a02c  0000102c  2**2
+                 ALLOC&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;.text&lt;/code&gt;, &lt;code&gt;.data&lt;/code&gt; and &lt;code&gt;.bss&lt;/code&gt; sections are located near 128 MiB.&lt;/p&gt;
+&lt;p&gt;Now lets see where is&amp;nbsp;the stack with help of&amp;nbsp;&lt;em&gt;gdb&lt;/em&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[restrict-memory]$ gdb big_alloc 
+...
+Reading symbols from big_alloc...done.
+(gdb) break main
+Breakpoint 1 at 0x80484fa: file big_alloc.c, line 12.
+(gdb) r
+Starting program: /home/avd/dev/restrict-memory/big_alloc 
+
+Breakpoint 1, main (argc=1, argv=0xbffff164) at big_alloc.c:12
+12              int i = 0;
+Missing separate debuginfos, use: debuginfo-install glibc-2.18-16.fc20.i686
+(gdb) info registers 
+eax            0x1      1
+ecx            0x9a8fc98f       -1701852785
+edx            0xbffff0f4       -1073745676
+ebx            0x42427000       1111650304
+esp            0xbffff0a0       0xbffff0a0
+ebp            0xbffff0c8       0xbffff0c8
+esi            0x0      0
+edi            0x0      0
+eip            0x80484fa        0x80484fa &amp;lt;main+10&amp;gt;
+eflags         0x286    [ PF SF IF ]
+cs             0x73     115
+ss             0x7b     123
+ds             0x7b     123
+es             0x7b     123
+fs             0x0      0
+gs             0x33     51&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;esp&lt;/code&gt; points to&amp;nbsp;&lt;code&gt;0xbffff0a0&lt;/code&gt; which is&amp;nbsp;near 3 GiB. So&amp;nbsp;we&amp;nbsp;have ~2.9 GiB for heap.&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;real world, stack top address is&amp;nbsp;randomized, e.g. you can see it&amp;nbsp;in&amp;nbsp;output of&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# cat /proc/self/maps&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;As&amp;nbsp;we&amp;nbsp;all know, heap grows up&amp;nbsp;from the end of&amp;nbsp;&lt;code&gt;.data&lt;/code&gt; towards the stack. &lt;strong&gt;What if&amp;nbsp;we&amp;nbsp;move &lt;code&gt;.data&lt;/code&gt; section to&amp;nbsp;highest possible address?&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Lets put data segment 2 MiB before stack. Take stack top, subtract 2 MiB:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;0xbffff0a0 - 0x200000 = 0xbfdff0a0 &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now shift all sections starting with &lt;code&gt;.data&lt;/code&gt; to&amp;nbsp;that address:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;. =     0xbfdff0a0
+.data           :
+{
+  *(.data .data.* .gnu.linkonce.d.*)
+  SORT(CONSTRUCTORS)
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Compile it:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ gcc big_alloc.c -o big_alloc -Wl,-T hack.lst&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;-Wl&lt;/code&gt; is&amp;nbsp;an&amp;nbsp;option to&amp;nbsp;linker and &lt;code&gt;-T hack.lst&lt;/code&gt; is&amp;nbsp;a&amp;nbsp;linker option itself. It&amp;nbsp;tells linker to&amp;nbsp;use &lt;code&gt;hack.lst&lt;/code&gt; as&amp;nbsp;a&amp;nbsp;linker script.&lt;/p&gt;
+&lt;p&gt;Now, if&amp;nbsp;we&amp;nbsp;look at&amp;nbsp;header we’ll&amp;nbsp;see that:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+
+ ...
+
+ 23 .data         00000004  bfdff0a0  bfdff0a0  000010a0  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 24 .bss          00000004  bfdff0a4  bfdff0a4  000010a4  2**2
+                  ALLOC&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;But nevertheless it&amp;nbsp;successfully allocates. How? That’s&amp;nbsp;really neat. When I&amp;nbsp;tried to&amp;nbsp;look at&amp;nbsp;pointer values that malloc returns I&amp;nbsp;saw that allocation is&amp;nbsp;starting somewhere over the end of&amp;nbsp;&lt;code&gt;.data&lt;/code&gt; section like &lt;code&gt;0xbf8b7000&lt;/code&gt;, continues for some time with increasing pointers and then resets pointers to&amp;nbsp;&lt;em&gt;lower&lt;/em&gt; address like &lt;code&gt;0xb7676000&lt;/code&gt;. From that address it&amp;nbsp;will allocate for some time with pointers increasing and then resets pointers again to&amp;nbsp;even lower address like &lt;code&gt;0xb5e76000&lt;/code&gt;. Eventually it&amp;nbsp;looks like heap growing down!&lt;/p&gt;
+&lt;p&gt;But if&amp;nbsp;you think for a&amp;nbsp;minute it&amp;nbsp;doesn’t&amp;nbsp;really that strange. I’ve&amp;nbsp;examined some &lt;a href="http://code.metager.de/source/xref/gnu/glibc/malloc/malloc.c#sysmalloc"&gt;glibc sources&lt;/a&gt; and found out that when &lt;code&gt;brk&lt;/code&gt; fails it&amp;nbsp;will use &lt;code&gt;mmap&lt;/code&gt; instead. So&amp;nbsp;glibc asks kernel to&amp;nbsp;map some pages, kernel sees that process has lots of&amp;nbsp;holes in&amp;nbsp;virtual memory space and map page from that space for glibc, and finally glibc returns pointer from that page.&lt;/p&gt;
+&lt;p&gt;Running &lt;code&gt;big_alloc&lt;/code&gt; under &lt;code&gt;strace&lt;/code&gt; confirmed theory. Just look at&amp;nbsp;normal binary:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;brk(0)                                  = 0x8135000
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb77df000
+mmap2(NULL, 95800, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb77c7000
+mmap2(0x4226d000, 1825436, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x4226d000
+mmap2(0x42425000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1b8000) = 0x42425000
+mmap2(0x42428000, 10908, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x42428000
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb77c6000
+mprotect(0x42425000, 8192, PROT_READ)   = 0
+mprotect(0x8049000, 4096, PROT_READ)    = 0
+mprotect(0x42269000, 4096, PROT_READ)   = 0
+munmap(0xb77c7000, 95800)               = 0
+brk(0)                                  = 0x8135000
+brk(0x8156000)                          = 0x8156000
+brk(0)                                  = 0x8156000
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb77de000
+brk(0)                                  = 0x8156000
+brk(0x8188000)                          = 0x8188000
+brk(0)                                  = 0x8188000
+brk(0x81ba000)                          = 0x81ba000
+brk(0)                                  = 0x81ba000
+brk(0x81ec000)                          = 0x81ec000
+...
+brk(0)                                  = 0x9c19000
+brk(0x9c4b000)                          = 0x9c4b000
+brk(0)                                  = 0x9c4b000
+brk(0x9c7d000)                          = 0x9c7d000
+brk(0)                                  = 0x9c7d000
+brk(0x9caf000)                          = 0x9caf000
+...
+brk(0)                                  = 0xe29c000
+brk(0xe2ce000)                          = 0xe2ce000
+brk(0)                                  = 0xe2ce000
+brk(0xe300000)                          = 0xe300000
+brk(0)                                  = 0xe300000
+brk(0)                                  = 0xe300000
+brk(0x8156000)                          = 0x8156000
+brk(0)                                  = 0x8156000
++++ exited with 0 +++&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;and now the modified binary&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;brk(0)                                  = 0xbf896000
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb778f000
+mmap2(NULL, 95800, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7777000
+mmap2(0x4226d000, 1825436, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x4226d000
+mmap2(0x42425000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1b8000) = 0x42425000
+mmap2(0x42428000, 10908, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x42428000
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7776000
+mprotect(0x42425000, 8192, PROT_READ)   = 0
+mprotect(0x8049000, 4096, PROT_READ)    = 0
+mprotect(0x42269000, 4096, PROT_READ)   = 0
+munmap(0xb7777000, 95800)               = 0
+brk(0)                                  = 0xbf896000
+brk(0xbf8b7000)                         = 0xbf8b7000
+brk(0)                                  = 0xbf8b7000
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb778e000
+brk(0)                                  = 0xbf8b7000
+brk(0xbf8e9000)                         = 0xbf8e9000
+brk(0)                                  = 0xbf8e9000
+brk(0xbf91b000)                         = 0xbf91b000
+brk(0)                                  = 0xbf91b000
+brk(0xbf94d000)                         = 0xbf94d000
+brk(0)                                  = 0xbf94d000
+brk(0xbf97f000)                         = 0xbf97f000
+...
+brk(0)                                  = 0xbff8e000
+brk(0xbffc0000)                         = 0xbffc0000
+brk(0)                                  = 0xbffc0000
+brk(0xbfff2000)                         = 0xbffc0000
+mmap2(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7676000
+brk(0)                                  = 0xbffc0000
+brk(0xbfffa000)                         = 0xbffc0000
+mmap2(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7576000
+brk(0)                                  = 0xbffc0000
+brk(0xbfffa000)                         = 0xbffc0000
+mmap2(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7476000
+brk(0)                                  = 0xbffc0000
+brk(0xbfffa000)                         = 0xbffc0000
+mmap2(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7376000
+...
+brk(0)                                  = 0xbffc0000
+brk(0xbfffa000)                         = 0xbffc0000
+mmap2(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb1c76000
+brk(0)                                  = 0xbffc0000
+brk(0xbfffa000)                         = 0xbffc0000
+mmap2(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb1b76000
+brk(0)                                  = 0xbffc0000
+brk(0xbfffa000)                         = 0xbffc0000
+mmap2(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb1a76000
+brk(0)                                  = 0xbffc0000
+brk(0)                                  = 0xbffc0000
+brk(0)                                  = 0xbffc0000
+...
+brk(0)                                  = 0xbffc0000
+brk(0)                                  = 0xbffc0000
+brk(0)                                  = 0xbffc0000
++++ exited with 0 +++&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That being said, shifting &lt;code&gt;.data&lt;/code&gt; section up&amp;nbsp;to&amp;nbsp;stack (thus reducing space for heap) is&amp;nbsp;pointless because kernel will map page for malloc from virtual memory empty area.&lt;/p&gt;
+&lt;h2 id="sandbox"&gt;Sandbox&lt;/h2&gt;
+&lt;p&gt;The other way to&amp;nbsp;restrict program memory is&amp;nbsp;sandboxing. The difference from emulation is&amp;nbsp;that we’re&amp;nbsp;not really emulating anything but instead we&amp;nbsp;track and control certain things in&amp;nbsp;program behaviour. Usually sandboxing is&amp;nbsp;used for security research when you have some kind of&amp;nbsp;malware and need to&amp;nbsp;analyze it&amp;nbsp;without harming your system.&lt;/p&gt;
+&lt;p&gt;I’ve&amp;nbsp;come up&amp;nbsp;with several sanboxing methods and implemented most promising.&lt;/p&gt;
+&lt;h3 id="ld_preload-trick"&gt;LD_PRELOAD trick&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;LD_PRELOAD&lt;/code&gt; is&amp;nbsp;special environment variable that when set will make dynamic linker use &amp;laquo;preloaded&amp;raquo; library before any other, including libc, library. It’s&amp;nbsp;used in&amp;nbsp;a&amp;nbsp;lot of&amp;nbsp;scenarios from debugging to, well, sanboxing.&lt;/p&gt;
+&lt;p&gt;This trick is&amp;nbsp;also infamously &lt;a href="http://blog.malwaremustdie.org/2014/05/elf-shared-so-dynamic-library-malware.html"&gt;used by&amp;nbsp;some malware&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;I&amp;nbsp;have written simple memory management sandbox that intercepts &lt;code&gt;malloc&lt;/code&gt;/&lt;code&gt;free&lt;/code&gt; calls, do&amp;nbsp;memory usage accounting and returns &lt;code&gt;ENOMEM&lt;/code&gt; if&amp;nbsp;memory limit is&amp;nbsp;exceeded.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;do&amp;nbsp;this I&amp;nbsp;have written a&amp;nbsp;shared library with my&amp;nbsp;own &lt;code&gt;malloc&lt;/code&gt;/&lt;code&gt;free&lt;/code&gt; wrappers that will increment counter by&amp;nbsp;&lt;code&gt;malloc&lt;/code&gt; size and decrement when &lt;code&gt;free&lt;/code&gt; is&amp;nbsp;called. This library is&amp;nbsp;being preloaded with &lt;code&gt;LD_PRELOAD&lt;/code&gt; when running application under test.&lt;/p&gt;
+&lt;p&gt;Here is&amp;nbsp;my&amp;nbsp;malloc implementation.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;void *malloc(size_t size)
+{
+    void *p = NULL;
+
+    if (libc_malloc == NULL) 
+        save_libc_malloc();
+
+    if (mem_allocated &amp;lt;= MEM_THRESHOLD)
+    {
+        p = libc_malloc(size);
+    }
+    else
+    {
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    if (!no_hook) 
+    {
+        no_hook = 1;
+        account(p, size);
+        no_hook = 0;
+    }
+
+    return p;
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;libc_malloc&lt;/code&gt; is&amp;nbsp;pointer to&amp;nbsp;original &lt;code&gt;malloc&lt;/code&gt; from libc. &lt;code&gt;no_hook&lt;/code&gt; is&amp;nbsp;a&amp;nbsp;&lt;nobr&gt;thread-local&lt;/nobr&gt; flag. It’s&amp;nbsp;is&amp;nbsp;used to&amp;nbsp;be&amp;nbsp;able to&amp;nbsp;use malloc in&amp;nbsp;malloc hooks and avoid recursive calls&amp;nbsp;&amp;mdash; idea taken from &lt;a href="http://www.slideshare.net/tetsu.koba/tips-of-malloc-free"&gt;Tetsuyuki Kobayashi presentation&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;malloc&lt;/code&gt; is&amp;nbsp;used implicitly in&amp;nbsp;&lt;code&gt;account&lt;/code&gt; function by&amp;nbsp;&lt;a href="http://troydhanson.github.io/uthash/"&gt;uthash&lt;/a&gt; hash table library. Why use hash table? It’s&amp;nbsp;because when you call &lt;code&gt;free&lt;/code&gt; you pass to&amp;nbsp;it&amp;nbsp;only the pointer and in&amp;nbsp;&lt;code&gt;free&lt;/code&gt; you don’t&amp;nbsp;know how much memory has been allocated. So&amp;nbsp;I&amp;nbsp;have hash table with pointer as&amp;nbsp;a&amp;nbsp;key and allocated size as&amp;nbsp;a&amp;nbsp;value. Here is&amp;nbsp;what I&amp;nbsp;do&amp;nbsp;on&amp;nbsp;malloc:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;struct malloc_item *item, *out;
+
+item = malloc(sizeof(*item));
+item-&amp;gt;p = ptr;
+item-&amp;gt;size = size;
+
+HASH_ADD_PTR(HT, p, item);
+
+mem_allocated += size;
+
+fprintf(stderr, &amp;quot;Alloc: %p -&amp;gt; %zu\n&amp;quot;, ptr, size);&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;mem_allocated&lt;/code&gt; is&amp;nbsp;that static variable that is&amp;nbsp;compared against threshold in&amp;nbsp;&lt;code&gt;malloc&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Now when &lt;code&gt;free&lt;/code&gt; is&amp;nbsp;called here is&amp;nbsp;what happened:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;struct malloc_item *found;
+
+HASH_FIND_PTR(HT, &amp;amp;ptr, found);
+if (found)
+{
+    mem_allocated -= found-&amp;gt;size;
+    fprintf(stderr, &amp;quot;Free: %p -&amp;gt; %zu\n&amp;quot;, found-&amp;gt;p, found-&amp;gt;size);
+    HASH_DEL(HT, found);
+    free(found);
+}
+else
+{
+    fprintf(stderr, &amp;quot;Freeing unaccounted allocation %p\n&amp;quot;, ptr);
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Yep, just decrement &lt;code&gt;mem_allocated&lt;/code&gt;. It’s&amp;nbsp;that simple.&lt;/p&gt;
+&lt;p&gt;But the really cool thing is&amp;nbsp;that it&amp;nbsp;works rock solid&lt;a href="#fn2" class="footnoteRef" id="fnref2"&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[restrict-memory]$ LD_PRELOAD=./libmemrestrict.so ./big_alloc
+pp[0] = 0x25ac210
+pp[1] = 0x25c5270
+pp[2] = 0x25de2d0
+pp[3] = 0x25f7330
+pp[4] = 0x2610390
+pp[5] = 0x26293f0
+pp[6] = 0x2642450
+pp[7] = 0x265b4b0
+pp[8] = 0x2674510
+pp[9] = 0x268d570
+pp[10] = 0x26a65d0
+pp[11] = 0x26bf630
+pp[12] = 0x26d8690
+pp[13] = 0x26f16f0
+pp[14] = 0x270a750
+pp[15] = 0x27237b0
+pp[16] = 0x273c810
+pp[17] = 0x2755870
+pp[18] = 0x276e8d0
+pp[19] = 0x2787930
+pp[20] = 0x27a0990
+malloc: Cannot allocate memory
+Failed after 21 allocations&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Full source code for library is&amp;nbsp;&lt;a href="https://github.com/dzeban/restrict-memory/blob/master/memrestrict.c"&gt;on&amp;nbsp;github&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;So, LD_PRELOAD is&amp;nbsp;a&amp;nbsp;great way to&amp;nbsp;restrict memory!&lt;/p&gt;
+&lt;h3 id="ptrace"&gt;ptrace&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;ptrace&lt;/code&gt; is&amp;nbsp;another feature that can be&amp;nbsp;use to&amp;nbsp;build memory sandboxing. &lt;code&gt;ptrace&lt;/code&gt; is&amp;nbsp;a&amp;nbsp;system call that allows you to&amp;nbsp;control the execution of&amp;nbsp;another process. It’s&amp;nbsp;built into various POSIX operating system including, of&amp;nbsp;course, Linux.&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;ptrace&lt;/code&gt; is&amp;nbsp;the foundation of&amp;nbsp;tracers like &lt;a href="http://sourceforge.net/p/strace/code/ci/master/tree/strace.c#l343"&gt;&lt;em&gt;strace&lt;/em&gt;&lt;/a&gt;, &lt;a href="http://anonscm.debian.org/cgit/collab-maint/ltrace.git/tree/sysdeps/linux-gnu/trace.c#n78"&gt;&lt;em&gt;ltrace&lt;/em&gt;&lt;/a&gt;, almost every sandboxing software like &lt;a href="http://www.citi.umich.edu/u/provos/systrace/"&gt;&lt;em&gt;systrace&lt;/em&gt;&lt;/a&gt;, &lt;a href="https://github.com/psychoschlumpf/sydbox"&gt;&lt;em&gt;sydbox&lt;/em&gt;&lt;/a&gt;, &lt;a href="http://pdos.csail.mit.edu/mbox/"&gt;&lt;em&gt;mbox&lt;/em&gt;&lt;/a&gt; and all debuggers including &lt;a href="https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=blob;f=gdb/inf-ptrace.c;h=6eb8080242349296e43dcc19df4a0896e6093fa8;hb=HEAD"&gt;&lt;em&gt;gdb&lt;/em&gt;&lt;/a&gt; itself.&lt;/p&gt;
+&lt;p&gt;I&amp;nbsp;have built custom tool with &lt;code&gt;ptrace&lt;/code&gt;. It&amp;nbsp;traces &lt;code&gt;brk&lt;/code&gt; calls and look for distance between initial program break value and new value set by&amp;nbsp;the next &lt;code&gt;brk&lt;/code&gt; call.&lt;/p&gt;
+&lt;p&gt;This tool forks and becomes 2 processes. Parent process is&amp;nbsp;tracer and child process is&amp;nbsp;tracee. In&amp;nbsp;child process I&amp;nbsp;call &lt;code&gt;ptrace(PTRACE_TRACEME)&lt;/code&gt; and then &lt;code&gt;execv&lt;/code&gt;. In&amp;nbsp;parent I&amp;nbsp;use &lt;code&gt;ptrace(PTRACE_SYSCALL)&lt;/code&gt; to&amp;nbsp;stop on&amp;nbsp;syscall and filter &lt;code&gt;brk&lt;/code&gt; calls from child and then another &lt;code&gt;ptrace(PTRACE_SYSCALL)&lt;/code&gt; to&amp;nbsp;get &lt;code&gt;brk&lt;/code&gt; return value.&lt;/p&gt;
+&lt;p&gt;When &lt;code&gt;brk&lt;/code&gt; exceeded threshold I&amp;nbsp;set &lt;code&gt;-ENOMEM&lt;/code&gt; as&amp;nbsp;&lt;code&gt;brk&lt;/code&gt; return value. This is&amp;nbsp;set in&amp;nbsp;&lt;code&gt;eax&lt;/code&gt; register so&amp;nbsp;I&amp;nbsp;just overwrite it&amp;nbsp;with &lt;code&gt;ptrace(PTRACE_SETREGS)&lt;/code&gt;. Here is&amp;nbsp;meaty part:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;// Get return value
+if (!syscall_trace(pid, &amp;amp;state))
+{
+    dbg(&amp;quot;brk return: 0x%08X, brk_start 0x%08X\n&amp;quot;, state.eax, brk_start);
+
+    if (brk_start) // We have start of brk
+    {
+        diff = state.eax - brk_start;
+
+        // If child process exceeded threshold 
+        // replace brk return value with -ENOMEM
+        if (diff &amp;gt; THRESHOLD || threshold) 
+        {
+            dbg(&amp;quot;THRESHOLD!\n&amp;quot;);
+            threshold = true;
+            state.eax = -ENOMEM;
+            ptrace(PTRACE_SETREGS, pid, 0, &amp;amp;state);
+        }
+        else
+        {
+            dbg(&amp;quot;diff 0x%08X\n&amp;quot;, diff);
+        }
+    }
+    else
+    {
+        dbg(&amp;quot;Assigning 0x%08X to brk_start\n&amp;quot;, state.eax);
+        brk_start = state.eax;
+    }
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Also, I&amp;nbsp;intercept &lt;code&gt;mmap&lt;/code&gt;/&lt;code&gt;mmap2&lt;/code&gt; calls because libc is&amp;nbsp;smart enough to&amp;nbsp;call it&amp;nbsp;when &lt;code&gt;brk&lt;/code&gt; failed. So&amp;nbsp;when I&amp;nbsp;have threshold exceeded and see &lt;code&gt;mmap&lt;/code&gt; calls I&amp;nbsp;just fail it&amp;nbsp;with &lt;code&gt;ENOMEM&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;It&amp;nbsp;works!&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;[restrict-memory]$ ./ptrace-restrict ./big_alloc
+pp[0] = 0x8958fb0
+pp[1] = 0x8971fb8
+pp[2] = 0x898afc0
+pp[3] = 0x89a3fc8
+pp[4] = 0x89bcfd0
+pp[5] = 0x89d5fd8
+pp[6] = 0x89eefe0
+pp[7] = 0x8a07fe8
+pp[8] = 0x8a20ff0
+pp[9] = 0x8a39ff8
+pp[10] = 0x8a53000
+pp[11] = 0x8a6c008
+pp[12] = 0x8a85010
+pp[13] = 0x8a9e018
+pp[14] = 0x8ab7020
+pp[15] = 0x8ad0028
+pp[16] = 0x8ae9030
+pp[17] = 0x8b02038
+pp[18] = 0x8b1b040
+pp[19] = 0x8b34048
+pp[20] = 0x8b4d050
+malloc: Cannot allocate memory
+Failed after 21 allocations&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;But&amp;hellip; I&amp;nbsp;don’t&amp;nbsp;really like it. It’s&amp;nbsp;ABI specific, i.e. it&amp;nbsp;has to&amp;nbsp;use &lt;code&gt;rax&lt;/code&gt; instead of&amp;nbsp;&lt;code&gt;eax&lt;/code&gt; on&amp;nbsp;&lt;nobr&gt;64-bit&lt;/nobr&gt; machine, so&amp;nbsp;either I&amp;nbsp;make different version of&amp;nbsp;that tool or&amp;nbsp;use &lt;code&gt;#ifdef&lt;/code&gt; to&amp;nbsp;cope with ABI differences or&amp;nbsp;make you build it&amp;nbsp;with &lt;code&gt;-m32&lt;/code&gt; option. But that’s&amp;nbsp;not usable. Also it&amp;nbsp;probably won’t&amp;nbsp;work on&amp;nbsp;other POSIX like systems, because they might have different ABI.&lt;/p&gt;
+&lt;h3 id="other"&gt;Other&lt;/h3&gt;
+&lt;p&gt;There are also other things one may try which I&amp;nbsp;rejected for different reasons:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="http://www.gnu.org/software/libc/manual/html_node/Hooks-for-Malloc.html"&gt;&lt;strong&gt;malloc hooks&lt;/strong&gt;&lt;/a&gt;. Deprecated as&amp;nbsp;said man page so&amp;nbsp;I&amp;nbsp;didn’t&amp;nbsp;bother trying it.&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://man7.org/linux/man-pages/man2/prctl.2.html"&gt;&lt;strong&gt;Seccomp and &lt;code&gt;prctl&lt;/code&gt; with &lt;code&gt;PR_SET_MM_START_BRK&lt;/code&gt;&lt;/strong&gt;&lt;/a&gt;. This might work but as&amp;nbsp;said in&amp;nbsp;&lt;a href="http://lxr.free-electrons.com/source/Documentation/prctl/seccomp_filter.txt"&gt;seccomp filtering kernel documentation&lt;/a&gt; it’s&amp;nbsp;not a&amp;nbsp;sandboxing but a&amp;nbsp;&amp;laquo;mechanism for minimizing the exposed kernel surface&amp;raquo;. So&amp;nbsp;I&amp;nbsp;guess it&amp;nbsp;will be&amp;nbsp;even more awkward than using ptrace by&amp;nbsp;hand. Though I&amp;nbsp;might look at&amp;nbsp;it&amp;nbsp;sometime.&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://sandbox.libvirt.org/quickstart/"&gt;&lt;strong&gt;&lt;nobr&gt;libvirt-sandbox&lt;/nobr&gt;&lt;/strong&gt;&lt;/a&gt;. Nope, it’s&amp;nbsp;just a&amp;nbsp;wrapper over lxc and qemu.&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://linux.die.net/man/8/sandbox"&gt;&lt;strong&gt;SELinux sandbox&lt;/strong&gt;&lt;/a&gt;. Nope. Just doesn’t&amp;nbsp;work though it&amp;nbsp;uses cgroup.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="recap"&gt;Recap&lt;/h2&gt;
+&lt;p&gt;In&amp;nbsp;the end I’d&amp;nbsp;like to&amp;nbsp;recap:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;There are lot of&amp;nbsp;ways to&amp;nbsp;restricting memory:
+&lt;ul&gt;
+&lt;li&gt;Resource limiting with ulimit and cgroup&lt;/li&gt;
+&lt;li&gt;Running under emulator like QEMU&lt;/li&gt;
+&lt;li&gt;Sandboxing with LD_PRELOAD and ptrace&lt;/li&gt;
+&lt;li&gt;Modifying segments in&amp;nbsp;binary image.&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;But not all of&amp;nbsp;them are working
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;ulimit&lt;/code&gt; doesn’t&amp;nbsp;work.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;cgroup&lt;/code&gt; kinda works&amp;nbsp;&amp;mdash; crashing application&lt;/li&gt;
+&lt;li&gt;Emulating works&amp;nbsp;&amp;mdash; crashing application&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;LD_PRELOAD&lt;/code&gt; works amazing!&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ptrace&lt;/code&gt; works good enough but ABI dependant&lt;/li&gt;
+&lt;li&gt;Linker magic doesn’t&amp;nbsp;work because ingenious libc calls &lt;code&gt;mmap&lt;/code&gt;.&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="references"&gt;References&lt;/h2&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;&lt;a href="http://duartes.org/gustavo/blog/post/anatomy-of-a-program-in-memory/"&gt;Gustavo Duarte’s&amp;nbsp;article again.&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://coldattic.info/shvedsky/pro/blogs/a-foo-walks-into-a-bar/posts/40"&gt;Limiting time and memory consumption of&amp;nbsp;a&amp;nbsp;program in&amp;nbsp;Linux.&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;[Linux sandboxing][http://stackoverflow.com/questions/4249063/run-an-untrusted-c-program-in-a-sandbox-in-linux-that-prevents-it-&lt;nobr&gt;from-opening-f&lt;/nobr&gt;]&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div class="footnotes"&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id="fn1"&gt;&lt;p&gt;I&amp;nbsp;think I’ve&amp;nbsp;just invented new term for QA&amp;nbsp;guys.&lt;a href="#fnref1"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn2"&gt;&lt;p&gt;Unless application itself uses LD_PRELOAD:-\&lt;a href="#fnref2"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;</content>
+  </entry>
   <entry xml:base="http://avd.reduct.ru/feed">
     <title type="text">Linux profiling. Ftrace</title>
     <id>linux/profiling-ftrace.html</id>
