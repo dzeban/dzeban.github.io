@@ -2,13 +2,388 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title type="text">Crazy rants</title>
   <id>http://avd.reduct.ru/feed</id>
-  <updated>2014-11-25T00:00:00Z</updated>
+  <updated>2015-04-02T00:00:00Z</updated>
   <link href="http://avd.reduct.ru" />
   <link href="http://avd.reduct.ru/feed" rel="self" />
   <author>
     <name>avd</name>
   </author>
   <generator>PyAtom</generator>
+  <entry xml:base="http://avd.reduct.ru/feed">
+    <title type="text">When memory is not enough...</title>
+    <id>programming/external-sort.html</id>
+    <updated>2015-04-02T00:00:00Z</updated>
+    <link href="programming/external-sort.html" />
+    <author>
+      <name>avd</name>
+    </author>
+    <content type="html">&lt;h2 id="intro"&gt;Intro&lt;/h2&gt;
+&lt;p&gt;&lt;a href="/programming/restrict-memory.html"&gt;The last time&lt;/a&gt; I&amp;nbsp;was wondering on&amp;nbsp;how to&amp;nbsp;restrict program memory consumption. As&amp;nbsp;a&amp;nbsp;trophy from my&amp;nbsp;previous journey I’ve&amp;nbsp;got &lt;a href="https://github.com/dzeban/restrict-memory/blob/master/memrestrict.c"&gt;libmemrestrict&lt;/a&gt;&amp;nbsp;&amp;mdash; a&amp;nbsp;library that implements wrappers over allocation functions like &lt;code&gt;malloc&lt;/code&gt; to&amp;nbsp;account memory usage&amp;nbsp;&amp;mdash; and &lt;a href="https://github.com/dzeban/restrict-memory/blob/master/ptrace-restrict.c"&gt;&lt;nobr&gt;ptrace-restrict&lt;/nobr&gt;&lt;/a&gt;&amp;nbsp;&amp;mdash; &lt;nobr&gt;ptrace-based&lt;/nobr&gt; tool that intercepts &lt;code&gt;brk&lt;/code&gt;, &lt;code&gt;sbrk&lt;/code&gt; and &lt;code&gt;mmap&lt;/code&gt; system calls to&amp;nbsp;do&amp;nbsp;the same thing.&lt;/p&gt;
+&lt;p&gt;But wait, why bother trying to&amp;nbsp;work in&amp;nbsp;memory restricted environment? Is&amp;nbsp;that really such a&amp;nbsp;common problem? Can you remember the last time when OOM killer shot your application? Do&amp;nbsp;you always think about memory consumption when you’re&amp;nbsp;programming. I&amp;nbsp;believe you don’t, because memory is&amp;nbsp;cheap and if&amp;nbsp;your application is&amp;nbsp;starving&amp;nbsp;&amp;mdash; just add a&amp;nbsp;few gigs of&amp;nbsp;RAM!&lt;/p&gt;
+&lt;p&gt;However, you can’t&amp;nbsp;add more and more RAM infinitely and it’s&amp;nbsp;not because you don’t&amp;nbsp;have infinite amount of&amp;nbsp;memory. Today’s&amp;nbsp;software has to&amp;nbsp;deal with things like Big Data, where you just can’t&amp;nbsp;fit your input into array. You need to&amp;nbsp;distribute data between RAM, storage and network. You need an&amp;nbsp;algorithms or&amp;nbsp;at&amp;nbsp;least techniques to&amp;nbsp;handle data in&amp;nbsp;that way.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;here I&amp;nbsp;am, trying to&amp;nbsp;get my&amp;nbsp;hands dirty on&amp;nbsp;such problems, though in&amp;nbsp;somewhat trivial fashion, with popular question&amp;nbsp;&amp;mdash; how to&amp;nbsp;sort 1 million integers (4 MiB of&amp;nbsp;data) in&amp;nbsp;2 MiB of&amp;nbsp;RAM? This could be&amp;nbsp;generalized to&amp;nbsp;the problem of&amp;nbsp;sorting data that doesn’t&amp;nbsp;fit in&amp;nbsp;RAM and this is&amp;nbsp;what I&amp;nbsp;will try solve here.&lt;/p&gt;
+&lt;h2 id="agenda"&gt;Agenda&lt;/h2&gt;
+&lt;p&gt;We&amp;nbsp;need to&amp;nbsp;write a&amp;nbsp;program(s) that will sort an&amp;nbsp;integers from file. To&amp;nbsp;generate such type of&amp;nbsp;file I’ve&amp;nbsp;written simple utilities &lt;a href="https://github.com/dzeban/cs/blob/master/number/randints.c"&gt;randints&lt;/a&gt; and &lt;a href="https://github.com/dzeban/cs/blob/master/number/rangeints.c"&gt;rangeints&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Program should output sorted array on&amp;nbsp;stdout in&amp;nbsp;text format.&lt;/p&gt;
+&lt;p&gt;Program should measure it’s&amp;nbsp;working time and output it&amp;nbsp;to&amp;nbsp;stderr&lt;a href="#fn1" class="footnoteRef" id="fnref1"&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Program should work with amount of&amp;nbsp;memory at&amp;nbsp;least two times smaller than file size (e.g. 2MiB of&amp;nbsp;RAM for 4MiB file). To&amp;nbsp;check this, we&amp;nbsp;will use &lt;code&gt;libmemrestrict&lt;/code&gt; or&amp;nbsp;&lt;code&gt;&lt;nobr&gt;ptrace-restrict&lt;/nobr&gt;&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Despite having such nice restriction tools, we&amp;nbsp;will not use them for some methods. For example, for &lt;code&gt;mmap&lt;/code&gt; it&amp;nbsp;will be&amp;nbsp;pointless&amp;nbsp;&amp;mdash; we&amp;nbsp;need to&amp;nbsp;restrict &lt;em&gt;physical&lt;/em&gt; RAM usage, &lt;em&gt;not virtual&lt;/em&gt; (see details in&amp;nbsp;&lt;a href="#mmap"&gt;corresponding section&lt;/a&gt;).&lt;/p&gt;
+&lt;p&gt;Programs will be&amp;nbsp;tested to&amp;nbsp;solve original problem (sort 4 MiB in&amp;nbsp;2 MiB). Also, I&amp;nbsp;will run it&amp;nbsp;in&amp;nbsp;virtual machine with 128 MiB of&amp;nbsp;RAM to&amp;nbsp;sort 500 MB&amp;nbsp;(125 millions of&amp;nbsp;4 bytes) of&amp;nbsp;integers.&lt;/p&gt;
+&lt;h2 id="naive-way"&gt;Naive way&lt;/h2&gt;
+&lt;p&gt;Let’s&amp;nbsp;try to&amp;nbsp;sort it&amp;nbsp;in&amp;nbsp;naive way to&amp;nbsp;get a&amp;nbsp;baseline and see how much RAM we&amp;nbsp;will use. &lt;a href="https://github.com/dzeban/cs/blob/master/sorting/external/naive.c"&gt;Here&lt;/a&gt; is&amp;nbsp;an&amp;nbsp;implementation that simply reads whole file into array of&amp;nbsp;integers and invokes &lt;code&gt;qsort&lt;/code&gt; on&amp;nbsp;it&amp;nbsp;(as&amp;nbsp;a&amp;nbsp;bonus you can find there a&amp;nbsp;simple dynamic array implementation via &lt;code&gt;realloc&lt;/code&gt;).&lt;/p&gt;
+&lt;p&gt;We’ll&amp;nbsp;try to&amp;nbsp;sort 4MB of&amp;nbsp;data with this program. With no&amp;nbsp;restrictions it&amp;nbsp;works:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./naive 4M.bin &amp;gt; /dev/null
+4000000 bytes sorted in 0.323146 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;but it’s&amp;nbsp;not interesting. When we&amp;nbsp;try to&amp;nbsp;restrict it&amp;nbsp;in&amp;nbsp;2 MiB we’ll&amp;nbsp;get segmentation fault.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ LD_PRELOAD=./libmemrestrict.so ./naive ints &amp;gt; ints.sorted 
+Segmentation fault&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;However, if&amp;nbsp;we&amp;nbsp;increase&lt;a href="#fn2" class="footnoteRef" id="fnref2"&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt; limit to&amp;nbsp;4 MiB to&amp;nbsp;hold all the data we&amp;nbsp;will still fail.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ MR_THRESHOLD=5000000 LD_PRELOAD=./libmemrestrict.so ./naive ints &amp;gt; ints.sorted 
+Segmentation fault&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Apparently, something is&amp;nbsp;trying to&amp;nbsp;get even more memory and, obviously, it’s&amp;nbsp;&lt;code&gt;qsort&lt;/code&gt;. Let’s&amp;nbsp;see how much memory it&amp;nbsp;wants with &lt;a href="/linux/profiling-valgrind.html#massif"&gt;help of&amp;nbsp;Valgrind’s&amp;nbsp;massif&lt;/a&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ valgrind --tool=massif ./naive ints 
+$ ms_print massif.out.10676&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here is&amp;nbsp;a&amp;nbsp;nice picture:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;    MB
+    8.819^               :::::::::::::::::::::::::::#                         
+     |                   :                          #                         
+     |                   :                          #                         
+     |                   :                          #                         
+     |                   :                          #                         
+     |                   :                          #                         
+     |                   :                          #                         
+     |                   :                          #                         
+     |                   :                          #                         
+     |            :::::::@                          #:::::::::::::::::::::::: 
+     |            :      @                          #                         
+     |            :      @                          #                         
+     |            :      @                          #                         
+     |            :      @                          #                         
+     |            :      @                          #                         
+     |      @@@@@@:      @                          #                         
+     |      @     :      @                          #                         
+     |      @     :      @                          #                         
+     |   :::@     :      @                          #                         
+     | :::  @     :      @                          #                         
+       0 +-----------------------------------------------------------------------&amp;gt;Gi
+     0                                                                   1.721&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You may see a&amp;nbsp;few doubling allocations up&amp;nbsp;to&amp;nbsp;4 MiB&amp;nbsp;&amp;mdash; that’s&amp;nbsp;my&amp;nbsp;dynamic array and then four more MiB for &lt;code&gt;qsort&lt;/code&gt;. Here are some stats:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;--------------------------------------------------------------------------------
+  n        time(i)         total(B)   useful-heap(B) extra-heap(B)    stacks(B)
+--------------------------------------------------------------------------------
+ 21    173,222,581        5,247,504        4,000,568     1,246,936            0
+ 22    173,223,802        5,246,920        4,000,000     1,246,920            0
+ 23    173,226,655        5,247,504        4,000,568     1,246,936            0
+ 24    173,229,202        5,246,920        4,000,000     1,246,920            0
+ 25    173,229,311        9,246,928        8,000,000     1,246,928            0
+ 26    869,058,772        9,246,928        8,000,000     1,246,928            0
+86.52% (8,000,000B) (heap allocation functions) malloc/new/new[], --alloc-fns, etc.
+-&amp;gt;43.26% (4,000,000B) 0x400A26: readfile (in /home/avd/dev/cs/sorting/external/naive)
+| -&amp;gt;43.26% (4,000,000B) 0x400ACD: main (in /home/avd/dev/cs/sorting/external/naive)
+|   
+-&amp;gt;43.26% (4,000,000B) 0x35D40383F7: qsort_r (in /usr/lib64/libc-2.18.so)
+| -&amp;gt;43.26% (4,000,000B) 0x400B3D: main (in /home/avd/dev/cs/sorting/external/naive)
+|   
+-&amp;gt;00.00% (0B) in 1+ places, all below ms_print&amp;#39;s threshold (01.00%)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;4 million (useful) bytes used by&amp;nbsp;me&amp;nbsp;and 4 more million bytes is&amp;nbsp;used by&amp;nbsp;&lt;code&gt;qsort_r&lt;/code&gt;. There is&amp;nbsp;also 1.2 MB&amp;nbsp;&lt;nobr&gt;extra-heap&lt;/nobr&gt; used by&amp;nbsp;massif.&lt;/p&gt;
+&lt;p&gt;Looks like in&amp;nbsp;this case &lt;code&gt;qsort&lt;/code&gt; behaves as&amp;nbsp;O(n) for space complexity.&lt;a href="#fn3" class="footnoteRef" id="fnref3"&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Ok, is&amp;nbsp;it&amp;nbsp;able to&amp;nbsp;sort 500 MB&amp;nbsp;in&amp;nbsp;128 MiB of&amp;nbsp;RAM?&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./naive 500M.bin &amp;gt; /dev/null
+Segmentation fault&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Of&amp;nbsp;course, not. As&amp;nbsp;for performance:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./naive 4M.bin &amp;gt; /dev/null
+4000000 bytes sorted in 0.322712 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;So, naive sorting works well when not restricted, fails when restricted and &lt;code&gt;qsort&lt;/code&gt; for some strange reason requires O(n) memory&lt;a href="#fn4" class="footnoteRef" id="fnref4"&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;h2 id="mmap"&gt;mmap’ed&amp;nbsp;file&lt;/h2&gt;
+&lt;p&gt;Using &lt;code&gt;mmap&lt;/code&gt; is&amp;nbsp;a&amp;nbsp;nice and hacky way to&amp;nbsp;sort large amount of&amp;nbsp;data in&amp;nbsp;small amount of&amp;nbsp;RAM. By&amp;nbsp;using &lt;code&gt;mmap&lt;/code&gt; you shift the burden of&amp;nbsp;balancing data between RAM and swap space to&amp;nbsp;the operating system kernel.&lt;/p&gt;
+&lt;p&gt;This is&amp;nbsp;how it&amp;nbsp;works:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;You &lt;code&gt;mmap&lt;/code&gt; whole file with data into memory.&lt;/li&gt;
+&lt;li&gt;From &lt;code&gt;mmap&lt;/code&gt; you get the pointer to&amp;nbsp;your data.&lt;/li&gt;
+&lt;li&gt;You invoke sorting algorithm on&amp;nbsp;data under &lt;code&gt;mmap&lt;/code&gt;ed&amp;nbsp;pointer.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;And that’s&amp;nbsp;it! From now on&amp;nbsp;you won’t&amp;nbsp;exceed physical memory limits even though you are sorting file much larger than your RAM. To&amp;nbsp;understand why is&amp;nbsp;it&amp;nbsp;working, you need a&amp;nbsp;little knowledge about memory management in&amp;nbsp;operating systems.&lt;/p&gt;
+&lt;p&gt;Every program represented by&amp;nbsp;a&amp;nbsp;process has its own private and isolated from other processes &lt;strong&gt;virtual&lt;/strong&gt; address space. Length of&amp;nbsp;address space is&amp;nbsp;bound by&amp;nbsp;CPU address bus width, e.g. for 32 bit CPU it’s&amp;nbsp;2&lt;sup&gt;32&lt;/sup&gt; which is&amp;nbsp;4 GiB.&lt;/p&gt;
+&lt;p&gt;All allocations that happen in&amp;nbsp;process via &lt;code&gt;malloc&lt;/code&gt;, &lt;code&gt;new&lt;/code&gt; or&amp;nbsp;whatever else is&amp;nbsp;a&amp;nbsp;&lt;strong&gt;virtual&lt;/strong&gt; memory allocations. That allocated virtual memory are mapped to&amp;nbsp;physical memory by&amp;nbsp;kernel memory management subsystem. Usually this is&amp;nbsp;done in&amp;nbsp;lazy mode. It&amp;nbsp;means that whenever process asks for some amount of&amp;nbsp;memory kernel will satisfy this request immediately, but will &lt;strong&gt;not&lt;/strong&gt; do&amp;nbsp;actual allocation&amp;nbsp;&amp;mdash; in&amp;nbsp;this case we&amp;nbsp;say that virtual memory page is&amp;nbsp;&lt;strong&gt;not mapped&lt;/strong&gt; (to&amp;nbsp;physical page frame). Whenever such unmapped page is&amp;nbsp;accessed (for example it’s&amp;nbsp;written) &lt;a href="http://en.wikipedia.org/wiki/Memory_management_unit"&gt;MMU&lt;/a&gt; will generate the &amp;laquo;page fault&amp;raquo; exception that kernel will handle by&amp;nbsp;mapping virtual memory page to&amp;nbsp;a&amp;nbsp;physical page frame. From now on&amp;nbsp;page is&amp;nbsp;&lt;strong&gt;mapped&lt;/strong&gt; and writing by&amp;nbsp;virtual address within that page will be&amp;nbsp;translated by&amp;nbsp;MMU to&amp;nbsp;physical address in&amp;nbsp;RAM.&lt;/p&gt;
+&lt;p&gt;On&amp;nbsp;the other hand, if&amp;nbsp;you remember that virtual address space is&amp;nbsp;bound only by&amp;nbsp;CPU address bus size, you might get into situation where program can allocate much more memory than available in&amp;nbsp;RAM. For example, your 32 bit system has only 256 MiB of&amp;nbsp;RAM, but process can allocate and use 1 GiB of&amp;nbsp;memory. In&amp;nbsp;this case, memory pages can’t&amp;nbsp;be&amp;nbsp;held in&amp;nbsp;RAM and going to&amp;nbsp;be&amp;nbsp;&lt;strong&gt;swapped&lt;/strong&gt;, i.e. evicted from RAM to&amp;nbsp;backing storage like hard drive. Whenever process requests that swapped page, kernel will fetch it&amp;nbsp;from disk and load into RAM (possibly by&amp;nbsp;replacing some other page).&lt;/p&gt;
+&lt;p&gt;As&amp;nbsp;you can see kernel can do&amp;nbsp;a&amp;nbsp;pretty good job in&amp;nbsp;distributing data between RAM and disk, so&amp;nbsp;it’s&amp;nbsp;very natural to&amp;nbsp;exploit this facility in&amp;nbsp;our task. When we&amp;nbsp;do&amp;nbsp;&lt;code&gt;mmap&lt;/code&gt; of&amp;nbsp;our file, kernel will reserve range of&amp;nbsp;virtual addresses for our file that won’t&amp;nbsp;be&amp;nbsp;mapped. Whenever we&amp;nbsp;will try to&amp;nbsp;access them by&amp;nbsp;changing bytes, moving array pivot or&amp;nbsp;anything else, kernel will fetch data from input file on&amp;nbsp;disk into the RAM. Whenever we&amp;nbsp;will exhaust &lt;strong&gt;physical&lt;/strong&gt; memory, kernel will evict some pages to&amp;nbsp;swap space. That way we&amp;nbsp;will be&amp;nbsp;able to&amp;nbsp;balance our data between original file on&amp;nbsp;disk, RAM and swap space.&lt;/p&gt;
+&lt;p&gt;The only restrictions in&amp;nbsp;that method is&amp;nbsp;virtual address space, which is&amp;nbsp;not much a&amp;nbsp;restriction (4 GiB for 32bit system and 256 TiB&lt;a href="#fn5" class="footnoteRef" id="fnref5"&gt;&lt;sup&gt;5&lt;/sup&gt;&lt;/a&gt; for 64 bit system), and swap space that can be&amp;nbsp;huge because hard drives are cheap today.&lt;/p&gt;
+&lt;p&gt;Also, note that because &lt;code&gt;mmap&lt;/code&gt; load whole file into &lt;strong&gt;virtual&lt;/strong&gt; memory we&amp;nbsp;can’t&amp;nbsp;use &lt;code&gt;libmemrestrict&lt;/code&gt; or&amp;nbsp;&lt;code&gt;&lt;nobr&gt;ptrace-restrict&lt;/nobr&gt;&lt;/code&gt; because they account for virtual memory itself. If&amp;nbsp;we&amp;nbsp;try to&amp;nbsp;restrict sorting 100M of&amp;nbsp;data in&amp;nbsp;10M of&amp;nbsp;virtual memory, &lt;code&gt;mmap&lt;/code&gt; program will fail:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ qemu-x86_64 -R 10M ./mmaped 100M.bin 
+mmap stack: Cannot allocate memory&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That’s&amp;nbsp;not a&amp;nbsp;surprise because &lt;code&gt;mmap&lt;/code&gt; loads whole file in&amp;nbsp;&lt;strong&gt;virtual memory&lt;/strong&gt; and then kernel distribute it&amp;nbsp;between actual physical memory and swap. So, we&amp;nbsp;need at&amp;nbsp;least 100M of&amp;nbsp;virtual memory (plus some extra space for &lt;code&gt;qemu&lt;/code&gt; itself) to&amp;nbsp;map file into memory.&lt;/p&gt;
+&lt;p&gt;That’s&amp;nbsp;a&amp;nbsp;why for this sorting method I&amp;nbsp;will use virtual machine with 128 MiB of&amp;nbsp;memory. Here is&amp;nbsp;&lt;a href="https://github.com/dzeban/cs/blob/master/sorting/external/mmaped.c"&gt;my&amp;nbsp;mmap sorting program&lt;/a&gt;. And, you know what? It&amp;nbsp;works like a&amp;nbsp;charm!&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ free -m
+             total       used       free     shared    buffers     cached
+Mem:           119         42         76          0          4         16
+-/+ buffers/cache:         21         97
+Swap:          382          0        382
+
+$ ll -h 500M.bin
+-rw-r--r-- 1 root root 477M Feb  3 05:39 500M.bin
+
+$ ./mmaped 500M.bin &amp;gt; /dev/null
+500000000 bytes sorted in 32.250000 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here is&amp;nbsp;the &lt;code&gt;top&lt;/code&gt; info:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;PID  USER      PR  NI  VIRT  RES  SHR S  %CPU %MEM    TIME+  COMMAND
+3167 root      20   0  480m  90m  90m R  84.6 76.4   1:18.65 mmaped &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;As&amp;nbsp;you can see we&amp;nbsp;use 500 MB&amp;nbsp;of&amp;nbsp;&lt;strong&gt;virtual&lt;/strong&gt; memory&lt;a href="#fn6" class="footnoteRef" id="fnref6"&gt;&lt;sup&gt;6&lt;/sup&gt;&lt;/a&gt; while actual resident memory is&amp;nbsp;only 90 MiB.&lt;/p&gt;
+&lt;p&gt;If&amp;nbsp;we&amp;nbsp;look at&amp;nbsp;more detailed &lt;code&gt;vmstat&lt;/code&gt; output while sorting 500 MB&amp;nbsp;we’ll&amp;nbsp;see how kernel is&amp;nbsp;balancing between swap, disk cache, buffers and free memory:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;procs -----------memory---------- ---swap-- -----io---- -system-- ----cpu----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa
+ 0  0      0  77776   2120  15104    1   27   710   971   24   34  3  1 95  1
+ 1  1      0   2060    488  90068    1   27   785  1057   25   37  3  1 95  1
+ 1  0    928   3400     60  89744    1   27   799  1092   25   38  3  1 94  1
+ 0  2   1908   1928    212  92040    1   27   852  1174   26   40  4  1 94  1
+ 0  2   3436   2360    280  93056    1   27   911  1282   28   42  4  1 94  2
+ 0  0   5272   3688    196  94688    1   27  1066  1471   31   48  4  1 93  2
+ 0  0   5272   3720    204  94700    1   27  1064  1469   31   48  4  1 93  2&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In&amp;nbsp;the beginning we&amp;nbsp;had ~70 MiB of&amp;nbsp;free memory, empty swap and some memory allocated for I/O buffers and disk cache. Then, we&amp;nbsp;did a&amp;nbsp;&lt;code&gt;mmap&lt;/code&gt; and all that memory had gone to&amp;nbsp;disk cache. When the free memory were exhausted, kernel had started to&amp;nbsp;use swap space and we&amp;nbsp;can see it’s&amp;nbsp;increasing along with increasing I/O load. And we&amp;nbsp;end up&amp;nbsp;in&amp;nbsp;situation where almost all of&amp;nbsp;the memory is&amp;nbsp;dedicated to&amp;nbsp;disk cache, though it’s&amp;nbsp;OK&amp;nbsp;because disk cache pages are first victims to&amp;nbsp;steal from when we&amp;nbsp;need memory for application.&lt;/p&gt;
+&lt;p&gt;So, sorting with help of&amp;nbsp;&lt;code&gt;mmap&lt;/code&gt; is&amp;nbsp;a&amp;nbsp;neat hack that requires simple understanding of&amp;nbsp;memory management, but gives you quick and easy solution to&amp;nbsp;handle large amount of&amp;nbsp;data in&amp;nbsp;small amount of&amp;nbsp;RAM.&lt;/p&gt;
+&lt;h2 id="generic-external-sort"&gt;Generic external sort&lt;/h2&gt;
+&lt;p&gt;All right, suppose you can’t&amp;nbsp;use &lt;code&gt;mmap&lt;/code&gt;, for example, you want to&amp;nbsp;sort 5 GiB file on&amp;nbsp;&lt;nobr&gt;32-bit&lt;/nobr&gt; system. What would you do?&lt;/p&gt;
+&lt;p&gt;There is&amp;nbsp;a&amp;nbsp;&lt;nobr&gt;well-known&lt;/nobr&gt; and popular way to&amp;nbsp;accomplish this named &lt;em&gt;external merge sort&lt;/em&gt;. Motivation is&amp;nbsp;simple&amp;nbsp;&amp;mdash; if&amp;nbsp;you don’t&amp;nbsp;have enough memory to&amp;nbsp;hold your data you just use some external storage like hard disk. Of&amp;nbsp;course, you have to&amp;nbsp;work with your data in&amp;nbsp;piece by&amp;nbsp;piece fashion because you still have only small amount of&amp;nbsp;main memory.&lt;/p&gt;
+&lt;p&gt;External merge sort works like this:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;You split your data to&amp;nbsp;chunks of&amp;nbsp;available memory buffer size.&lt;/li&gt;
+&lt;li&gt;Each chunk is&amp;nbsp;sorted in&amp;nbsp;memory buffer and written to&amp;nbsp;external storage.&lt;/li&gt;
+&lt;li&gt;Now you have &lt;code&gt;filesize/buffersize&lt;/code&gt; chunks on&amp;nbsp;your storage.&lt;/li&gt;
+&lt;li&gt;Finally, you read &lt;code&gt;buffersize/#chunks&lt;/code&gt; pieces from each chunk to&amp;nbsp;merge them in&amp;nbsp;buffer and output to&amp;nbsp;result file.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;I&amp;nbsp;made some &lt;a href="https://github.com/dzeban/cs/blob/master/sorting/external/external-merge.c"&gt;trivial, absolutely-not-optimized-&lt;nobr&gt;in-any-sense&lt;/nobr&gt; implementation&lt;/a&gt; that simply works:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ LD_PRELOAD=./libmemrestrict.so ./external-merge 4M.bin 1048576 &amp;gt; /dev/null
+4194304 bytes sorted in 0.383171 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We’ve&amp;nbsp;sorted in&amp;nbsp;2 MiB of&amp;nbsp;memory using 1 MiB buffer.&lt;/p&gt;
+&lt;p&gt;Now let’s&amp;nbsp;sort 500MB. First, disable swap&amp;nbsp;&amp;mdash; we’re&amp;nbsp;handling chunks swapping by&amp;nbsp;hand:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ swapoff /dev/vda5&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Drop caches:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ echo 3 &amp;gt; /proc/sys/vm/drop_caches&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Check free memory:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ free -m
+             total       used       free     shared    buffers     cached
+Mem:           119         28         90          0          0          6
+-/+ buffers/cache:         21         97
+Swap:            0          0          0&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We’ll&amp;nbsp;use 50M as&amp;nbsp;a&amp;nbsp;buffer&amp;nbsp;&amp;mdash; 10 times smaller than file size.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./external-merge 500M.bin 50000000 &amp;gt; /dev/null
+500000000 bytes sorted in 120.115180 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Holy crap, two minutes! Why is&amp;nbsp;that? Well, the main killer of&amp;nbsp;performance here is&amp;nbsp;I/O. There are 3 things that cause lots of&amp;nbsp;I/O and slow things down. On&amp;nbsp;the split phase we’re&amp;nbsp;sequentially reading file slipping it&amp;nbsp;through a&amp;nbsp;small buffer. On&amp;nbsp;the merge phase we’re&amp;nbsp;constantly opening and closing chunk files. And last but not least is&amp;nbsp;output&amp;nbsp;&amp;mdash; on&amp;nbsp;merge phase we&amp;nbsp;output whole buffer (50 MB, 12.5 millions of&amp;nbsp;integer) to&amp;nbsp;stdout that, despite redirecting it&amp;nbsp;to&amp;nbsp;&lt;code&gt;/dev/null&lt;/code&gt;, creating a&amp;nbsp;heavy load. We&amp;nbsp;may turn it&amp;nbsp;off. All in&amp;nbsp;all, in&amp;nbsp;&lt;code&gt;mmaped&lt;/code&gt; we&amp;nbsp;output everything in&amp;nbsp;a&amp;nbsp;single pass in&amp;nbsp;the end of&amp;nbsp;program and doesn’t&amp;nbsp;account it&amp;nbsp;in&amp;nbsp;performance counters. So&amp;nbsp;if&amp;nbsp;we&amp;nbsp;turn off output &lt;strong&gt;we’ll&amp;nbsp;run in&amp;nbsp;~90 seconds&amp;nbsp;&amp;mdash; 25% faster&lt;/strong&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./external-merge-no-output 500M.bin 50000000 &amp;gt; /dev/null
+500000000 bytes sorted in 87.140000 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;As&amp;nbsp;for memory consumption&amp;nbsp;&amp;mdash; it’s&amp;nbsp;fine. If&amp;nbsp;we&amp;nbsp;try to&amp;nbsp;run it&amp;nbsp;under &lt;em&gt;massif&lt;/em&gt; we’ll&amp;nbsp;see that peak consumption is&amp;nbsp;our buffer size plus some extra heap.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;--------------------------------------------------------------------------------
+Command:            ./external-merge 500M.bin 50000000
+Massif arguments:   (none)
+ms_print arguments: massif.out.17423
+--------------------------------------------------------------------------------
+
+
+    MB
+47.75^                                                                  ::::: 
+     |#::::::@:::::::::::@:::::::::@:::@::::@::::@::::::::@::::@::::@:::@     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+     |# : :  @ :  : :  : @  : :    @   @    @    @   :    @    @    @   @     
+   0 +-----------------------------------------------------------------------&amp;gt;Gi
+     0                                                                   332.5
+
+Number of snapshots: 98
+ Detailed snapshots: [4 (peak), 10, 20, 29, 32, 35, 38, 45, 48, 54, 64, 74, 84, 94]
+
+--------------------------------------------------------------------------------
+  n        time(i)         total(B)   useful-heap(B) extra-heap(B)    stacks(B)
+--------------------------------------------------------------------------------
+  0              0                0                0             0            0
+  1        119,690              584              568            16            0
+  2        123,141       50,004,496       50,000,568         3,928            0
+  3      4,814,014       50,005,080       50,001,136         3,944            0
+  4      4,817,234       50,005,080       50,001,136         3,944            0
+99.99% (50,001,136B) (heap allocation functions) malloc/new/new[], --alloc-fns, etc.
+-&amp;gt;99.99% (50,000,000B) 0x400FA2: external_merge_sort (in /root/external-merge)
+| -&amp;gt;99.99% (50,000,000B) 0x40128E: main (in /root/external-merge)
+|   
+-&amp;gt;00.00% (1,136B) in 1+ places, all below ms_print&amp;#39;s threshold (01.00%)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If&amp;nbsp;we&amp;nbsp;restrict memory to&amp;nbsp;50 MB&lt;a href="#fn7" class="footnoteRef" id="fnref7"&gt;&lt;sup&gt;7&lt;/sup&gt;&lt;/a&gt; we’ll&amp;nbsp;see that it&amp;nbsp;works:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ LD_PRELOAD=./libmemrestrict.so MR_THRESHOLD=51000000 ./external-merge 500M.bin 50000000 &amp;gt; /dev/null
+500000000 bytes sorted in 87.900000 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Ok, memory consumption is&amp;nbsp;fine, but performance is&amp;nbsp;not that good. Recall that &lt;code&gt;mmaped&lt;/code&gt; has done this in&amp;nbsp;32 seconds. Let’s&amp;nbsp;see how we&amp;nbsp;can improve our 90 seconds.&lt;/p&gt;
+&lt;p&gt;Lets profile this nice program with gprof. Build instrumented binary&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ gcc -pg -g -Wall -Wextra external-merge.c -o external-merge-gprof&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And invoke this program multiple times accumulating statistics. To&amp;nbsp;do&amp;nbsp;so&amp;nbsp;we’ll&amp;nbsp;use nice script from my&amp;nbsp;&lt;a href="/linux/profiling-gprof-gcov.html"&gt;article on&amp;nbsp;gprof&lt;/a&gt;. Here is&amp;nbsp;the output:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;%   cumulative   self              self     total           
+time   seconds   seconds    calls  Ts/call  Ts/call  name    
+81.98    432.87   432.87                             compar
+18.17    528.82    95.95                             print_arr
+0.00    528.82     0.00     1100     0.00     0.00  form_filename
+0.00    528.82     0.00      100     0.00     0.00  merge
+0.00    528.82     0.00      100     0.00     0.00  save_buf
+0.00    528.82     0.00       10     0.00     0.00  external_merge_sort
+0.00    528.82     0.00       10     0.00     0.00  split&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Most of&amp;nbsp;the time we&amp;nbsp;have spent in&amp;nbsp;sorting and printing. But also don’t&amp;nbsp;forget that gprof won’t&amp;nbsp;show you time spent in&amp;nbsp;syscalls and I/O.&lt;/p&gt;
+&lt;p&gt;I&amp;nbsp;can think of&amp;nbsp;2 things to&amp;nbsp;improve here:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Tune external sorting with multithreading and I/O tricks&lt;/li&gt;
+&lt;li&gt;Think about different sorting algorithm&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;So, generic external merge sort is&amp;nbsp;quite simple idea to&amp;nbsp;sort a&amp;nbsp;bunch of&amp;nbsp;data in&amp;nbsp;small RAM, but usually without tuning and improving it’s&amp;nbsp;slow.&lt;/p&gt;
+&lt;h2 id="tuning-external-sort"&gt;Tuning external sort&lt;/h2&gt;
+&lt;p&gt;One of&amp;nbsp;the things that we&amp;nbsp;can try is&amp;nbsp;to&amp;nbsp;use multiple threads on&amp;nbsp;split and merge phases of&amp;nbsp;our external sort. However, in&amp;nbsp;this case, it’s&amp;nbsp;not a&amp;nbsp;really great idea.&lt;/p&gt;
+&lt;p&gt;Using multithreading on&amp;nbsp;split phase doesn’t&amp;nbsp;make sense because there is&amp;nbsp;a&amp;nbsp;single buffer that can hold the data. But we&amp;nbsp;may try to&amp;nbsp;advise kernel on&amp;nbsp;how we’ll&amp;nbsp;read data. There are 2 functions for that:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;&lt;code&gt;readahead&lt;/code&gt;, though it’s&amp;nbsp;Linux specific.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;posix_fadvise&lt;/code&gt; with &lt;code&gt;POSIX_FADV_SEQUENTIAL&lt;/code&gt;.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;These functions will inform memory management subsystem on&amp;nbsp;how we’ll&amp;nbsp;read the data. In&amp;nbsp;our case we&amp;nbsp;read it&amp;nbsp;sequentially and thus it&amp;nbsp;would be&amp;nbsp;nice to&amp;nbsp;see file content in&amp;nbsp;page cache.&lt;/p&gt;
+&lt;p&gt;On&amp;nbsp;a&amp;nbsp;merge phase we&amp;nbsp;could avoid constant &lt;code&gt;open&lt;/code&gt;/&lt;code&gt;close&lt;/code&gt; of&amp;nbsp;chunk files by&amp;nbsp;creating dedicated thread for each of&amp;nbsp;the chunks. Each thread will keep its file open, and will fill buffer at&amp;nbsp;thread offset. When buffer is&amp;nbsp;filled it&amp;nbsp;will be&amp;nbsp;sorted&lt;a href="#fn8" class="footnoteRef" id="fnref8"&gt;&lt;sup&gt;8&lt;/sup&gt;&lt;/a&gt; and output. Also, we&amp;nbsp;will employ &lt;code&gt;readahead&lt;/code&gt; for each thread.&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://github.com/dzeban/cs/blob/master/sorting/external/mt-external-merge.c"&gt;Here&lt;/a&gt; is&amp;nbsp;tuned and multithreaded version of&amp;nbsp;external merge sort.&lt;/p&gt;
+&lt;p&gt;OK, so&amp;nbsp;as&amp;nbsp;I&amp;nbsp;said, multithreading here is&amp;nbsp;not a&amp;nbsp;great idea. All these threads things are nice and dandy, but for single core CPU it’s&amp;nbsp;not showing any effect:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./mt-ext-merge 500M.bin 50000000 &amp;gt; /dev/null
+500000000 bytes sorted in 117.380000 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It&amp;nbsp;is&amp;nbsp;the version with printing. And here is&amp;nbsp;the version without printing:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./mt-ext-merge-no-output 500M.bin 50000000 &amp;gt; /dev/null
+500000000 bytes sorted in 91.040000 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You may think that it’s&amp;nbsp;because we&amp;nbsp;have hard times scheduling dozen of&amp;nbsp;threads on&amp;nbsp;a&amp;nbsp;single CPU. Allright, lets compare it&amp;nbsp;with other methods on&amp;nbsp;&lt;nobr&gt;quad-core&lt;/nobr&gt; machine (Intel Core &lt;nobr&gt;i7-3612QM&lt;/nobr&gt; CPU @ 2.10GHz):&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./naive 500M.bin &amp;gt; /dev/null 
+500000000 bytes sorted in 23.040499 seconds
+
+$ ./mmaped 500M.bin &amp;gt; /dev/null
+500000000 bytes sorted in 23.542076 seconds
+
+$ ./external-merge 500M.bin 50000000 &amp;gt; /dev/null 
+500000000 bytes sorted in 39.228695 seconds
+
+$ ./mt-external-merge 500M.bin 50000000 &amp;gt; /dev/null 
+500000000 bytes sorted in 41.062793 seconds
+
+$ ./external-merge-no-output 500M.bin 50000000 &amp;gt; /dev/null
+500000000 bytes sorted in 28.893745 seconds
+
+$ ./mt-external-merge-no-output 500M.bin 50000000 &amp;gt; /dev/null
+500000000 bytes sorted in 28.368976 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now with a&amp;nbsp;100 chunks (100 threads):&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./external-merge-no-output 500M.bin 5000000 &amp;gt; /dev/null
+500000000 bytes sorted in 27.107728 seconds
+
+$ ./mt-external-merge-no-output 500M.bin 5000000 &amp;gt; /dev/null
+500000000 bytes sorted in 28.558468 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You can see no&amp;nbsp;changes in&amp;nbsp;performance between &lt;code&gt;&lt;nobr&gt;external-merge&lt;/nobr&gt;&lt;/code&gt; and &lt;code&gt;&lt;nobr&gt;mt-external-merge&lt;/nobr&gt;&lt;/code&gt;. Why is&amp;nbsp;that? Because &lt;strong&gt;for most cases multithreading is&amp;nbsp;not a&amp;nbsp;solution for &lt;span style="text-decoration:underline"&gt;I/O bound&lt;/span&gt; applications&lt;/strong&gt;. Still, there are situations when spawning some threads will speed up&amp;nbsp;things:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Your execution threads are independent&lt;/li&gt;
+&lt;li&gt;Your I/O resource can work in&amp;nbsp;parallel, e.g. it’s&amp;nbsp;RAID&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Examples here are some graphic application that renders image in&amp;nbsp;independent areas, or&amp;nbsp;scientific application that makes some heavy calculations for multiple results.&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;multithreaded external sort threads are dependant&amp;nbsp;&amp;mdash; you have to&amp;nbsp;wait for main thread to&amp;nbsp;sort buffer before you can do&amp;nbsp;further reading from the chunk. Also, reading for slice is&amp;nbsp;done much faster that sorting whole buffer, so&amp;nbsp;most of&amp;nbsp;the time threads are waiting for main thread to&amp;nbsp;finish.&lt;/p&gt;
+&lt;p&gt;That’s&amp;nbsp;why multithreading won’t&amp;nbsp;help us, so&amp;nbsp;we&amp;nbsp;need to&amp;nbsp;look for other ways to&amp;nbsp;improve.&lt;/p&gt;
+&lt;h2 id="special-sorting-algorithms"&gt;Special sorting algorithms&lt;/h2&gt;
+&lt;p&gt;Now, let’s&amp;nbsp;try to&amp;nbsp;use some sorting algorithm that would perform better than QuickSort assuming we&amp;nbsp;know distribution of&amp;nbsp;data. Like we&amp;nbsp;know that we’re&amp;nbsp;sorting integers, so&amp;nbsp;why not play around this? There are few sorting algorithms designed specifically for special type of&amp;nbsp;data can fall in&amp;nbsp;either of&amp;nbsp;2 groups:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;Don’t&amp;nbsp;use compares.&lt;/li&gt;
+&lt;li&gt;Don’t&amp;nbsp;even require to&amp;nbsp;load input array in&amp;nbsp;memory.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Such algorithms are known to&amp;nbsp;work better than O(n&amp;nbsp;log(n))&amp;nbsp;&amp;mdash; a&amp;nbsp;lower bound for comparison based sort like QuickSort. Of&amp;nbsp;course, not every algorithm will work for us&amp;nbsp;because we&amp;nbsp;have memory restriction. For example, radix sort and other kinds of&amp;nbsp;bucket sorting won’t&amp;nbsp;help us&amp;nbsp;because it&amp;nbsp;requires additional memory for buckets, though there are implementations of&amp;nbsp;&lt;a href="http://www.drdobbs.com/architecture-and-design/algorithm-improvement-through-performanc/220300654"&gt;&lt;nobr&gt;in-place&lt;/nobr&gt; Radix sort&lt;/a&gt;. Anyway, such implementations require reading whole data set multiple times for each radix&amp;nbsp;&amp;mdash; 32 times for &lt;nobr&gt;binary-radix&lt;/nobr&gt; sort and that’s&amp;nbsp;way too much. Also, deep recursion that arise from MSD radix sort is&amp;nbsp;a&amp;nbsp;memory consumption itself. That’s&amp;nbsp;why I&amp;nbsp;came up&amp;nbsp;to&amp;nbsp;using counting sort.&lt;/p&gt;
+&lt;h2 id="counting-sort"&gt;Counting sort&lt;/h2&gt;
+&lt;p&gt;If&amp;nbsp;we&amp;nbsp;know that our data are big, but it’s&amp;nbsp;range is&amp;nbsp;small, then we&amp;nbsp;can use counting sort. The idea is&amp;nbsp;dead simple&amp;nbsp;&amp;mdash; instead of&amp;nbsp;holding data in&amp;nbsp;memory we&amp;nbsp;will hold array of&amp;nbsp;counters. We’ll&amp;nbsp;read our data sequentially and then increment relevant counter. The most important is&amp;nbsp;that counting sort time complexity is&amp;nbsp;&lt;strong&gt;linear&lt;/strong&gt; and space complexity is&amp;nbsp;proportional to&amp;nbsp;range that is&amp;nbsp;usually small.&lt;/p&gt;
+&lt;p&gt;A&amp;nbsp;simple implementation works with consecutive range of&amp;nbsp;integers from 0 to&amp;nbsp;some &lt;code&gt;N&lt;/code&gt;. There is&amp;nbsp;an&amp;nbsp;array size of&amp;nbsp;range, where integers correspond to&amp;nbsp;array indices. Here is&amp;nbsp;my&amp;nbsp;implementation &lt;a href="https://github.com/dzeban/cs/blob/master/sorting/counting-array.c"&gt;on&amp;nbsp;github&lt;/a&gt; performing really well without any tuning&lt;a href="#fn9" class="footnoteRef" id="fnref9"&gt;&lt;sup&gt;9&lt;/sup&gt;&lt;/a&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./counting-array 500M-range.bin 1000000 &amp;gt; /dev/null
+Range is 1000000
+500000000 bytes sorted in 3.240000 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Yep, half gig of&amp;nbsp;data sorted in&amp;nbsp;3 and a&amp;nbsp;half seconds on&amp;nbsp;128 MiB machine with single CPU. Compare it&amp;nbsp;with &lt;code&gt;qsort&lt;/code&gt; on&amp;nbsp;&lt;code&gt;mmap&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./mmaped 500M-range.bin &amp;gt; /dev/null
+500000000 bytes sorted in 76.150000 seconds&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;23 times faster!&lt;/p&gt;
+&lt;p&gt;But anyway you should be&amp;nbsp;aware of&amp;nbsp;restrictions that counting sort implies: only integers (or&amp;nbsp;equivalent) from small and consecutive range. I’ve&amp;nbsp;also tried to&amp;nbsp;develop counting sort for &lt;nobr&gt;non-consecutive&lt;/nobr&gt; range with hash tables and binary search trees&amp;nbsp;&amp;mdash; &lt;a href="https://github.com/dzeban/cs/blob/master/sorting/counting.c"&gt;here is&amp;nbsp;the code&lt;/a&gt;. However, its performance is&amp;nbsp;pretty bad and, unfortunately, I&amp;nbsp;still can’t&amp;nbsp;explain this.&lt;/p&gt;
+&lt;p&gt;Anyway, we&amp;nbsp;can go&amp;nbsp;even further and assume that numbers in&amp;nbsp;our range is&amp;nbsp;unique. Then, counter for value might be&amp;nbsp;only in&amp;nbsp;2 states&amp;nbsp;&amp;mdash; present or&amp;nbsp;not, so&amp;nbsp;we&amp;nbsp;could use a&amp;nbsp;single bit for counter. This will enormously compact our array, although in&amp;nbsp;that case we&amp;nbsp;don’t&amp;nbsp;even need any array. We&amp;nbsp;could store each number as&amp;nbsp;a&amp;nbsp;single bit, thus transforming our data into a&amp;nbsp;bit vector&amp;nbsp;&amp;mdash; while reading a&amp;nbsp;file, set Nth bit if&amp;nbsp;there is&amp;nbsp;an&amp;nbsp;integer N&amp;nbsp;in&amp;nbsp;file. After bit vector is&amp;nbsp;formed, read it&amp;nbsp;and write to&amp;nbsp;output file numbers that correspond to&amp;nbsp;bits that are set.&lt;/p&gt;
+&lt;p&gt;Bit vector solution requires even more attention because, despite its seem compactness, you might violate your restrictions, for example to&amp;nbsp;sort array of&amp;nbsp;numbers from whole integers range (2&lt;sup&gt;32&lt;/sup&gt;) you would need a&amp;nbsp;1 bit for every integer, which is&amp;nbsp;4294967296 bits = 536870912 bytes = 512 MiB. In&amp;nbsp;my&amp;nbsp;case I&amp;nbsp;have only 128 MiB, so&amp;nbsp;it&amp;nbsp;won’t&amp;nbsp;work for me. But there are cases where you &lt;em&gt;will&lt;/em&gt; benefit like a&amp;nbsp;boss&amp;nbsp;&amp;mdash; read &lt;a href="http://www.cs.bell-labs.com/cm/cs/pearls/cto.html"&gt;a&amp;nbsp;great story from &amp;laquo;Programming Pearls&amp;raquo; by&amp;nbsp;Jon Bentley&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;A&amp;nbsp;moral here is&amp;nbsp;&amp;laquo;knowing your data is&amp;nbsp;extremely useful&amp;raquo;.&lt;/p&gt;
+&lt;h2 id="recap"&gt;Recap&lt;/h2&gt;
+&lt;p&gt;For the last 5 months of&amp;nbsp;writing this article I&amp;nbsp;did a&amp;nbsp;lot of&amp;nbsp;things&amp;nbsp;&amp;mdash; I’ve&amp;nbsp;implemented a&amp;nbsp;dozen of&amp;nbsp;programs, come up&amp;nbsp;with a&amp;nbsp;few good ideas, failed with many more and still I&amp;nbsp;have things to&amp;nbsp;try and/or fix. Now it’s&amp;nbsp;time for conclusions.&lt;/p&gt;
+&lt;p&gt;The simple problem of&amp;nbsp;sorting data in&amp;nbsp;small memory revealed a&amp;nbsp;whole class of&amp;nbsp;peculiarities we&amp;nbsp;don’t&amp;nbsp;usually think of:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Common widely used algorithms are not suitable for any problems.&lt;/li&gt;
+&lt;li&gt;Dynamic debugging and profiling are extremely useful and demonstrative.&lt;/li&gt;
+&lt;li&gt;I/O is&amp;nbsp;a&amp;nbsp;bitch, unless you fully rely on&amp;nbsp;kernel.&lt;/li&gt;
+&lt;li&gt;Multithreading is&amp;nbsp;not a&amp;nbsp;silver bullet for performance.&lt;/li&gt;
+&lt;li&gt;Know your data, know your environment.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;As&amp;nbsp;for sorting here is&amp;nbsp;a&amp;nbsp;result table:&lt;/p&gt;
+&lt;table&gt;
+&lt;col width="14%" /&gt;
+&lt;col width="14%" /&gt;
+&lt;col width="14%" /&gt;
+&lt;col width="16%" /&gt;
+&lt;col width="28%" /&gt;
+&lt;col width="10%" /&gt;
+&lt;thead&gt;
+&lt;tr class="header"&gt;
+&lt;th align="left"&gt;Test case&lt;/th&gt;
+&lt;th align="left"&gt;Naive QuickSort&lt;/th&gt;
+&lt;th align="left"&gt;mmap and QuickSort&lt;/th&gt;
+&lt;th align="left"&gt;External merge sort&lt;/th&gt;
+&lt;th align="left"&gt;Multithreaded external merge sort&lt;/th&gt;
+&lt;th align="left"&gt;Counting sort&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class="odd"&gt;
+&lt;td align="left"&gt;4 MiB in&amp;nbsp;2 MiB&lt;/td&gt;
+&lt;td align="left"&gt;Segfault&lt;/td&gt;
+&lt;td align="left"&gt;N/A&lt;/td&gt;
+&lt;td align="left"&gt;0.38s&lt;/td&gt;
+&lt;td align="left"&gt;0.41s&lt;/td&gt;
+&lt;td align="left"&gt;0.01&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class="even"&gt;
+&lt;td align="left"&gt;500 MB&amp;nbsp;in&amp;nbsp;128 MiB&lt;/td&gt;
+&lt;td align="left"&gt;Segfault&lt;/td&gt;
+&lt;td align="left"&gt;32.25s&lt;/td&gt;
+&lt;td align="left"&gt;87.14s&lt;/td&gt;
+&lt;td align="left"&gt;91.04&lt;/td&gt;
+&lt;td align="left"&gt;3.24&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The bottom line is&amp;nbsp;&lt;strong&gt;&amp;laquo;Know your data and develop a&amp;nbsp;simple algorithm for it&amp;raquo;&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Thank you for your attention.&lt;/p&gt;
+&lt;h2 id="references"&gt;References&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p&gt;&lt;a href="http://neopythonic.blogspot.ru/2008/10/sorting-million-32-bit-integers-in-2mb.html"&gt;Sorting a&amp;nbsp;million &lt;nobr&gt;32-bit&lt;/nobr&gt; integers in&amp;nbsp;2MB of&amp;nbsp;RAM using Python&lt;/a&gt;&amp;nbsp;&amp;mdash; simple external sort in&amp;nbsp;pythonic way with generators, &lt;code&gt;array&lt;/code&gt; module and &lt;code&gt;heapq&lt;/code&gt;. Also, has nice explanation of&amp;nbsp;buffering advantages.&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;a href="http://www.umbrant.com/blog/2011/external_sorting.html"&gt;External sorting of&amp;nbsp;large datasets&lt;/a&gt;&amp;nbsp;&amp;mdash; External sort implementation by&amp;nbsp;Andrew Wang with performance measurements.&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;a href="http://www.reddit.com/r/programming/comments/grrrr/efficiently_sorting_datasets_bigger_than_memory_c/"&gt;Efficiently sorting datasets bigger than memory&lt;/a&gt;&amp;nbsp;&amp;mdash; Nice reddit thread regarding Andrew Wang’s&amp;nbsp;article showing some different methods along with pros and cons.&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;a href="http://www.cs.bell-labs.com/cm/cs/pearls/cto.html"&gt;Cracking the Oyster (Column 1 of&amp;nbsp;Programming Pearls)&lt;/a&gt;&amp;nbsp;&amp;mdash; Amazingly written story on&amp;nbsp;doing large sorting. Discussed the bit vector idea in&amp;nbsp;great details.&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;a href="http://www.drdobbs.com/parallel/multithreaded-file-io/220300055"&gt;Multithreaded File I/O&lt;/a&gt;&amp;nbsp;&amp;mdash; How multithreaded I/O behaves on&amp;nbsp;single disk and RAID5 array.&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;a href="http://www.drdobbs.com/architecture-and-design/algorithm-improvement-through-performanc/220300654"&gt;Algorithm Improvement through Performance Measurement: Part 2&lt;/a&gt; presents &lt;nobr&gt;in-place&lt;/nobr&gt; radix sort implementation.&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;a href="http://stackoverflow.com/questions/3969813/which-parallel-sorting-algorithm-has-the-best-average-case-performance"&gt;Parallel sorting algorithms&lt;/a&gt;&amp;nbsp;&amp;mdash; comprehensive list of&amp;nbsp;resources regarding sorting on&amp;nbsp;multinode computer systems.&lt;/p&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="footnotes"&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id="fn1"&gt;&lt;p&gt;We&amp;nbsp;can’t&amp;nbsp;simply launch program under &lt;code&gt;time&lt;/code&gt; utility because it&amp;nbsp;will include time for reading file into memory and time for outputting to&amp;nbsp;console.&lt;a href="#fnref1"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn2"&gt;&lt;p&gt;libmemrestrict gets a&amp;nbsp;configuration from environment. Common practice for libraries, for example &lt;code&gt;LD_PRELOAD&lt;/code&gt; and &lt;code&gt;LD_LIBRARY_PATH&lt;/code&gt; are &lt;nobr&gt;well-known&lt;/nobr&gt; environment variables for &lt;nobr&gt;ld-linux&lt;/nobr&gt;.so, and there is&amp;nbsp;also less known, but extremely useful &lt;code&gt;LD_DEBUG&lt;/code&gt; environment variable for &lt;a href="http://www.bnikolic.co.uk/blog/linux-ld-debug.html"&gt;linkage debugging&lt;/a&gt;.&lt;a href="#fnref2"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn3"&gt;&lt;p&gt;It’s&amp;nbsp;strange because qsort is&amp;nbsp;&lt;nobr&gt;in-place&lt;/nobr&gt; and uses optimizations suggested by&amp;nbsp;Robert Sedgewick to, among others, guarantee O(log n) space complexity. You can dive into &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob;f=stdlib/qsort.c;h=04c25b984f74a8f738233cc6da8a738b6437833c;hb=b8079dd0d360648e4e8de48656c5c38972621072"&gt;glibc qsort implementation.&lt;/a&gt;&lt;a href="#fnref3"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn4"&gt;&lt;p&gt;There is&amp;nbsp;a&amp;nbsp;strange behaviour though. For example, if&amp;nbsp;I&amp;nbsp;restrict memory for 5.3 MB&amp;nbsp;it&amp;nbsp;will work and &lt;em&gt;not&lt;/em&gt; require O(n) memory. I’m&amp;nbsp;still investigating on&amp;nbsp;this.&lt;a href="#fnref4"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn5"&gt;&lt;p&gt;&lt;a href="http://en.wikipedia.org/wiki/X86-64#Virtual_address_space_details"&gt;http://en.wikipedia.org/wiki/&lt;nobr&gt;X86-64&lt;/nobr&gt;#Virtual_address_space_details&lt;/a&gt;&lt;a href="#fnref5"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn6"&gt;&lt;p&gt;Note that &lt;strong&gt;MiB&lt;/strong&gt; is&amp;nbsp;2&lt;sup&gt;20&lt;/sup&gt; and &lt;strong&gt;MB&lt;/strong&gt; is&amp;nbsp;10&lt;sup&gt;6&lt;/sup&gt; = 1 million. So&amp;nbsp;500 MB&amp;nbsp;= 500&amp;nbsp;000&amp;nbsp;000 bytes which is&amp;nbsp;500&amp;nbsp;000&amp;nbsp;000 &amp;gt;&amp;gt; 20 = 476 MiB.&lt;a href="#fnref6"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn7"&gt;&lt;p&gt;Plus extra 500 KB&amp;nbsp;for temporary strings holding chunks paths.&lt;a href="#fnref7"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn8"&gt;&lt;p&gt;In&amp;nbsp;this way it’s&amp;nbsp;kind of&amp;nbsp;&lt;nobr&gt;N-way&lt;/nobr&gt; merge.&lt;a href="#fnref8"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn9"&gt;&lt;p&gt;Second argument is&amp;nbsp;a&amp;nbsp;buffer size in&amp;nbsp;elements. Buffering improves performance drastically because it&amp;nbsp;doesn’t&amp;nbsp;read from file by&amp;nbsp;4 bytes.&lt;a href="#fnref9"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;</content>
+  </entry>
   <entry xml:base="http://avd.reduct.ru/feed">
     <title type="text">Restricting program memory</title>
     <id>programming/restrict-memory.html</id>
@@ -17,7 +392,7 @@
     <author>
       <name>avd</name>
     </author>
-    <content type="html">&lt;p&gt;On&amp;nbsp;the other day I’ve&amp;nbsp;decided to&amp;nbsp;solve popular problem: how to&amp;nbsp;sort 1 million of&amp;nbsp;integers in&amp;nbsp;1 MiB?&lt;/p&gt;
+    <content type="html">&lt;p&gt;On&amp;nbsp;the other day I’ve&amp;nbsp;decided to&amp;nbsp;solve popular problem: &lt;a href="/programming/external-sort.html"&gt;how to&amp;nbsp;sort 1 million of&amp;nbsp;integers in&amp;nbsp;1 MiB?&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;But before I’ve&amp;nbsp;even started to&amp;nbsp;do&amp;nbsp;anything I&amp;nbsp;thought&amp;nbsp;&amp;mdash; how can I&amp;nbsp;restrict process memory to&amp;nbsp;1 MiB? Will it&amp;nbsp;work? So, here is&amp;nbsp;the answers.&lt;/p&gt;
 &lt;h2 id="process-virtual-memory"&gt;Process virtual memory&lt;/h2&gt;
 &lt;p&gt;What you have to&amp;nbsp;know before diving in&amp;nbsp;various methods is&amp;nbsp;how process’s&amp;nbsp;virtual memory is&amp;nbsp;structured. There is&amp;nbsp;a, hands down, the best article you could ever find about that is&amp;nbsp;&lt;a href="http://duartes.org/gustavo/blog/post/anatomy-of-a-program-in-memory/"&gt;Gustavo Duarte’s&amp;nbsp;&amp;laquo;Anatomy of&amp;nbsp;a&amp;nbsp;Program in&amp;nbsp;Memory&amp;raquo;&lt;/a&gt;. His whole blog is&amp;nbsp;a&amp;nbsp;treasure.&lt;/p&gt;
@@ -552,7 +927,7 @@ Failed after 21 allocations&lt;/code&gt;&lt;/pre&gt;
 &lt;ol style="list-style-type: decimal"&gt;
 &lt;li&gt;&lt;a href="http://duartes.org/gustavo/blog/post/anatomy-of-a-program-in-memory/"&gt;Gustavo Duarte’s&amp;nbsp;article again.&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="http://coldattic.info/shvedsky/pro/blogs/a-foo-walks-into-a-bar/posts/40"&gt;Limiting time and memory consumption of&amp;nbsp;a&amp;nbsp;program in&amp;nbsp;Linux.&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;[Linux sandboxing][http://stackoverflow.com/questions/4249063/run-an-untrusted-c-program-in-a-sandbox-in-linux-that-prevents-it-&lt;nobr&gt;from-opening-f&lt;/nobr&gt;]&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://stackoverflow.com/questions/4249063/run-an-untrusted-c-program-in-a-sandbox-in-linux-that-prevents-it-from-opening-f"&gt;Linux sandboxing&lt;/a&gt;&lt;/li&gt;
 &lt;/ol&gt;
 &lt;div class="footnotes"&gt;
 &lt;hr /&gt;
