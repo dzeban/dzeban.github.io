@@ -2,13 +2,343 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title type="text">Crazy rants</title>
   <id>http://avd.reduct.ru/feed</id>
-  <updated>2015-04-02T00:00:00Z</updated>
+  <updated>2015-09-09T00:00:00Z</updated>
   <link href="http://avd.reduct.ru" />
   <link href="http://avd.reduct.ru/feed" rel="self" />
   <author>
     <name>avd</name>
   </author>
   <generator>PyAtom</generator>
+  <entry xml:base="http://avd.reduct.ru/feed">
+    <title type="text">Linux profiling. Perf</title>
+    <id>linux/profiling-perf.html</id>
+    <updated>2015-09-09T00:00:00Z</updated>
+    <link href="linux/profiling-perf.html" />
+    <author>
+      <name>Alex Dzyoba</name>
+    </author>
+    <content type="html">&lt;p&gt;TOC:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-intro.html"&gt;Intro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-gprof-gcov.html"&gt;Userspace profiling: gprof, gcov&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-valgrind.html"&gt;Userspace profiling: Valgrind&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Kernel profiling: perf&lt;/li&gt;
+&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
+&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
+&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="perf-overview"&gt;Perf overview&lt;/h2&gt;
+&lt;p&gt;Perf is&amp;nbsp;a&amp;nbsp;facility comprised of&amp;nbsp;kernel infrastructure for gathering various events and userspace tool to&amp;nbsp;get gathered data from the kernel and analyze it. It&amp;nbsp;is&amp;nbsp;like a&amp;nbsp;&lt;code&gt;gprof&lt;/code&gt;, but it&amp;nbsp;is&amp;nbsp;&lt;nobr&gt;non-invasive&lt;/nobr&gt;, &lt;nobr&gt;low-overhead&lt;/nobr&gt; and profile whole stack, including your app, libraries, system calls AND kernel with CPU!&lt;/p&gt;
+&lt;p&gt;The &lt;code&gt;perf&lt;/code&gt; tool supports a&amp;nbsp;list of&amp;nbsp;measurable events that you can view with &lt;code&gt;perf list&lt;/code&gt; command. The tool and underlying kernel interface can measure events coming from different sources. For instance, some events are pure kernel counters, in&amp;nbsp;this case they are called software events. Examples include: &lt;nobr&gt;context-switches&lt;/nobr&gt;, &lt;nobr&gt;minor-faults&lt;/nobr&gt;, &lt;nobr&gt;page-faults&lt;/nobr&gt; and others.&lt;/p&gt;
+&lt;p&gt;Another source of&amp;nbsp;events is&amp;nbsp;the processor itself and its Performance Monitoring Unit (PMU). It&amp;nbsp;provides a&amp;nbsp;list of&amp;nbsp;events to&amp;nbsp;measure &lt;nobr&gt;micro-architectural&lt;/nobr&gt; events such as&amp;nbsp;the number of&amp;nbsp;cycles, instructions retired, L1 cache misses and so&amp;nbsp;on. Those events are called &amp;laquo;PMU hardware events&amp;raquo; or&amp;nbsp;&amp;laquo;hardware events&amp;raquo; for short. They vary with each processor type and model&amp;nbsp;&amp;mdash; look at&amp;nbsp;&lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/support.html"&gt;this Vince Weaver’s&amp;nbsp;perf page&lt;/a&gt; for details&lt;/p&gt;
+&lt;p&gt;The &amp;laquo;perf_events&amp;raquo; interface also provides a&amp;nbsp;small set of&amp;nbsp;common hardware events monikers. On&amp;nbsp;each processor, those events get mapped onto an&amp;nbsp;actual events provided by&amp;nbsp;the CPU if&amp;nbsp;they exist, otherwise the event cannot be&amp;nbsp;used. Somewhat confusingly, these are also called hardware events and hardware cache events.&lt;/p&gt;
+&lt;p&gt;Finally, there are also tracepoint events which are implemented by&amp;nbsp;the kernel &lt;a href="/linux/profiling-ftrace.html"&gt;ftrace&lt;/a&gt; infrastructure. Those are only available with the 2.6.3x and newer kernels.&lt;/p&gt;
+&lt;p&gt;Thanks to&amp;nbsp;such a&amp;nbsp;variety of&amp;nbsp;events and analysis abilities of&amp;nbsp;userspace tool (see below) &lt;code&gt;perf&lt;/code&gt; is&amp;nbsp;a&amp;nbsp;big fish in&amp;nbsp;the world of&amp;nbsp;tracing and profiling of&amp;nbsp;Linux systems. It&amp;nbsp;is&amp;nbsp;a&amp;nbsp;really versatile tool that may be&amp;nbsp;used in&amp;nbsp;several ways of&amp;nbsp;which I&amp;nbsp;know a&amp;nbsp;few:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;Record a&amp;nbsp;profile and analyze it&amp;nbsp;later: &lt;code&gt;perf record&lt;/code&gt; + &lt;code&gt;perf report&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Gather statistics for application or&amp;nbsp;system: &lt;code&gt;perf stat&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;nobr&gt;Real-time&lt;/nobr&gt; &lt;nobr&gt;function-wise&lt;/nobr&gt; analysis: &lt;code&gt;perf top&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Trace application or&amp;nbsp;system: &lt;code&gt;perf trace&lt;/code&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Each of&amp;nbsp;these approaches include tremendous amount of&amp;nbsp;possibilities for sorting, filtering, grouping and so&amp;nbsp;on.&lt;/p&gt;
+&lt;p&gt;But as&amp;nbsp;someone said, &lt;code&gt;perf&lt;/code&gt; is&amp;nbsp;a&amp;nbsp;powerful tool with a&amp;nbsp;little documentation. So&amp;nbsp;in&amp;nbsp;this article I’ll&amp;nbsp;try to&amp;nbsp;share some of&amp;nbsp;my&amp;nbsp;knowledge about it.&lt;/p&gt;
+&lt;h2 id="basic-perf-workflows"&gt;Basic perf workflows&lt;/h2&gt;
+&lt;h3 id="preflight-check"&gt;Preflight check&lt;/h3&gt;
+&lt;p&gt;First thing to&amp;nbsp;do&amp;nbsp;when you start working with Perf is&amp;nbsp;to&amp;nbsp;launch &lt;code&gt;perf test&lt;/code&gt;. This will check your system and kernel features and report if&amp;nbsp;something isn’t&amp;nbsp;available. Usually, you need to&amp;nbsp;make as&amp;nbsp;much as&amp;nbsp;possible &amp;laquo;OK"s. Beware though that &lt;code&gt;perf&lt;/code&gt; will behave differently when launched under &amp;laquo;root&amp;raquo; and ordinary user. It’s&amp;nbsp;smart enough to&amp;nbsp;let you do&amp;nbsp;some things without root priveleges. There is&amp;nbsp;a&amp;nbsp;control file at&amp;nbsp;&amp;laquo;/proc/sys/kernel/perf_event_paranoid&amp;raquo; that you can tweak in&amp;nbsp;order to&amp;nbsp;change access to&amp;nbsp;perf events:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ perf stat -a
+Error:
+You may not have permission to collect system-wide stats.
+Consider tweaking /proc/sys/kernel/perf_event_paranoid:
+ -1 - Not paranoid at all
+  0 - Disallow raw tracepoint access for unpriv
+  1 - Disallow cpu events for unpriv
+  2 - Disallow kernel profiling for unpriv&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;After you played with &lt;code&gt;perf test&lt;/code&gt;, you can see what hardware events are available to&amp;nbsp;you with &lt;code&gt;perf list&lt;/code&gt;. Again, the list will differ depending on&amp;nbsp;current user id. Also, the amount of&amp;nbsp;events will depend on&amp;nbsp;your hardware: x86_64 CPUs have much more hardware events than some &lt;nobr&gt;low-end&lt;/nobr&gt; ARM processors.&lt;/p&gt;
+&lt;h3 id="system-statistics"&gt;System statistics&lt;/h3&gt;
+&lt;p&gt;Now to&amp;nbsp;some real profiling. To&amp;nbsp;check general health of&amp;nbsp;your system you can gather statistics with &lt;code&gt;perf stat&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf stat -a sleep 5
+
+ Performance counter stats for &amp;#39;system wide&amp;#39;:
+
+      20005.830934      task-clock (msec)         #    3.999 CPUs utilized            (100.00%)
+             4,236      context-switches          #    0.212 K/sec                    (100.00%)
+               160      cpu-migrations            #    0.008 K/sec                    (100.00%)
+             2,193      page-faults               #    0.110 K/sec                  
+     2,414,170,118      cycles                    #    0.121 GHz                      (83.35%)
+     4,196,068,507      stalled-cycles-frontend   #  173.81% frontend cycles idle     (83.34%)
+     3,735,211,886      stalled-cycles-backend    #  154.72% backend  cycles idle     (66.68%)
+     2,109,428,612      instructions              #    0.87  insns per cycle        
+                                                  #    1.99  stalled cycles per insn  (83.34%)
+       406,168,187      branches                  #   20.302 M/sec                    (83.32%)
+         6,869,950      branch-misses             #    1.69% of all branches          (83.32%)
+
+       5.003164377 seconds time elapsed&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here you can see how many context switches, migrations, page faults and other events happened during 5 seconds, along with some simple calculations. In&amp;nbsp;fact &lt;code&gt;perf&lt;/code&gt; tool highlight statistics that you should worry about. In&amp;nbsp;my&amp;nbsp;case it’s&amp;nbsp;a&amp;nbsp;&lt;nobr&gt;stalled-cycles-frontend&lt;/nobr&gt;/backend. This counter shows how much time CPU pipeline is&amp;nbsp;stalled (i.e. not advanced) due to&amp;nbsp;some external cause like waiting for memory access.&lt;/p&gt;
+&lt;p&gt;Along with &lt;code&gt;perf stat&lt;/code&gt; you have &lt;code&gt;perf top&lt;/code&gt;&amp;nbsp;&amp;mdash; a&amp;nbsp;&lt;code&gt;top&lt;/code&gt; like utility, but that works &lt;nobr&gt;symbol-wise&lt;/nobr&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf top -a --stdio
+
+PerfTop:     361 irqs/sec  kernel:35.5%  exact:  0.0% [4000Hz cycles],  (all, 4 CPUs)
+----------------------------------------------------------------------------------------
+
+ 2.06%  libglib-2.0.so.0.4400.1     [.] g_mutex_lock                   
+ 1.99%  libglib-2.0.so.0.4400.1     [.] g_mutex_unlock                 
+ 1.47%  [kernel]                    [k] __fget                         
+ 1.34%  libpython2.7.so.1.0         [.] PyEval_EvalFrameEx             
+ 1.07%  [kernel]                    [k] copy_user_generic_string       
+ 1.00%  libpthread-2.21.so          [.] pthread_mutex_lock             
+ 0.96%  libpthread-2.21.so          [.] pthread_mutex_unlock           
+ 0.85%  libc-2.21.so                [.] _int_malloc                    
+ 0.83%  libpython2.7.so.1.0         [.] PyParser_AddToken              
+ 0.82%  [kernel]                    [k] do_sys_poll                    
+ 0.81%  libQtCore.so.4.8.6          [.] QMetaObject::activate          
+ 0.77%  [kernel]                    [k] fput                           
+ 0.76%  [kernel]                    [k] __audit_syscall_exit           
+ 0.75%  [kernel]                    [k] unix_stream_recvmsg            
+ 0.63%  [kernel]                    [k] ia32_sysenter_target           &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here you can see kernel functions, glib library functions, CPython functions, Qt&amp;nbsp;framework functions and a&amp;nbsp;pthread functions combined with its overhead. It’s&amp;nbsp;a&amp;nbsp;great tool to&amp;nbsp;peek into system state to&amp;nbsp;see what’s&amp;nbsp;going on.&lt;/p&gt;
+&lt;h3 id="application-profiling"&gt;Application profiling&lt;/h3&gt;
+&lt;p&gt;To&amp;nbsp;profile particular application, either already running or&amp;nbsp;not, you use &lt;code&gt;perf record&lt;/code&gt; to&amp;nbsp;collect events and then &lt;code&gt;perf report&lt;/code&gt; to&amp;nbsp;analyze program behavior. Let’s&amp;nbsp;see:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf record -bag updatedb
+[ perf record: Woken up 259 times to write data ]
+[ perf record: Captured and wrote 65.351 MB perf.data (127127 samples) ]&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now dive into data with &lt;code&gt;perf report&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf report&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You will see a&amp;nbsp;nice interactive TUI interface.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/perf-tui.png" alt="perf tui" /&gt;
+&lt;p class="caption"&gt;perf tui&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;You can zoom into pid/thread&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/perf-zoom-into-thread.png" alt="perf zoom into thread" /&gt;
+&lt;p class="caption"&gt;perf zoom into thread&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;and see what’s&amp;nbsp;going on&amp;nbsp;there&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/perf-thread-info.png" alt="perf thread info" /&gt;
+&lt;p class="caption"&gt;perf thread info&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;You can look into nice assembly code (this looks almost as&amp;nbsp;in&amp;nbsp;&lt;a href="http://www.radare.org/r/"&gt;radare&lt;/a&gt;)&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/perf-assembly.png" alt="perf assembly" /&gt;
+&lt;p class="caption"&gt;perf assembly&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;and run scripts on&amp;nbsp;it&amp;nbsp;to&amp;nbsp;see, for example, function calls histogram:&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/perf-histogram.png" alt="perf histogram" /&gt;
+&lt;p class="caption"&gt;perf histogram&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;If&amp;nbsp;it’s&amp;nbsp;not enough to&amp;nbsp;you, there are a&amp;nbsp;lot of&amp;nbsp;options both for &lt;code&gt;perf record&lt;/code&gt; and &lt;code&gt;perf report&lt;/code&gt; so&amp;nbsp;play with it.&lt;/p&gt;
+&lt;h3 id="other"&gt;Other&lt;/h3&gt;
+&lt;p&gt;In&amp;nbsp;addition to&amp;nbsp;that you can find tools to&amp;nbsp;profile kernel memory subsystem, locking, kvm guests, scheduling, do&amp;nbsp;benchmarking and even create timecharts.&lt;/p&gt;
+&lt;p&gt;Now let’s&amp;nbsp;try to&amp;nbsp;solve &lt;a href="/linux/profiling-intro.html"&gt;our problem with &lt;code&gt;block_hasher&lt;/code&gt;&lt;/a&gt; with help of&amp;nbsp;&lt;code&gt;perf&lt;/code&gt;.&lt;/p&gt;
+&lt;h2 id="hot-spots-profiling"&gt;Hot spots profiling&lt;/h2&gt;
+&lt;p&gt;All right, as&amp;nbsp;we&amp;nbsp;saw &lt;a href="/linux/profiling-gprof-gcov.html#not-application"&gt;previously&lt;/a&gt; we&amp;nbsp;spend time in&amp;nbsp;kernel waiting for I/O. Let’s&amp;nbsp;see if&amp;nbsp;&lt;code&gt;perf&lt;/code&gt; can help us.&lt;/p&gt;
+&lt;p&gt;Start with &lt;code&gt;perf stat&lt;/code&gt; giving options for detailed and scaled counters for CPU (&amp;laquo;-dac&amp;raquo;)&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf stat -dac ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000
+
+ Performance counter stats for &amp;#39;system wide&amp;#39;:
+
+      32978.276562      task-clock (msec)         #    4.000 CPUs utilized            (100.00%)
+             6,349      context-switches          #    0.193 K/sec                    (100.00%)
+               142      cpu-migrations            #    0.004 K/sec                    (100.00%)
+             2,709      page-faults               #    0.082 K/sec                  
+    20,998,366,508      cycles                    #    0.637 GHz                      (41.08%)
+    23,007,780,670      stalled-cycles-frontend   #  109.57% frontend cycles idle     (37.50%)
+    18,687,140,923      stalled-cycles-backend    #   88.99% backend  cycles idle     (42.64%)
+    23,466,705,987      instructions              #    1.12  insns per cycle        
+                                                  #    0.98  stalled cycles per insn  (53.74%)
+     4,389,207,421      branches                  #  133.094 M/sec                    (55.51%)
+        11,086,505      branch-misses             #    0.25% of all branches          (55.53%)
+     7,435,101,164      L1-dcache-loads           #  225.455 M/sec                    (37.50%)
+       248,499,989      L1-dcache-load-misses     #    3.34% of all L1-dcache hits    (26.52%)
+       111,621,984      LLC-loads                 #    3.385 M/sec                    (28.77%)
+   &amp;lt;not supported&amp;gt;      LLC-load-misses:HG       
+
+       8.245518548 seconds time elapsed&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Well, nothing really suspicious. 6K page context switches is&amp;nbsp;OK&amp;nbsp;because my&amp;nbsp;machine is&amp;nbsp;&lt;nobr&gt;2-core&lt;/nobr&gt; and I’m&amp;nbsp;running 10 threads. 2K page faults is&amp;nbsp;fine since we’re&amp;nbsp;reading a&amp;nbsp;lot of&amp;nbsp;data from disks. Big &lt;nobr&gt;stalled-cycles-frontend&lt;/nobr&gt;/backend is&amp;nbsp;kind of&amp;nbsp;outliers here since it’s&amp;nbsp;still big on&amp;nbsp;simple &lt;code&gt;ls&lt;/code&gt; and &lt;code&gt;-&lt;nobr&gt;per-core&lt;/nobr&gt;&lt;/code&gt; statistics shows 0.00% percents of&amp;nbsp;&lt;nobr&gt;stalled-cycles&lt;/nobr&gt;.&lt;/p&gt;
+&lt;p&gt;Let’s&amp;nbsp;collect profile:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf record -a -g -s -d -b ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000
+[ perf record: Woken up 73 times to write data ]
+[ perf record: Captured and wrote 20.991 MB perf.data (33653 samples) ]&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Options are:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;-a for all CPUs&lt;/li&gt;
+&lt;li&gt;-g for call graphs&lt;/li&gt;
+&lt;li&gt;-s for per thread count&lt;/li&gt;
+&lt;li&gt;-d for sampling addresses. Not sure about this one, but it&amp;nbsp;doesn’t&amp;nbsp;affect profile&lt;/li&gt;
+&lt;li&gt;-b for sample any taken branches&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Now show me&amp;nbsp;the profile:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf report -g -T&lt;/code&gt;&lt;/pre&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/perf-report-block-hasher.png" alt="perf report of block_hasher" /&gt;
+&lt;p class="caption"&gt;perf report of&amp;nbsp;block_hasher&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;Nothing much. I’ve&amp;nbsp;looked into block_hasher threads, I’ve&amp;nbsp;built a&amp;nbsp;histogram, looked for vmlinux DSO, found instruction with most overhead&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/perf-lock-acquire-assembly.png" alt="perf __lock_acquire" /&gt;
+&lt;p class="caption"&gt;perf __lock_acquire&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;and still can’t&amp;nbsp;say I&amp;nbsp;found what’s&amp;nbsp;wrong. That’s&amp;nbsp;because there is&amp;nbsp;no&amp;nbsp;real overhead, nothing is&amp;nbsp;spinning in&amp;nbsp;vain. Something is&amp;nbsp;just plain sleeping.&lt;/p&gt;
+&lt;p&gt;What we’ve&amp;nbsp;done here and &lt;a href="/linux/profiling-ftrace.html"&gt;before in&amp;nbsp;ftrace part&lt;/a&gt; is&amp;nbsp;a&amp;nbsp;hot spots analysis, i.e. we&amp;nbsp;try to&amp;nbsp;find places in&amp;nbsp;our application or&amp;nbsp;system that cause CPU to&amp;nbsp;spin in&amp;nbsp;useless cycles. Usually, it’s&amp;nbsp;what you want but not today. We&amp;nbsp;need to&amp;nbsp;understand why &lt;code&gt;pread&lt;/code&gt; is&amp;nbsp;sleeping. And that’s&amp;nbsp;what I&amp;nbsp;call &amp;laquo;latency profiling&amp;raquo;.&lt;/p&gt;
+&lt;h2 id="latency-profiling"&gt;Latency profiling&lt;/h2&gt;
+&lt;h3 id="record-sched_stat-and-sched_switch-events"&gt;Record sched_stat and sched_switch events&lt;/h3&gt;
+&lt;p&gt;When you search for perf documentation, first thing you find is&amp;nbsp;&lt;a href="https://perf.wiki.kernel.org/index.php/Tutorial"&gt;&amp;laquo;Perf tutorial&amp;raquo;&lt;/a&gt;. The &amp;laquo;perf tutorial&amp;raquo; page is&amp;nbsp;almost entirely dedicated to&amp;nbsp;the &amp;laquo;hot spots&amp;raquo; scenario, but, fortunately, there is&amp;nbsp;an&amp;nbsp;&amp;laquo;Other scenarios&amp;raquo; section with &lt;a href="https://perf.wiki.kernel.org/index.php/Tutorial#Other_Scenarios"&gt;&amp;laquo;Profiling sleep times&amp;raquo;&lt;/a&gt; tutorial.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Profiling sleep times&lt;/p&gt;
+&lt;p&gt;This feature shows where and how long a&amp;nbsp;program is&amp;nbsp;sleeping or&amp;nbsp;waiting something.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Whoa, that’s&amp;nbsp;what we&amp;nbsp;need!&lt;/p&gt;
+&lt;p&gt;Unfortunately scheduling stats profiling is&amp;nbsp;not working by&amp;nbsp;default. &lt;code&gt;perf inject&lt;/code&gt; failing with&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf inject -v -s -i perf.data.raw -o perf.data
+registering plugin: /usr/lib64/traceevent/plugins/plugin_kmem.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_mac80211.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_function.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_hrtimer.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_sched_switch.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_jbd2.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_cfg80211.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_scsi.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_xen.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_kvm.so
+overriding event (263) sched:sched_switch with new print handler
+build id event received for [kernel.kallsyms]:
+8adbfad59810c80cb47189726415682e0734788a
+failed to write feature 2&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The reason is&amp;nbsp;that it&amp;nbsp;can’t&amp;nbsp;find in&amp;nbsp;&lt;nobr&gt;build-id&lt;/nobr&gt; cache scheduling stats symbols because CONFIG_SCHEDSTATS is&amp;nbsp;disabled because it&amp;nbsp;introduces some &amp;laquo;&lt;nobr&gt;non-trivial&lt;/nobr&gt; performance impact for context switches&amp;raquo;. Details in&amp;nbsp;Red Hat bugzilla &lt;a href="https://bugzilla.redhat.com/show_bug.cgi?id=1026506"&gt;Bug 1026506&lt;/a&gt; and &lt;a href="https://bugzilla.redhat.com/show_bug.cgi?id=1013225"&gt;Bug 1013225&lt;/a&gt;. Debian kernels also don’t&amp;nbsp;enable this option.&lt;/p&gt;
+&lt;p&gt;You can recompile kernel enabling &amp;laquo;Collect scheduler statistics&amp;raquo; in&amp;nbsp;&lt;code&gt;make menuconfig&lt;/code&gt;, but happy Fedora users can just install &lt;a href="http://pkgs.fedoraproject.org/cgit/kernel.git/commit/?id=73e4f49352c74eeb2d0b951c47adf0b53278f84b"&gt;debug kernel&lt;/a&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;dnf install kernel-debug kernel-debug-devel kernel-debug-debuginfo&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now, when everything works, we&amp;nbsp;can give it&amp;nbsp;a&amp;nbsp;try:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf record -e sched:sched_stat_sleep -e sched:sched_switch  -e sched:sched_process_exit -g -o perf.data.raw ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.564 MB perf.data.raw (2001 samples) ]
+
+# perf inject -v -s -i perf.data.raw -o perf.data.sched
+registering plugin: /usr/lib64/traceevent/plugins/plugin_kmem.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_mac80211.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_function.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_hrtimer.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_sched_switch.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_jbd2.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_cfg80211.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_scsi.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_xen.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_kvm.so
+overriding event (266) sched:sched_switch with new print handler
+build id event received for /usr/lib/debug/lib/modules/4.1.6-200.fc22.x86_64+debug/vmlinux: c6e34bcb0ab7d65e44644ea2263e89a07744bf85
+Using /root/.debug/.build-id/c6/e34bcb0ab7d65e44644ea2263e89a07744bf85 for symbols&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;But it’s&amp;nbsp;really disappointing, I’ve&amp;nbsp;expanded all callchains to&amp;nbsp;see nothing:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf report --show-total-period -i perf.data.sched
+Samples: 10  of event &amp;#39;sched:sched_switch&amp;#39;, Event count (approx.): 31403254575
+  Children      Self        Period  Command       Shared Object                           Symbol                                      
+-  100.00%     0.00%             0  block_hasher  libpthread-2.21.so                      [.] pthread_join                            
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] system_call                             
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] sys_futex                               
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] do_futex                                
+     do_futex                                                                                                                         
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] futex_wait                              
+     futex_wait                                                                                                                       
+     do_futex                                                                                                                         
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] futex_wait_queue_me                     
+     futex_wait_queue_me                                                                                                              
+     futex_wait                                                                                                                       
+     do_futex                                                                                                                         
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] schedule                                
+     schedule                                                                                                                         
+     futex_wait_queue_me                                                                                                              
+     futex_wait                                                                                                                       
+     do_futex                                                                                                                         
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%   100.00%   31403254575  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] __schedule                              
+     __schedule                                                                                                                       
+     schedule                                                                                                                         
+     futex_wait_queue_me                                                                                                              
+     futex_wait                                                                                                                       
+     do_futex                                                                                                                         
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-   14.52%     0.00%             0  block_hasher  [unknown]                               [.] 0000000000000000                        
+     0                                                                                                                &lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="perf-sched"&gt;perf sched&lt;/h3&gt;
+&lt;p&gt;Let’s&amp;nbsp;see what else can we&amp;nbsp;do. There is&amp;nbsp;a&amp;nbsp;&lt;code&gt;perf sched&lt;/code&gt; command that has &lt;code&gt;latency&lt;/code&gt; subcommand to&amp;nbsp;&amp;laquo;report the per task scheduling latencies and other scheduling properties of&amp;nbsp;the workload&amp;raquo;. Why not give it&amp;nbsp;a&amp;nbsp;shot?&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# perf sched record -o perf.sched -g ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000
+[ perf record: Woken up 6 times to write data ]
+[ perf record: Captured and wrote 13.998 MB perf.sched (56914 samples) ]
+
+# perf report -i perf.sched&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;I’ve&amp;nbsp;inspected samples for &lt;code&gt;sched_switch&lt;/code&gt; and &lt;code&gt;sched_stat_runtime&lt;/code&gt; events (15K and 17K respectively) and found nothing. But then I&amp;nbsp;looked in&amp;nbsp;&lt;code&gt;sched_stat_iowait&lt;/code&gt;.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/perf-sched-stat-iowait.png" alt="perf sched_stat_iowait" /&gt;
+&lt;p class="caption"&gt;perf sched_stat_iowait&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;and there I&amp;nbsp;found really suspicious thing:&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/perf-dm-delay.png" alt="perf dm-delay" /&gt;
+&lt;p class="caption"&gt;perf &lt;nobr&gt;dm-delay&lt;/nobr&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;See? Almost all symbols come from &amp;laquo;kernel.vmlinux&amp;raquo; shared object, but one with strange name &amp;laquo;0&amp;times;000000005f8ccc27&amp;raquo; comes from &amp;laquo;dm_delay&amp;raquo; object. Wait, what is&amp;nbsp;&amp;laquo;dm_delay&amp;raquo;? Quick find gives us&amp;nbsp;the answer:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;&amp;gt; dm-delay
+&amp;gt; ========
+&amp;gt;
+&amp;gt; Device-Mapper&amp;#39;s &amp;quot;delay&amp;quot; target delays reads and/or writes
+&amp;gt; and maps them to different devices.&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;WHAT?! Delays reads and/or writes? Really?&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# dmsetup info 
+Name:              delayed
+State:             ACTIVE
+Read Ahead:        256
+Tables present:    LIVE
+Open count:        1
+Event number:      0
+Major, minor:      253, 0
+Number of targets: 1
+
+# dmsetup table
+delayed: 0 1000000 delay 1:7 0 30
+
+# udevadm info -rq name /sys/dev/block/1:7
+/dev/ram7&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;So, we&amp;nbsp;have block device &amp;laquo;/dev/ram7&amp;raquo; mapped to&amp;nbsp;DeviceMapper &amp;laquo;delay&amp;raquo; target to, well, delay I/O requests to&amp;nbsp;30 milliseconds. That’s&amp;nbsp;why whole RAID was slow&amp;nbsp;&amp;mdash; performance of&amp;nbsp;RAID0 is&amp;nbsp;performance of&amp;nbsp;a&amp;nbsp;slowest disk in&amp;nbsp;RAID.&lt;/p&gt;
+&lt;p&gt;Of&amp;nbsp;course, I&amp;nbsp;knew it&amp;nbsp;from the beginning. I&amp;nbsp;just wanted to&amp;nbsp;see if&amp;nbsp;I’ll&amp;nbsp;be&amp;nbsp;able to&amp;nbsp;detect it&amp;nbsp;with profiling tools. And in&amp;nbsp;this case I&amp;nbsp;don’t&amp;nbsp;think it’s&amp;nbsp;fair to&amp;nbsp;say that &lt;code&gt;perf&lt;/code&gt; helped. Actually, &lt;code&gt;perf&lt;/code&gt; gives a&amp;nbsp;lot of&amp;nbsp;confusion in&amp;nbsp;the interface. Look at&amp;nbsp;the picture above. What are these couple of&amp;nbsp;dozens lines with &amp;laquo;99.67%" tell us? Which of&amp;nbsp;these symbols cause latency? How to&amp;nbsp;interpret it? If&amp;nbsp;I&amp;nbsp;wasn’t&amp;nbsp;really attentive, like after couple of&amp;nbsp;hours of&amp;nbsp;debugging and investigating, I&amp;nbsp;couldn’t&amp;nbsp;be&amp;nbsp;able to&amp;nbsp;notice it. If&amp;nbsp;I&amp;nbsp;issued the magic &lt;code&gt;perf inject&lt;/code&gt; command it&amp;nbsp;will collapse &lt;code&gt;sched_stat_iowait&lt;/code&gt; command and I’ll&amp;nbsp;not see &lt;nobr&gt;dm-delay&lt;/nobr&gt; in&amp;nbsp;top records.&lt;/p&gt;
+&lt;p&gt;Again, this is&amp;nbsp;all are very confusing and it’s&amp;nbsp;just a&amp;nbsp;fortune that I’ve&amp;nbsp;noticed it.&lt;/p&gt;
+&lt;h2 id="conclusion"&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;Perf is&amp;nbsp;really versatile and extremely complex tool with a&amp;nbsp;little documentation. On&amp;nbsp;some simple cases it&amp;nbsp;will help you a&amp;nbsp;LOT. But a&amp;nbsp;few steps from the mainstream problems and you are left alone with unintuitive data. We&amp;nbsp;all need various documentation on&amp;nbsp;perf&amp;nbsp;&amp;mdash; tutorials, books, slides, videos&amp;nbsp;&amp;mdash; that not only scratch the surface of&amp;nbsp;it&amp;nbsp;but gives a&amp;nbsp;comprehensive overview of&amp;nbsp;how it&amp;nbsp;works, what it&amp;nbsp;can do&amp;nbsp;and what it&amp;nbsp;doesn’t. I&amp;nbsp;hope I&amp;nbsp;have contributed to&amp;nbsp;that purpose with this article (it&amp;nbsp;took me&amp;nbsp;half a&amp;nbsp;year to&amp;nbsp;write it).&lt;/p&gt;
+&lt;h2 id="references"&gt;References&lt;/h2&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;&lt;a href="https://perf.wiki.kernel.org/index.php/Tutorial"&gt;Perf tutorial&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events"&gt;Vince Weaver’s&amp;nbsp;perf page&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://www.brendangregg.com/perf.html"&gt;Beautiful Brendan Gregg’s&amp;nbsp;&amp;laquo;perf&amp;raquo; page&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;</content>
+  </entry>
   <entry xml:base="http://avd.reduct.ru/feed">
     <title type="text">When memory is not enough...</title>
     <id>programming/external-sort.html</id>
@@ -322,12 +652,14 @@ Range is 1000000
 &lt;/ul&gt;
 &lt;p&gt;As&amp;nbsp;for sorting here is&amp;nbsp;a&amp;nbsp;result table:&lt;/p&gt;
 &lt;table&gt;
+&lt;colgroup&gt;
 &lt;col width="14%" /&gt;
 &lt;col width="14%" /&gt;
 &lt;col width="14%" /&gt;
 &lt;col width="16%" /&gt;
 &lt;col width="28%" /&gt;
 &lt;col width="10%" /&gt;
+&lt;/colgroup&gt;
 &lt;thead&gt;
 &lt;tr class="header"&gt;
 &lt;th align="left"&gt;Test case&lt;/th&gt;
@@ -376,7 +708,7 @@ Range is 1000000
 &lt;li id="fn2"&gt;&lt;p&gt;libmemrestrict gets a&amp;nbsp;configuration from environment. Common practice for libraries, for example &lt;code&gt;LD_PRELOAD&lt;/code&gt; and &lt;code&gt;LD_LIBRARY_PATH&lt;/code&gt; are &lt;nobr&gt;well-known&lt;/nobr&gt; environment variables for &lt;nobr&gt;ld-linux&lt;/nobr&gt;.so, and there is&amp;nbsp;also less known, but extremely useful &lt;code&gt;LD_DEBUG&lt;/code&gt; environment variable for &lt;a href="http://www.bnikolic.co.uk/blog/linux-ld-debug.html"&gt;linkage debugging&lt;/a&gt;.&lt;a href="#fnref2"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id="fn3"&gt;&lt;p&gt;It’s&amp;nbsp;strange because qsort is&amp;nbsp;&lt;nobr&gt;in-place&lt;/nobr&gt; and uses optimizations suggested by&amp;nbsp;Robert Sedgewick to, among others, guarantee O(log n) space complexity. You can dive into &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob;f=stdlib/qsort.c;h=04c25b984f74a8f738233cc6da8a738b6437833c;hb=b8079dd0d360648e4e8de48656c5c38972621072"&gt;glibc qsort implementation.&lt;/a&gt;&lt;a href="#fnref3"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id="fn4"&gt;&lt;p&gt;There is&amp;nbsp;a&amp;nbsp;strange behaviour though. For example, if&amp;nbsp;I&amp;nbsp;restrict memory for 5.3 MB&amp;nbsp;it&amp;nbsp;will work and &lt;em&gt;not&lt;/em&gt; require O(n) memory. I’m&amp;nbsp;still investigating on&amp;nbsp;this.&lt;a href="#fnref4"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
-&lt;li id="fn5"&gt;&lt;p&gt;&lt;a href="http://en.wikipedia.org/wiki/X86-64#Virtual_address_space_details"&gt;http://en.wikipedia.org/wiki/&lt;nobr&gt;X86-64&lt;/nobr&gt;#Virtual_address_space_details&lt;/a&gt;&lt;a href="#fnref5"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn5"&gt;&lt;p&gt;&lt;a href="http://en.wikipedia.org/wiki/X86-64#Virtual_address_space_details" class="uri"&gt;http://en.wikipedia.org/wiki/&lt;nobr&gt;X86-64&lt;/nobr&gt;#Virtual_address_space_details&lt;/a&gt;&lt;a href="#fnref5"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id="fn6"&gt;&lt;p&gt;Note that &lt;strong&gt;MiB&lt;/strong&gt; is&amp;nbsp;2&lt;sup&gt;20&lt;/sup&gt; and &lt;strong&gt;MB&lt;/strong&gt; is&amp;nbsp;10&lt;sup&gt;6&lt;/sup&gt; = 1 million. So&amp;nbsp;500 MB&amp;nbsp;= 500&amp;nbsp;000&amp;nbsp;000 bytes which is&amp;nbsp;500&amp;nbsp;000&amp;nbsp;000 &amp;gt;&amp;gt; 20 = 476 MiB.&lt;a href="#fnref6"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id="fn7"&gt;&lt;p&gt;Plus extra 500 KB&amp;nbsp;for temporary strings holding chunks paths.&lt;a href="#fnref7"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id="fn8"&gt;&lt;p&gt;In&amp;nbsp;this way it’s&amp;nbsp;kind of&amp;nbsp;&lt;nobr&gt;N-way&lt;/nobr&gt; merge.&lt;a href="#fnref8"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
@@ -952,7 +1284,7 @@ Failed after 21 allocations&lt;/code&gt;&lt;/pre&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-valgrind.html"&gt;Userspace profiling: Valgrind&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Kernel profiling: ftrace&lt;/li&gt;
-&lt;li&gt;Kernel profiling: perf&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
 &lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
 &lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
@@ -1233,7 +1565,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;li&gt;&lt;a href="/linux/profiling-valgrind.html"&gt;Userspace profiling: Valgrind&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Kernel profiling: Intro&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Kernel profiling: perf&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
 &lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
 &lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
@@ -1244,7 +1576,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;h2 id="intro"&gt;Intro&lt;/h2&gt;
 &lt;p&gt;Sometimes when you’re&amp;nbsp;facing really hard performance problem it’s&amp;nbsp;not always enough to&amp;nbsp;profile your applicatiion. As&amp;nbsp;we&amp;nbsp;saw while profiling our application with &lt;a href="/linux/profiling-intro.html"&gt;gprof, gcov&lt;/a&gt; and &lt;a href="/linux/profiling-valgrind.html"&gt;Valgrind&lt;/a&gt; problem is&amp;nbsp;somewhere underneath our application&amp;nbsp;&amp;mdash; something is&amp;nbsp;holding &lt;code&gt;pread&lt;/code&gt; in&amp;nbsp;long I/O wait cycles.&lt;/p&gt;
 &lt;p&gt;How to&amp;nbsp;trace system call is&amp;nbsp;not clear at&amp;nbsp;first sight&amp;nbsp;&amp;mdash; there are various kernel profilers, all of&amp;nbsp;them works in&amp;nbsp;it’s&amp;nbsp;own way, requires unique configuration, methods, analyzis and so&amp;nbsp;on. Yes, it’s&amp;nbsp;really hard to&amp;nbsp;figure it&amp;nbsp;out. Being the biggest &lt;nobr&gt;open-source&lt;/nobr&gt; project developed by&amp;nbsp;massive community, Linux absorbed several different and sometimes conflicting profiling facilities. And it’s&amp;nbsp;in&amp;nbsp;some sense getting even worse&amp;nbsp;&amp;mdash; while some profiles tend to&amp;nbsp;merge (&lt;em&gt;ftrace&lt;/em&gt; and &lt;em&gt;perf&lt;/em&gt;) other tools emerge&amp;nbsp;&amp;mdash; last example is&amp;nbsp;&lt;em&gt;ktap&lt;/em&gt;.&lt;/p&gt;
-&lt;p&gt;To&amp;nbsp;undertand that &lt;a href="https://ru.wikipedia.org/wiki/%D0%A1%D0%BE%D0%B1%D0%BE%D1%80_%D0%B8_%D0%91%D0%B0%D0%B7%D0%B0%D1%80"&gt;bazaar&lt;/a&gt; lets start from the bottom&amp;nbsp;&amp;mdash; what does kernel have that makes it&amp;nbsp;able profile it? Basically there are only 3 kernel facilities that enable profiling:&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;undertand that &lt;a href="https://en.wikipedia.org/wiki/The_Cathedral_and_the_Bazaar"&gt;bazaar&lt;/a&gt; lets start from the bottom&amp;nbsp;&amp;mdash; what does kernel have that makes it&amp;nbsp;able profile it? Basically there are only 3 kernel facilities that enable profiling:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Kernel tracepoints&lt;/li&gt;
 &lt;li&gt;Kernel probes&lt;/li&gt;
@@ -1414,7 +1746,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;p&gt;And in&amp;nbsp;addition to&amp;nbsp;that perf included &lt;em&gt;tracepoint&lt;/em&gt; support via &lt;code&gt;ftrace&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;To&amp;nbsp;access &lt;em&gt;perf_events&lt;/em&gt; there is&amp;nbsp;a&amp;nbsp;special syscall &lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/perf_event_open.html"&gt;&lt;code&gt;perf_event_open&lt;/code&gt;&lt;/a&gt;. You are passing the type of&amp;nbsp;event (hardware, kernel, tracepoint) and so&amp;nbsp;called config, where you specifies what exactly you want depending on&amp;nbsp;type. It’s&amp;nbsp;gonna be&amp;nbsp;function name in&amp;nbsp;case of&amp;nbsp;tracepoint, some CPU metric in&amp;nbsp;case of&amp;nbsp;hardware and so&amp;nbsp;on.&lt;/p&gt;
 &lt;p&gt;And on&amp;nbsp;top of&amp;nbsp;that there are a&amp;nbsp;whole lot of&amp;nbsp;stuff like event groups, filters, sampling, various output formats and others. And all of&amp;nbsp;that are &lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/abi_breakage.html"&gt;constantly breaking&lt;/a&gt;&lt;a href="#fn3" class="footnoteRef" id="fnref3"&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt;, that’s&amp;nbsp;why the only thing you can ask for perf_events is&amp;nbsp;special &lt;code&gt;perf&lt;/code&gt; utility&amp;nbsp;&amp;mdash; the only userspace utility that is&amp;nbsp;a&amp;nbsp;part of&amp;nbsp;kernel tree.&lt;/p&gt;
-&lt;p&gt;&lt;em&gt;perf_events and all things related to&amp;nbsp;it&amp;nbsp;spreads as&amp;nbsp;a&amp;nbsp;plague in&amp;nbsp;kernel and now &lt;code&gt;ftrace&lt;/code&gt; is&amp;nbsp;going to&amp;nbsp;be&amp;nbsp;part of&amp;nbsp;&lt;code&gt;perf&lt;/code&gt; (&lt;a href="http://thread.gmane.org/gmane.linux.kernel/1136520"&gt;1&lt;/a&gt;, &lt;a href="https://lkml.org/lkml/2013/10/16/15"&gt;2&lt;/a&gt;). Some people overreacting on&amp;nbsp;&lt;/em&gt;perf_ related things though it’s&amp;nbsp;useless because &lt;em&gt;perf&lt;/em&gt; is&amp;nbsp;developed by&amp;nbsp;kernel big fishes&amp;nbsp;&amp;mdash; Info Molnar&lt;a href="#fn4" class="footnoteRef" id="fnref4"&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt; and Peter Zijlstra.&lt;/p&gt;
+&lt;p&gt;_perf_events and all things related to&amp;nbsp;it&amp;nbsp;spreads as&amp;nbsp;a&amp;nbsp;plague in&amp;nbsp;kernel and now &lt;code&gt;ftrace&lt;/code&gt; is&amp;nbsp;going to&amp;nbsp;be&amp;nbsp;part of&amp;nbsp;&lt;code&gt;perf&lt;/code&gt; (&lt;a href="http://thread.gmane.org/gmane.linux.kernel/1136520"&gt;1&lt;/a&gt;, &lt;a href="https://lkml.org/lkml/2013/10/16/15"&gt;2&lt;/a&gt;). Some people overreacting on&amp;nbsp;&lt;em&gt;perf&lt;/em&gt; related things though it’s&amp;nbsp;useless because &lt;em&gt;perf&lt;/em&gt; is&amp;nbsp;developed by&amp;nbsp;kernel big fishes&amp;nbsp;&amp;mdash; Info Molnar&lt;a href="#fn4" class="footnoteRef" id="fnref4"&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt; and Peter Zijlstra.&lt;/p&gt;
 &lt;p&gt;I&amp;nbsp;really can’t&amp;nbsp;tell anything more about &lt;em&gt;perf_events&lt;/em&gt; in&amp;nbsp;isolation of&amp;nbsp;&lt;code&gt;perf&lt;/code&gt;, so&amp;nbsp;here I&amp;nbsp;finish.&lt;/p&gt;
 &lt;h2 id="summary"&gt;Summary&lt;/h2&gt;
 &lt;p&gt;There are a&amp;nbsp;few Linux kernel features that enables profiling:&lt;/p&gt;
@@ -1426,22 +1758,22 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;p&gt;All Linux kernel profilers uses combinations of&amp;nbsp;that features, read details in&amp;nbsp;article for particular profiler.&lt;/p&gt;
 &lt;h2 id="to-read"&gt;To&amp;nbsp;read&lt;/h2&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf"&gt;https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf"&gt;http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf" class="uri"&gt;https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf" class="uri"&gt;http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;em&gt;tracepoints&lt;/em&gt;: &lt;ul&gt;
 &lt;li&gt;&lt;a href="http://lxr.free-electrons.com/source/Documentation/trace/tracepoints.txt?v=3.13"&gt;Documentation/trace/tracepoints.txt&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="http://lttng.org/files/thesis/desnoyers-dissertation-2009-12-v27.pdf"&gt;http://lttng.org/files/thesis/desnoyers-dissertation-&lt;nobr&gt;2009-12-v27&lt;/nobr&gt;.pdf&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="http://lwn.net/Articles/379903/"&gt;http://lwn.net/Articles/379903/&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="http://lwn.net/Articles/381064/"&gt;http://lwn.net/Articles/381064/&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="http://lwn.net/Articles/383362/"&gt;http://lwn.net/Articles/383362/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lttng.org/files/thesis/desnoyers-dissertation-2009-12-v27.pdf" class="uri"&gt;http://lttng.org/files/thesis/desnoyers-dissertation-&lt;nobr&gt;2009-12-v27&lt;/nobr&gt;.pdf&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lwn.net/Articles/379903/" class="uri"&gt;http://lwn.net/Articles/379903/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lwn.net/Articles/381064/" class="uri"&gt;http://lwn.net/Articles/381064/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lwn.net/Articles/383362/" class="uri"&gt;http://lwn.net/Articles/383362/&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;&lt;/li&gt;
 &lt;li&gt;&lt;em&gt;kprobes&lt;/em&gt;: &lt;ul&gt;
 &lt;li&gt;&lt;a href="http://lxr.free-electrons.com/source/Documentation/kprobes.txt?v=3.13"&gt;Documentation/kprobes.txt&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://lwn.net/Articles/132196/"&gt;https://lwn.net/Articles/132196/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://lwn.net/Articles/132196/" class="uri"&gt;https://lwn.net/Articles/132196/&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;&lt;/li&gt;
 &lt;li&gt;&lt;em&gt;perf_events&lt;/em&gt;: &lt;ul&gt;
-&lt;li&gt;&lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/"&gt;http://web.eece.maine.edu/~vweaver/projects/perf_events/&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://lwn.net/Articles/441209/"&gt;https://lwn.net/Articles/441209/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/" class="uri"&gt;http://web.eece.maine.edu/~vweaver/projects/perf_events/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://lwn.net/Articles/441209/" class="uri"&gt;https://lwn.net/Articles/441209/&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;div class="footnotes"&gt;
@@ -1469,14 +1801,14 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;li&gt;Userspace profiling: Valgrind&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Kernel profiling: perf&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
 &lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
 &lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;Quick reminder. I’m&amp;nbsp;trying to&amp;nbsp;understand why my&amp;nbsp;nice little program is&amp;nbsp;doing reading from RAID so&amp;nbsp;slow. I’m&amp;nbsp;using various profiling tools to&amp;nbsp;inspect my&amp;nbsp;&lt;code&gt;block_hasher&lt;/code&gt; and get a&amp;nbsp;&lt;nobr&gt;hands-on&lt;/nobr&gt; experience with profilers.&lt;/p&gt;
 &lt;h2 id="valgrind"&gt;Valgrind&lt;/h2&gt;
-&lt;p&gt;Countrary to&amp;nbsp;popular belief, &lt;em&gt;Valgrind is&amp;nbsp;not a&amp;nbsp;single tool, but a&amp;nbsp;suite of&amp;nbsp;such tools, with &lt;/em&gt;Memcheck_ as&amp;nbsp;default. By&amp;nbsp;the time of&amp;nbsp;writing &lt;em&gt;Valgrind&lt;/em&gt; consists of:&lt;/p&gt;
+&lt;p&gt;Countrary to&amp;nbsp;popular belief, _Valgrind is&amp;nbsp;not a&amp;nbsp;single tool, but a&amp;nbsp;suite of&amp;nbsp;such tools, with &lt;em&gt;Memcheck&lt;/em&gt; as&amp;nbsp;default. By&amp;nbsp;the time of&amp;nbsp;writing &lt;em&gt;Valgrind&lt;/em&gt; consists of:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Memcheck&amp;nbsp;&amp;mdash; memory management errors detection.&lt;/li&gt;
 &lt;li&gt;Cachegrind&amp;nbsp;&amp;mdash; CPU cache access profiling tool.&lt;/li&gt;
@@ -1751,7 +2083,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;li&gt;&lt;a href="/linux/profiling-valgrind.html"&gt;Userspace profiling: Valgrind&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Kernel profiling: perf&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
 &lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
 &lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
@@ -1912,7 +2244,7 @@ block_hasher.c:creating &amp;#39;block_hasher.c.gcov&amp;#39;&lt;/code&gt;&lt;/p
 &lt;li&gt;&lt;a href="/linux/profiling-valgrind.html"&gt;Userspace profiling: Valgrind&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Kernel profiling: perf&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
 &lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
 &lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
@@ -2112,7 +2444,8 @@ T09: 29.88 MB/s f6eb529ee5b59824a657fb8de43c8c6d3e29cb00&lt;/code&gt;&lt;/pre&gt
 &lt;p&gt;You need this stack manipulation later to&amp;nbsp;access your local vars by&amp;nbsp;subtracting from &lt;code&gt;%rbp&lt;/code&gt;. But we&amp;nbsp;were subtratcting from &lt;code&gt;%rsp&lt;/code&gt;, isn’t&amp;nbsp;it&amp;nbsp;strange?&lt;/p&gt;
 &lt;p&gt;Wait a&amp;nbsp;minute&amp;hellip; I&amp;nbsp;decided to&amp;nbsp;draw stack frame and got it!&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/red-zone.png" alt="Stack" /&gt;&lt;p class="caption"&gt;Stack&lt;/p&gt;
+&lt;img src="/assets/img/red-zone.png" alt="Stack" /&gt;
+&lt;p class="caption"&gt;Stack&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;Holy shucks! We&amp;nbsp;are processing undefined memory. All instructions like this&lt;/p&gt;
 &lt;pre class="asm"&gt;&lt;code&gt;movdqa  -24(%rsp), %xmm0&lt;/code&gt;&lt;/pre&gt;

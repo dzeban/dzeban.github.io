@@ -140,7 +140,8 @@
 <p>You need this stack manipulation later to&nbsp;access your local vars by&nbsp;subtracting from <code>%rbp</code>. But we&nbsp;were subtratcting from <code>%rsp</code>, isn’t&nbsp;it&nbsp;strange?</p>
 <p>Wait a&nbsp;minute&hellip; I&nbsp;decided to&nbsp;draw stack frame and got it!</p>
 <div class="figure">
-<img src="/assets/img/red-zone.png" alt="Stack" /><p class="caption">Stack</p>
+<img src="/assets/img/red-zone.png" alt="Stack" />
+<p class="caption">Stack</p>
 </div>
 <p>Holy shucks! We&nbsp;are processing undefined memory. All instructions like this</p>
 <pre class="asm"><code>movdqa  -24(%rsp), %xmm0</code></pre>

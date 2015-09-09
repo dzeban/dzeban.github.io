@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Linux profiling. Perf</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="page-header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">avd</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a href="http://discourse.reduct.ru"><i class="fi-comments"></i>&nbsp;&nbsp;Discuss</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+      <li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+      <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+      <li><a href="http://discourse.reduct.ru"><i class="fi-comments"></i>&nbsp;&nbsp;Discuss</a></li>
+      <li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+      <li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Linux profiling. Perf</h2>
+                            <h6 class="post-meta">
+                              09 Sep 2015, in
+                              <a class="disabled" href="/categories/linux">linux</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>TOC:</p>
+<ol style="list-style-type: decimal">
+<li><a href="/linux/profiling-intro.html">Intro</a></li>
+<li><a href="/linux/profiling-gprof-gcov.html">Userspace profiling: gprof, gcov</a></li>
+<li><a href="/linux/profiling-valgrind.html">Userspace profiling: Valgrind</a></li>
+<li><a href="/linux/profiling-kernel.html">Kernel profiling: Intro</a></li>
+<li><a href="/linux/profiling-ftrace.html">Kernel profiling: ftrace</a></li>
+<li>Kernel profiling: perf</li>
+<li>Kernel profiling: SystemTap</li>
+<li>Kernel profiling: ktap</li>
+<li>Vendor specific profiling: Intel VTune</li>
+</ol>
+<h2 id="perf-overview">Perf overview</h2>
+<p>Perf is&nbsp;a&nbsp;facility comprised of&nbsp;kernel infrastructure for gathering various events and userspace tool to&nbsp;get gathered data from the kernel and analyze it. It&nbsp;is&nbsp;like a&nbsp;<code>gprof</code>, but it&nbsp;is&nbsp;<nobr>non-invasive</nobr>, <nobr>low-overhead</nobr> and profile whole stack, including your app, libraries, system calls AND kernel with CPU!</p>
+<p>The <code>perf</code> tool supports a&nbsp;list of&nbsp;measurable events that you can view with <code>perf list</code> command. The tool and underlying kernel interface can measure events coming from different sources. For instance, some events are pure kernel counters, in&nbsp;this case they are called software events. Examples include: <nobr>context-switches</nobr>, <nobr>minor-faults</nobr>, <nobr>page-faults</nobr> and others.</p>
+<p>Another source of&nbsp;events is&nbsp;the processor itself and its Performance Monitoring Unit (PMU). It&nbsp;provides a&nbsp;list of&nbsp;events to&nbsp;measure <nobr>micro-architectural</nobr> events such as&nbsp;the number of&nbsp;cycles, instructions retired, L1 cache misses and so&nbsp;on. Those events are called &laquo;PMU hardware events&raquo; or&nbsp;&laquo;hardware events&raquo; for short. They vary with each processor type and model&nbsp;&mdash; look at&nbsp;<a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/support.html">this Vince Weaver’s&nbsp;perf page</a> for details</p>
+<p>The &laquo;perf_events&raquo; interface also provides a&nbsp;small set of&nbsp;common hardware events monikers. On&nbsp;each processor, those events get mapped onto an&nbsp;actual events provided by&nbsp;the CPU if&nbsp;they exist, otherwise the event cannot be&nbsp;used. Somewhat confusingly, these are also called hardware events and hardware cache events.</p>
+<p>Finally, there are also tracepoint events which are implemented by&nbsp;the kernel <a href="/linux/profiling-ftrace.html">ftrace</a> infrastructure. Those are only available with the 2.6.3x and newer kernels.</p>
+<p>Thanks to&nbsp;such a&nbsp;variety of&nbsp;events and analysis abilities of&nbsp;userspace tool (see below) <code>perf</code> is&nbsp;a&nbsp;big fish in&nbsp;the world of&nbsp;tracing and profiling of&nbsp;Linux systems. It&nbsp;is&nbsp;a&nbsp;really versatile tool that may be&nbsp;used in&nbsp;several ways of&nbsp;which I&nbsp;know a&nbsp;few:</p>
+<ol style="list-style-type: decimal">
+<li>Record a&nbsp;profile and analyze it&nbsp;later: <code>perf record</code> + <code>perf report</code></li>
+<li>Gather statistics for application or&nbsp;system: <code>perf stat</code></li>
+<li><nobr>Real-time</nobr> <nobr>function-wise</nobr> analysis: <code>perf top</code></li>
+<li>Trace application or&nbsp;system: <code>perf trace</code></li>
+</ol>
+<p>Each of&nbsp;these approaches include tremendous amount of&nbsp;possibilities for sorting, filtering, grouping and so&nbsp;on.</p>
+<p>But as&nbsp;someone said, <code>perf</code> is&nbsp;a&nbsp;powerful tool with a&nbsp;little documentation. So&nbsp;in&nbsp;this article I’ll&nbsp;try to&nbsp;share some of&nbsp;my&nbsp;knowledge about it.</p>
+<h2 id="basic-perf-workflows">Basic perf workflows</h2>
+<h3 id="preflight-check">Preflight check</h3>
+<p>First thing to&nbsp;do&nbsp;when you start working with Perf is&nbsp;to&nbsp;launch <code>perf test</code>. This will check your system and kernel features and report if&nbsp;something isn’t&nbsp;available. Usually, you need to&nbsp;make as&nbsp;much as&nbsp;possible &laquo;OK"s. Beware though that <code>perf</code> will behave differently when launched under &laquo;root&raquo; and ordinary user. It’s&nbsp;smart enough to&nbsp;let you do&nbsp;some things without root priveleges. There is&nbsp;a&nbsp;control file at&nbsp;&laquo;/proc/sys/kernel/perf_event_paranoid&raquo; that you can tweak in&nbsp;order to&nbsp;change access to&nbsp;perf events:</p>
+<pre><code>$ perf stat -a
+Error:
+You may not have permission to collect system-wide stats.
+Consider tweaking /proc/sys/kernel/perf_event_paranoid:
+ -1 - Not paranoid at all
+  0 - Disallow raw tracepoint access for unpriv
+  1 - Disallow cpu events for unpriv
+  2 - Disallow kernel profiling for unpriv</code></pre>
+<p>After you played with <code>perf test</code>, you can see what hardware events are available to&nbsp;you with <code>perf list</code>. Again, the list will differ depending on&nbsp;current user id. Also, the amount of&nbsp;events will depend on&nbsp;your hardware: x86_64 CPUs have much more hardware events than some <nobr>low-end</nobr> ARM processors.</p>
+<h3 id="system-statistics">System statistics</h3>
+<p>Now to&nbsp;some real profiling. To&nbsp;check general health of&nbsp;your system you can gather statistics with <code>perf stat</code>.</p>
+<pre><code># perf stat -a sleep 5
+
+ Performance counter stats for &#39;system wide&#39;:
+
+      20005.830934      task-clock (msec)         #    3.999 CPUs utilized            (100.00%)
+             4,236      context-switches          #    0.212 K/sec                    (100.00%)
+               160      cpu-migrations            #    0.008 K/sec                    (100.00%)
+             2,193      page-faults               #    0.110 K/sec                  
+     2,414,170,118      cycles                    #    0.121 GHz                      (83.35%)
+     4,196,068,507      stalled-cycles-frontend   #  173.81% frontend cycles idle     (83.34%)
+     3,735,211,886      stalled-cycles-backend    #  154.72% backend  cycles idle     (66.68%)
+     2,109,428,612      instructions              #    0.87  insns per cycle        
+                                                  #    1.99  stalled cycles per insn  (83.34%)
+       406,168,187      branches                  #   20.302 M/sec                    (83.32%)
+         6,869,950      branch-misses             #    1.69% of all branches          (83.32%)
+
+       5.003164377 seconds time elapsed</code></pre>
+<p>Here you can see how many context switches, migrations, page faults and other events happened during 5 seconds, along with some simple calculations. In&nbsp;fact <code>perf</code> tool highlight statistics that you should worry about. In&nbsp;my&nbsp;case it’s&nbsp;a&nbsp;<nobr>stalled-cycles-frontend</nobr>/backend. This counter shows how much time CPU pipeline is&nbsp;stalled (i.e. not advanced) due to&nbsp;some external cause like waiting for memory access.</p>
+<p>Along with <code>perf stat</code> you have <code>perf top</code>&nbsp;&mdash; a&nbsp;<code>top</code> like utility, but that works <nobr>symbol-wise</nobr>.</p>
+<pre><code># perf top -a --stdio
+
+PerfTop:     361 irqs/sec  kernel:35.5%  exact:  0.0% [4000Hz cycles],  (all, 4 CPUs)
+----------------------------------------------------------------------------------------
+
+ 2.06%  libglib-2.0.so.0.4400.1     [.] g_mutex_lock                   
+ 1.99%  libglib-2.0.so.0.4400.1     [.] g_mutex_unlock                 
+ 1.47%  [kernel]                    [k] __fget                         
+ 1.34%  libpython2.7.so.1.0         [.] PyEval_EvalFrameEx             
+ 1.07%  [kernel]                    [k] copy_user_generic_string       
+ 1.00%  libpthread-2.21.so          [.] pthread_mutex_lock             
+ 0.96%  libpthread-2.21.so          [.] pthread_mutex_unlock           
+ 0.85%  libc-2.21.so                [.] _int_malloc                    
+ 0.83%  libpython2.7.so.1.0         [.] PyParser_AddToken              
+ 0.82%  [kernel]                    [k] do_sys_poll                    
+ 0.81%  libQtCore.so.4.8.6          [.] QMetaObject::activate          
+ 0.77%  [kernel]                    [k] fput                           
+ 0.76%  [kernel]                    [k] __audit_syscall_exit           
+ 0.75%  [kernel]                    [k] unix_stream_recvmsg            
+ 0.63%  [kernel]                    [k] ia32_sysenter_target           </code></pre>
+<p>Here you can see kernel functions, glib library functions, CPython functions, Qt&nbsp;framework functions and a&nbsp;pthread functions combined with its overhead. It’s&nbsp;a&nbsp;great tool to&nbsp;peek into system state to&nbsp;see what’s&nbsp;going on.</p>
+<h3 id="application-profiling">Application profiling</h3>
+<p>To&nbsp;profile particular application, either already running or&nbsp;not, you use <code>perf record</code> to&nbsp;collect events and then <code>perf report</code> to&nbsp;analyze program behavior. Let’s&nbsp;see:</p>
+<pre><code># perf record -bag updatedb
+[ perf record: Woken up 259 times to write data ]
+[ perf record: Captured and wrote 65.351 MB perf.data (127127 samples) ]</code></pre>
+<p>Now dive into data with <code>perf report</code>:</p>
+<pre><code># perf report</code></pre>
+<p>You will see a&nbsp;nice interactive TUI interface.</p>
+<div class="figure">
+<img src="/assets/img/perf-tui.png" alt="perf tui" />
+<p class="caption">perf tui</p>
+</div>
+<p>You can zoom into pid/thread</p>
+<div class="figure">
+<img src="/assets/img/perf-zoom-into-thread.png" alt="perf zoom into thread" />
+<p class="caption">perf zoom into thread</p>
+</div>
+<p>and see what’s&nbsp;going on&nbsp;there</p>
+<div class="figure">
+<img src="/assets/img/perf-thread-info.png" alt="perf thread info" />
+<p class="caption">perf thread info</p>
+</div>
+<p>You can look into nice assembly code (this looks almost as&nbsp;in&nbsp;<a href="http://www.radare.org/r/">radare</a>)</p>
+<div class="figure">
+<img src="/assets/img/perf-assembly.png" alt="perf assembly" />
+<p class="caption">perf assembly</p>
+</div>
+<p>and run scripts on&nbsp;it&nbsp;to&nbsp;see, for example, function calls histogram:</p>
+<div class="figure">
+<img src="/assets/img/perf-histogram.png" alt="perf histogram" />
+<p class="caption">perf histogram</p>
+</div>
+<p>If&nbsp;it’s&nbsp;not enough to&nbsp;you, there are a&nbsp;lot of&nbsp;options both for <code>perf record</code> and <code>perf report</code> so&nbsp;play with it.</p>
+<h3 id="other">Other</h3>
+<p>In&nbsp;addition to&nbsp;that you can find tools to&nbsp;profile kernel memory subsystem, locking, kvm guests, scheduling, do&nbsp;benchmarking and even create timecharts.</p>
+<p>Now let’s&nbsp;try to&nbsp;solve <a href="/linux/profiling-intro.html">our problem with <code>block_hasher</code></a> with help of&nbsp;<code>perf</code>.</p>
+<h2 id="hot-spots-profiling">Hot spots profiling</h2>
+<p>All right, as&nbsp;we&nbsp;saw <a href="/linux/profiling-gprof-gcov.html#not-application">previously</a> we&nbsp;spend time in&nbsp;kernel waiting for I/O. Let’s&nbsp;see if&nbsp;<code>perf</code> can help us.</p>
+<p>Start with <code>perf stat</code> giving options for detailed and scaled counters for CPU (&laquo;-dac&raquo;)</p>
+<pre><code># perf stat -dac ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000
+
+ Performance counter stats for &#39;system wide&#39;:
+
+      32978.276562      task-clock (msec)         #    4.000 CPUs utilized            (100.00%)
+             6,349      context-switches          #    0.193 K/sec                    (100.00%)
+               142      cpu-migrations            #    0.004 K/sec                    (100.00%)
+             2,709      page-faults               #    0.082 K/sec                  
+    20,998,366,508      cycles                    #    0.637 GHz                      (41.08%)
+    23,007,780,670      stalled-cycles-frontend   #  109.57% frontend cycles idle     (37.50%)
+    18,687,140,923      stalled-cycles-backend    #   88.99% backend  cycles idle     (42.64%)
+    23,466,705,987      instructions              #    1.12  insns per cycle        
+                                                  #    0.98  stalled cycles per insn  (53.74%)
+     4,389,207,421      branches                  #  133.094 M/sec                    (55.51%)
+        11,086,505      branch-misses             #    0.25% of all branches          (55.53%)
+     7,435,101,164      L1-dcache-loads           #  225.455 M/sec                    (37.50%)
+       248,499,989      L1-dcache-load-misses     #    3.34% of all L1-dcache hits    (26.52%)
+       111,621,984      LLC-loads                 #    3.385 M/sec                    (28.77%)
+   &lt;not supported&gt;      LLC-load-misses:HG       
+
+       8.245518548 seconds time elapsed</code></pre>
+<p>Well, nothing really suspicious. 6K page context switches is&nbsp;OK&nbsp;because my&nbsp;machine is&nbsp;<nobr>2-core</nobr> and I’m&nbsp;running 10 threads. 2K page faults is&nbsp;fine since we’re&nbsp;reading a&nbsp;lot of&nbsp;data from disks. Big <nobr>stalled-cycles-frontend</nobr>/backend is&nbsp;kind of&nbsp;outliers here since it’s&nbsp;still big on&nbsp;simple <code>ls</code> and <code>-<nobr>per-core</nobr></code> statistics shows 0.00% percents of&nbsp;<nobr>stalled-cycles</nobr>.</p>
+<p>Let’s&nbsp;collect profile:</p>
+<pre><code># perf record -a -g -s -d -b ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000
+[ perf record: Woken up 73 times to write data ]
+[ perf record: Captured and wrote 20.991 MB perf.data (33653 samples) ]</code></pre>
+<p>Options are:</p>
+<ul>
+<li>-a for all CPUs</li>
+<li>-g for call graphs</li>
+<li>-s for per thread count</li>
+<li>-d for sampling addresses. Not sure about this one, but it&nbsp;doesn’t&nbsp;affect profile</li>
+<li>-b for sample any taken branches</li>
+</ul>
+<p>Now show me&nbsp;the profile:</p>
+<pre><code># perf report -g -T</code></pre>
+<div class="figure">
+<img src="/assets/img/perf-report-block-hasher.png" alt="perf report of block_hasher" />
+<p class="caption">perf report of&nbsp;block_hasher</p>
+</div>
+<p>Nothing much. I’ve&nbsp;looked into block_hasher threads, I’ve&nbsp;built a&nbsp;histogram, looked for vmlinux DSO, found instruction with most overhead</p>
+<div class="figure">
+<img src="/assets/img/perf-lock-acquire-assembly.png" alt="perf __lock_acquire" />
+<p class="caption">perf __lock_acquire</p>
+</div>
+<p>and still can’t&nbsp;say I&nbsp;found what’s&nbsp;wrong. That’s&nbsp;because there is&nbsp;no&nbsp;real overhead, nothing is&nbsp;spinning in&nbsp;vain. Something is&nbsp;just plain sleeping.</p>
+<p>What we’ve&nbsp;done here and <a href="/linux/profiling-ftrace.html">before in&nbsp;ftrace part</a> is&nbsp;a&nbsp;hot spots analysis, i.e. we&nbsp;try to&nbsp;find places in&nbsp;our application or&nbsp;system that cause CPU to&nbsp;spin in&nbsp;useless cycles. Usually, it’s&nbsp;what you want but not today. We&nbsp;need to&nbsp;understand why <code>pread</code> is&nbsp;sleeping. And that’s&nbsp;what I&nbsp;call &laquo;latency profiling&raquo;.</p>
+<h2 id="latency-profiling">Latency profiling</h2>
+<h3 id="record-sched_stat-and-sched_switch-events">Record sched_stat and sched_switch events</h3>
+<p>When you search for perf documentation, first thing you find is&nbsp;<a href="https://perf.wiki.kernel.org/index.php/Tutorial">&laquo;Perf tutorial&raquo;</a>. The &laquo;perf tutorial&raquo; page is&nbsp;almost entirely dedicated to&nbsp;the &laquo;hot spots&raquo; scenario, but, fortunately, there is&nbsp;an&nbsp;&laquo;Other scenarios&raquo; section with <a href="https://perf.wiki.kernel.org/index.php/Tutorial#Other_Scenarios">&laquo;Profiling sleep times&raquo;</a> tutorial.</p>
+<blockquote>
+<p>Profiling sleep times</p>
+<p>This feature shows where and how long a&nbsp;program is&nbsp;sleeping or&nbsp;waiting something.</p>
+</blockquote>
+<p>Whoa, that’s&nbsp;what we&nbsp;need!</p>
+<p>Unfortunately scheduling stats profiling is&nbsp;not working by&nbsp;default. <code>perf inject</code> failing with</p>
+<pre><code># perf inject -v -s -i perf.data.raw -o perf.data
+registering plugin: /usr/lib64/traceevent/plugins/plugin_kmem.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_mac80211.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_function.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_hrtimer.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_sched_switch.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_jbd2.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_cfg80211.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_scsi.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_xen.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_kvm.so
+overriding event (263) sched:sched_switch with new print handler
+build id event received for [kernel.kallsyms]:
+8adbfad59810c80cb47189726415682e0734788a
+failed to write feature 2</code></pre>
+<p>The reason is&nbsp;that it&nbsp;can’t&nbsp;find in&nbsp;<nobr>build-id</nobr> cache scheduling stats symbols because CONFIG_SCHEDSTATS is&nbsp;disabled because it&nbsp;introduces some &laquo;<nobr>non-trivial</nobr> performance impact for context switches&raquo;. Details in&nbsp;Red Hat bugzilla <a href="https://bugzilla.redhat.com/show_bug.cgi?id=1026506">Bug 1026506</a> and <a href="https://bugzilla.redhat.com/show_bug.cgi?id=1013225">Bug 1013225</a>. Debian kernels also don’t&nbsp;enable this option.</p>
+<p>You can recompile kernel enabling &laquo;Collect scheduler statistics&raquo; in&nbsp;<code>make menuconfig</code>, but happy Fedora users can just install <a href="http://pkgs.fedoraproject.org/cgit/kernel.git/commit/?id=73e4f49352c74eeb2d0b951c47adf0b53278f84b">debug kernel</a>:</p>
+<pre><code>dnf install kernel-debug kernel-debug-devel kernel-debug-debuginfo</code></pre>
+<p>Now, when everything works, we&nbsp;can give it&nbsp;a&nbsp;try:</p>
+<pre><code># perf record -e sched:sched_stat_sleep -e sched:sched_switch  -e sched:sched_process_exit -g -o perf.data.raw ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.564 MB perf.data.raw (2001 samples) ]
+
+# perf inject -v -s -i perf.data.raw -o perf.data.sched
+registering plugin: /usr/lib64/traceevent/plugins/plugin_kmem.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_mac80211.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_function.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_hrtimer.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_sched_switch.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_jbd2.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_cfg80211.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_scsi.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_xen.so
+registering plugin: /usr/lib64/traceevent/plugins/plugin_kvm.so
+overriding event (266) sched:sched_switch with new print handler
+build id event received for /usr/lib/debug/lib/modules/4.1.6-200.fc22.x86_64+debug/vmlinux: c6e34bcb0ab7d65e44644ea2263e89a07744bf85
+Using /root/.debug/.build-id/c6/e34bcb0ab7d65e44644ea2263e89a07744bf85 for symbols</code></pre>
+<p>But it’s&nbsp;really disappointing, I’ve&nbsp;expanded all callchains to&nbsp;see nothing:</p>
+<pre><code># perf report --show-total-period -i perf.data.sched
+Samples: 10  of event &#39;sched:sched_switch&#39;, Event count (approx.): 31403254575
+  Children      Self        Period  Command       Shared Object                           Symbol                                      
+-  100.00%     0.00%             0  block_hasher  libpthread-2.21.so                      [.] pthread_join                            
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] system_call                             
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] sys_futex                               
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] do_futex                                
+     do_futex                                                                                                                         
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] futex_wait                              
+     futex_wait                                                                                                                       
+     do_futex                                                                                                                         
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] futex_wait_queue_me                     
+     futex_wait_queue_me                                                                                                              
+     futex_wait                                                                                                                       
+     do_futex                                                                                                                         
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%     0.00%             0  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] schedule                                
+     schedule                                                                                                                         
+     futex_wait_queue_me                                                                                                              
+     futex_wait                                                                                                                       
+     do_futex                                                                                                                         
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-  100.00%   100.00%   31403254575  block_hasher  e34bcb0ab7d65e44644ea2263e89a07744bf85  [k] __schedule                              
+     __schedule                                                                                                                       
+     schedule                                                                                                                         
+     futex_wait_queue_me                                                                                                              
+     futex_wait                                                                                                                       
+     do_futex                                                                                                                         
+     sys_futex                                                                                                                        
+     system_call                                                                                                                      
+   - pthread_join                                                                                                                     
+        0                                                                                                                             
+-   14.52%     0.00%             0  block_hasher  [unknown]                               [.] 0000000000000000                        
+     0                                                                                                                </code></pre>
+<h3 id="perf-sched">perf sched</h3>
+<p>Let’s&nbsp;see what else can we&nbsp;do. There is&nbsp;a&nbsp;<code>perf sched</code> command that has <code>latency</code> subcommand to&nbsp;&laquo;report the per task scheduling latencies and other scheduling properties of&nbsp;the workload&raquo;. Why not give it&nbsp;a&nbsp;shot?</p>
+<pre><code># perf sched record -o perf.sched -g ./block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000
+[ perf record: Woken up 6 times to write data ]
+[ perf record: Captured and wrote 13.998 MB perf.sched (56914 samples) ]
+
+# perf report -i perf.sched</code></pre>
+<p>I’ve&nbsp;inspected samples for <code>sched_switch</code> and <code>sched_stat_runtime</code> events (15K and 17K respectively) and found nothing. But then I&nbsp;looked in&nbsp;<code>sched_stat_iowait</code>.</p>
+<div class="figure">
+<img src="/assets/img/perf-sched-stat-iowait.png" alt="perf sched_stat_iowait" />
+<p class="caption">perf sched_stat_iowait</p>
+</div>
+<p>and there I&nbsp;found really suspicious thing:</p>
+<div class="figure">
+<img src="/assets/img/perf-dm-delay.png" alt="perf dm-delay" />
+<p class="caption">perf <nobr>dm-delay</nobr></p>
+</div>
+<p>See? Almost all symbols come from &laquo;kernel.vmlinux&raquo; shared object, but one with strange name &laquo;0&times;000000005f8ccc27&raquo; comes from &laquo;dm_delay&raquo; object. Wait, what is&nbsp;&laquo;dm_delay&raquo;? Quick find gives us&nbsp;the answer:</p>
+<pre><code>&gt; dm-delay
+&gt; ========
+&gt;
+&gt; Device-Mapper&#39;s &quot;delay&quot; target delays reads and/or writes
+&gt; and maps them to different devices.</code></pre>
+<p>WHAT?! Delays reads and/or writes? Really?</p>
+<pre><code># dmsetup info 
+Name:              delayed
+State:             ACTIVE
+Read Ahead:        256
+Tables present:    LIVE
+Open count:        1
+Event number:      0
+Major, minor:      253, 0
+Number of targets: 1
+
+# dmsetup table
+delayed: 0 1000000 delay 1:7 0 30
+
+# udevadm info -rq name /sys/dev/block/1:7
+/dev/ram7</code></pre>
+<p>So, we&nbsp;have block device &laquo;/dev/ram7&raquo; mapped to&nbsp;DeviceMapper &laquo;delay&raquo; target to, well, delay I/O requests to&nbsp;30 milliseconds. That’s&nbsp;why whole RAID was slow&nbsp;&mdash; performance of&nbsp;RAID0 is&nbsp;performance of&nbsp;a&nbsp;slowest disk in&nbsp;RAID.</p>
+<p>Of&nbsp;course, I&nbsp;knew it&nbsp;from the beginning. I&nbsp;just wanted to&nbsp;see if&nbsp;I’ll&nbsp;be&nbsp;able to&nbsp;detect it&nbsp;with profiling tools. And in&nbsp;this case I&nbsp;don’t&nbsp;think it’s&nbsp;fair to&nbsp;say that <code>perf</code> helped. Actually, <code>perf</code> gives a&nbsp;lot of&nbsp;confusion in&nbsp;the interface. Look at&nbsp;the picture above. What are these couple of&nbsp;dozens lines with &laquo;99.67%" tell us? Which of&nbsp;these symbols cause latency? How to&nbsp;interpret it? If&nbsp;I&nbsp;wasn’t&nbsp;really attentive, like after couple of&nbsp;hours of&nbsp;debugging and investigating, I&nbsp;couldn’t&nbsp;be&nbsp;able to&nbsp;notice it. If&nbsp;I&nbsp;issued the magic <code>perf inject</code> command it&nbsp;will collapse <code>sched_stat_iowait</code> command and I’ll&nbsp;not see <nobr>dm-delay</nobr> in&nbsp;top records.</p>
+<p>Again, this is&nbsp;all are very confusing and it’s&nbsp;just a&nbsp;fortune that I’ve&nbsp;noticed it.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Perf is&nbsp;really versatile and extremely complex tool with a&nbsp;little documentation. On&nbsp;some simple cases it&nbsp;will help you a&nbsp;LOT. But a&nbsp;few steps from the mainstream problems and you are left alone with unintuitive data. We&nbsp;all need various documentation on&nbsp;perf&nbsp;&mdash; tutorials, books, slides, videos&nbsp;&mdash; that not only scratch the surface of&nbsp;it&nbsp;but gives a&nbsp;comprehensive overview of&nbsp;how it&nbsp;works, what it&nbsp;can do&nbsp;and what it&nbsp;doesn’t. I&nbsp;hope I&nbsp;have contributed to&nbsp;that purpose with this article (it&nbsp;took me&nbsp;half a&nbsp;year to&nbsp;write it).</p>
+<h2 id="references">References</h2>
+<ol style="list-style-type: decimal">
+<li><a href="https://perf.wiki.kernel.org/index.php/Tutorial">Perf tutorial</a></li>
+<li><a href="http://web.eece.maine.edu/~vweaver/projects/perf_events">Vince Weaver’s&nbsp;perf page</a></li>
+<li><a href="http://www.brendangregg.com/perf.html">Beautiful Brendan Gregg’s&nbsp;&laquo;perf&raquo; page</a></li>
+</ol>
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2015 avd
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>

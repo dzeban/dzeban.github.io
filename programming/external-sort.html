@@ -366,12 +366,14 @@ Range is 1000000
 </ul>
 <p>As&nbsp;for sorting here is&nbsp;a&nbsp;result table:</p>
 <table>
+<colgroup>
 <col width="14%" />
 <col width="14%" />
 <col width="14%" />
 <col width="16%" />
 <col width="28%" />
 <col width="10%" />
+</colgroup>
 <thead>
 <tr class="header">
 <th align="left">Test case</th>
@@ -420,7 +422,7 @@ Range is 1000000
 <li id="fn2"><p>libmemrestrict gets a&nbsp;configuration from environment. Common practice for libraries, for example <code>LD_PRELOAD</code> and <code>LD_LIBRARY_PATH</code> are <nobr>well-known</nobr> environment variables for <nobr>ld-linux</nobr>.so, and there is&nbsp;also less known, but extremely useful <code>LD_DEBUG</code> environment variable for <a href="http://www.bnikolic.co.uk/blog/linux-ld-debug.html">linkage debugging</a>.<a href="#fnref2">&#8617;</a></p></li>
 <li id="fn3"><p>It’s&nbsp;strange because qsort is&nbsp;<nobr>in-place</nobr> and uses optimizations suggested by&nbsp;Robert Sedgewick to, among others, guarantee O(log n) space complexity. You can dive into <a href="https://sourceware.org/git/?p=glibc.git;a=blob;f=stdlib/qsort.c;h=04c25b984f74a8f738233cc6da8a738b6437833c;hb=b8079dd0d360648e4e8de48656c5c38972621072">glibc qsort implementation.</a><a href="#fnref3">&#8617;</a></p></li>
 <li id="fn4"><p>There is&nbsp;a&nbsp;strange behaviour though. For example, if&nbsp;I&nbsp;restrict memory for 5.3 MB&nbsp;it&nbsp;will work and <em>not</em> require O(n) memory. I’m&nbsp;still investigating on&nbsp;this.<a href="#fnref4">&#8617;</a></p></li>
-<li id="fn5"><p><a href="http://en.wikipedia.org/wiki/X86-64#Virtual_address_space_details">http://en.wikipedia.org/wiki/<nobr>X86-64</nobr>#Virtual_address_space_details</a><a href="#fnref5">&#8617;</a></p></li>
+<li id="fn5"><p><a href="http://en.wikipedia.org/wiki/X86-64#Virtual_address_space_details" class="uri">http://en.wikipedia.org/wiki/<nobr>X86-64</nobr>#Virtual_address_space_details</a><a href="#fnref5">&#8617;</a></p></li>
 <li id="fn6"><p>Note that <strong>MiB</strong> is&nbsp;2<sup>20</sup> and <strong>MB</strong> is&nbsp;10<sup>6</sup> = 1 million. So&nbsp;500 MB&nbsp;= 500&nbsp;000&nbsp;000 bytes which is&nbsp;500&nbsp;000&nbsp;000 &gt;&gt; 20 = 476 MiB.<a href="#fnref6">&#8617;</a></p></li>
 <li id="fn7"><p>Plus extra 500 KB&nbsp;for temporary strings holding chunks paths.<a href="#fnref7">&#8617;</a></p></li>
 <li id="fn8"><p>In&nbsp;this way it’s&nbsp;kind of&nbsp;<nobr>N-way</nobr> merge.<a href="#fnref8">&#8617;</a></p></li>
