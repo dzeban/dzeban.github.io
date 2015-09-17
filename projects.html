@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+  <title>Projects | Alex Dzyoba</title>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+
+<body>
+  <div class="wrapper">
+    <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="page-header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+    <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">Alex Dzyoba</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="http://discourse.reduct.ru"><i class="fi-comments"></i>&nbsp;&nbsp;Discuss</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="http://discourse.reduct.ru"><i class="fi-comments"></i>&nbsp;&nbsp;Discuss</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+  </ul>
+</div>
+
+            <div class="large-10 small-12 columns">
+                <div class="contacts">
+                    <h1 id="my-projects">My&nbsp;projects</h1>
+<p>From time to&nbsp;time I&nbsp;write some software that I&nbsp;release open source. Here are the list of&nbsp;most notable software I’ve&nbsp;built over the years.</p>
+<h2 id="git-journal">Git journal</h2>
+<p><i class="fi-web"></i> <a href="http://alex.dzyoba.com/git-journal">Project page</a> <i class="fi-social-github"></i> <a href="https://github.com/dzeban/git-journal">Source code</a></p>
+<p>When you grasp core git concepts you start using it&nbsp;for everything you can. This happened to&nbsp;me&nbsp;and I’ve&nbsp;created &laquo;Git Journal&raquo;.</p>
+<p>When you developing some large project it’s&nbsp;often useful to&nbsp;keep &laquo;Lab journal&raquo; to&nbsp;track your progress, thought process and things to&nbsp;care. But most of&nbsp;the tools force you to&nbsp;linear thinking, while humans’ (at&nbsp;least me) thought are more like a&nbsp;graph. And here is&nbsp;where wild git appears.</p>
+<p>Git is&nbsp;essentially a&nbsp;directed acyclic graph with handy, though terse, interface. You can quickly make it&nbsp;to&nbsp;help you track your work as&nbsp;a&nbsp;series of&nbsp;commits with all the git features&nbsp;&mdash; branches, merging, rebasing and so&nbsp;on. And it&nbsp;will be&nbsp;saved, consistend and neat. Check it&nbsp;out!</p>
+<h2 id="block-hasher">Block hasher</h2>
+<p><i class="fi-web"></i> <a href="http://alex.dzyoba.com/block_hasher">Project page</a> <i class="fi-social-github"></i> <a href="https://github.com/dzeban/block_hasher">Source code</a></p>
+<p>Simple utility to&nbsp;read block device in&nbsp;multiple threads,calculate I/O throughput and compute hash sum for each thread. Thus, it&nbsp;allows you to&nbsp;check performance and integrity of&nbsp;I/O device.</p>
+<p>I&nbsp;wrote this utility to&nbsp;test my&nbsp;SSD cache solution for data corruptions and bottlenecks when I&nbsp;was working at&nbsp;<a href="http://www.raidix.com">Raidix</a>.</p>
+<h2 id="anatolik">Anatolik</h2>
+<p><i class="fi-web"></i> <a href="http://alex.dzyoba.com/anatolik">Project page</a> <i class="fi-social-github"></i> <a href="https://github.com/dzeban/anatolik">Source code</a></p>
+<p>Funny static blog engine that is&nbsp;made as&nbsp;simple as&nbsp;possible but not simpler. It’s&nbsp;written in&nbsp;Python 3 with Mako templates. I’ve&nbsp;built it&nbsp;because <a href="http://getpelican.com">Pelican</a> was too heavy for me&nbsp;and <a href="https://jekyllrb.com/">Jekyll</a> feels alien because of&nbsp;Ruby.</p>
+<p>This blog is&nbsp;generated with Anatolik (of&nbsp;course).</p>
+<h2 id="vim-log-syntax">Vim Log Syntax</h2>
+<p><i class="fi-web"></i> <a href="http://alex.dzyoba.com/vim-log-syntax">Project page</a> <i class="fi-social-github"></i> <a href="https://github.com/dzeban/vim-log-syntax">Source code</a></p>
+<p>I&nbsp;write system software and usually such software doesn’t&nbsp;have any good facility to&nbsp;debug and inspect code except logs. Large amount of&nbsp;logs.</p>
+<p>All that logs I&nbsp;read in&nbsp;my&nbsp;primary editor&nbsp;&mdash; Vim. To&nbsp;help detect problems in&nbsp;logs I’ve&nbsp;created syntax file for Vim to&nbsp;highlight Error and Warning messages, dates, strings and hex numbers.</p>
+<p><a href="/assets/img/vim-log-syntax-compare.png">Compare</a> with how you see it&nbsp;usual:</p>
+<div class="figure">
+<img src="/assets/img/vim-log-syntax-on.png" alt="Vim Log Syntax screenshot" />
+<p class="caption">Vim Log Syntax screenshot</p>
+</div>
+<p>Believe me, it’s&nbsp;REALLY helpful!</p>
+<h2 id="keymon">Keymon</h2>
+<p><i class="fi-web"></i> <a href="http://alex.dzyoba.com/keymon">Project page</a> <i class="fi-social-github"></i> <a href="https://github.com/dzeban/keymon">Source code</a></p>
+<p>Keymon is&nbsp;a&nbsp;Linux kernel module that receives keyboard presses and send it&nbsp;to&nbsp;the userspace daemon via netlink socket. Daemon collects raw keyboard notifications to&nbsp;BerkeleyDB that you can analyze later with python script.</p>
+<p>It’s&nbsp;a&nbsp;great example of&nbsp;using generic netlink sockets both in&nbsp;kernel and in&nbsp;userspace.</p>
+<h2 id="feedparser">FeedParser</h2>
+<p><i class="fi-web"></i> <a href="http://alex.dzyoba.com/FeedParser">Project page</a> <i class="fi-social-github"></i> <a href="https://github.com/dzeban/FeedParser">Source code</a></p>
+<p>FeedParser is&nbsp;a&nbsp;<acronym title="Hypertext Preprocessor" lang="en">PHP</acronym> library that provides unified interface for parsing all kinds of&nbsp;RSS/Atom feeds.</p>
+                </div>
+            </div>
+        </div>
+        <div class="push"></div>
+  </div>
+  <div class="footer">
+    <div class="row">
+    &copy; 2015 Alex Dzyoba
+    </div>
+</div>
+
+  <script src="/assets/js/vendor/jquery.js"></script>
+  <script src="/assets/js/foundation.min.js"></script>
+  <script>
+    $(document).foundation();
+  </script>
+</body>
+</html>
+

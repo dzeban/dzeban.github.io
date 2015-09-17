@@ -50,6 +50,11 @@ pre {
     padding: 1em;    
 }
 
+.project-links {
+    padding-top: 0.5em;
+    padding-bottom: 1em;
+}
+
 /* Disabled link for categories */
 a.disabled {
     pointer-events: none;
