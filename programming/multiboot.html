@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Multiboot kernel | Alex Dzyoba</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="page-header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">Alex Dzyoba</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="http://discourse.reduct.ru"><i class="fi-comments"></i>&nbsp;&nbsp;Discuss</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="http://discourse.reduct.ru"><i class="fi-comments"></i>&nbsp;&nbsp;Discuss</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/contacts.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;Contacts</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Multiboot kernel</h2>
+                            <h6 class="post-meta">
+                              28 Sep 2015, in
+                              <a class="disabled" href="/categories/programming">programming</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>As&nbsp;a&nbsp;headcase, in&nbsp;my&nbsp;spare time (among other things) I’m&nbsp;writing an&nbsp;operating system kernel. There is&nbsp;nothing much at&nbsp;this moment because I’m&nbsp;digging into boot process of&nbsp;x86 system<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>. And, to&nbsp;commit my&nbsp;knowledge so&nbsp;far, I’ll&nbsp;explain first simple but really important steps of&nbsp;booting trivial kernel.</p>
+<h2 id="the-kernel">The &laquo;kernel&raquo;</h2>
+<p>For illustrations I’m&nbsp;gonna use &laquo;Hello world&raquo; kernel that is&nbsp;written in&nbsp;NASM assembly (grab the source <a href="http://github.com/dzeban/hello-kernel">from github</a>):</p>
+<pre class="sourceCode nasm"><code class="sourceCode nasm">    <span class="kw">global</span> start                    <span class="co">; the entry symbol for ELF</span>
+
+    MAGIC_NUMBER <span class="dt">equ</span> <span class="bn">0x1BADB002</span>     <span class="co">; define the magic number constant</span>
+    FLAGS        <span class="dt">equ</span><span class="bn"> 0x0            </span><span class="co">; multiboot flags</span>
+    CHECKSUM     <span class="dt">equ</span> -MAGIC_NUMBER  <span class="co">; calculate the checksum</span>
+                                    <span class="co">; (magic number + checksum + flags should equal 0)</span>
+
+    <span class="kw">section</span> .text:                  <span class="co">; start of the text (code) section</span>
+    <span class="kw">align</span> <span class="dv">4</span>                         <span class="co">; the code must be 4 byte aligned</span>
+        <span class="dt">dd</span> MAGIC_NUMBER             <span class="co">; write the magic number to the machine code,</span>
+        <span class="dt">dd</span> FLAGS                    <span class="co">; the flags,</span>
+        <span class="dt">dd</span> CHECKSUM                 <span class="co">; and the checksum</span>
+
+<span class="fu">    start:</span>                          <span class="co">; the loader label (defined as entry point in linker script)</span>
+      <span class="kw">mov</span> <span class="kw">ebx</span>, <span class="bn">0xb8000</span> <span class="co">; VGA area base</span>
+      <span class="kw">mov</span> <span class="kw">ecx</span>, <span class="dv">80</span>*<span class="dv">25</span> <span class="co">; console size</span>
+
+      <span class="co">; Clear screen</span>
+      <span class="kw">mov</span> <span class="kw">edx</span>, <span class="bn">0x0020</span><span class="co">;  space symbol (0x20) on black background</span>
+<span class="fu">    clear_loop:</span>
+      <span class="kw">mov</span> [<span class="kw">ebx</span> + <span class="kw">ecx</span>], <span class="kw">edx</span>
+      <span class="kw">dec</span> <span class="kw">ecx</span>
+      <span class="kw">cmp</span> <span class="kw">ecx</span>, -<span class="dv">1</span>
+      <span class="kw">jnz</span> clear_loop
+      
+      <span class="co">; Print red &#39;A&#39;</span>
+      <span class="kw">mov</span> <span class="kw">eax</span>, ( <span class="dv">4</span> &lt;&lt; <span class="dv">8</span> | <span class="bn">0x41</span>) <span class="co">; &#39;A&#39; symbol (0x41) print in red (0x4)</span>
+      <span class="kw">mov</span> [<span class="kw">ebx</span>], <span class="kw">eax</span>
+
+<span class="fu">    .loop:</span>
+        <span class="kw">jmp</span> .<span class="kw">loop</span>                   <span class="co">; loop forever</span></code></pre>
+<p>This kernel works with VGA buffer&nbsp;&mdash; it&nbsp;clears the screen from the old BIOS messages and print capital ‘A’ letter in&nbsp;red. After it, it&nbsp;just loop forever.</p>
+<p>Compile it&nbsp;with</p>
+<pre><code>nasm -f elf32 kernel.S -o kernel.o</code></pre>
+<p><code>nasm</code> generates object file, which is&nbsp;NOT suitable for executing because its addresses need to&nbsp;be&nbsp;relocated from base address <code>0&times;0</code>, combined with other section, resolve external symbols and so&nbsp;on. This is&nbsp;a&nbsp;job of&nbsp;the linker program.</p>
+<p>When compiling program for userspace application <code>gcc</code> will invoke linker for you with default linker script. But for kernel space code you must provide your own link script that will tell where to&nbsp;put various sections of&nbsp;the code. Our kernel code has only <code>.text</code> section, no&nbsp;stack or&nbsp;heap, and multiboot header is&nbsp;hardcoded into <code>.text</code> section. So&nbsp;link script is&nbsp;pretty simple:</p>
+<pre><code>ENTRY(start)                /* the name of the entry label */
+
+SECTIONS {
+    . = 0x00100000;          /* the code should be loaded at 1 MB */
+
+    .text ALIGN (0x1000) :   /* align at 4 KB */
+    {
+        *(.text)             /* all text sections from all files */
+    }
+}</code></pre>
+<p>I’ve&nbsp;already touched linking part in&nbsp;<a href="http://alex.dzyoba.com/programming/restrict-memory.html#Linker">Restricting program memory article</a>.</p>
+<p>Basically, we’re&nbsp;saying &laquo;Start our code at&nbsp;1MiB and put section <code>.text</code> in&nbsp;the beginning with 4K alignment. Entry point is&nbsp;<code>start</code>&raquo;.</p>
+<p>Link like this:</p>
+<pre><code>ld -melf_i386 -T link.ld kernel.o -o kernel</code></pre>
+<p>And run kernel directly with QEMU:</p>
+<pre><code>$ qemu-system-i386 -kernel kernel</code></pre>
+<p>You’re&nbsp;got it:</p>
+<div class="figure">
+<img src="/assets/img/qemu-kernel.png" alt="QEMU direct kernel" />
+<p class="caption">QEMU direct kernel</p>
+</div>
+<h2 id="the-multiboot-part">The multiboot part</h2>
+<p>When computer is&nbsp;being power up&nbsp;it&nbsp;starts executing code according to&nbsp;its &laquo;reset vector&raquo;. For modern x86 processors it&nbsp;is&nbsp;<code>0xFFFFFFF0</code>. At&nbsp;this address motherboard sets jump instruction to&nbsp;the BIOS code. CPU is&nbsp;in&nbsp;&laquo;Real mode&raquo; (16 bit addressing with segmentation (up&nbsp;to&nbsp;1MiB), no&nbsp;protection, no&nbsp;paging).</p>
+<p>BIOS does all the usual work like scan for devices and initializes it&nbsp;and finds bootable device. After bootable device found it&nbsp;passes control to&nbsp;bootloader on&nbsp;this device.</p>
+<p>Bootloader loads itself from disk (in&nbsp;case of&nbsp;<nobr>multi-stage</nobr>) finds kernel and load it&nbsp;into memory. In&nbsp;the dark old days every OS&nbsp;had its own format and rules, so&nbsp;there was a&nbsp;variaty of&nbsp;incompatible bootloaders. But now there is&nbsp;a&nbsp;Multiboot specification that gives your kernel some guarantees and amenities in&nbsp;exchange to&nbsp;comply the specification and provide Multiboot header.</p>
+<p>Dependence on&nbsp;Multiboot specification is&nbsp;a&nbsp;big deal because it&nbsp;helps make the life MUCH easier and this is&nbsp;how:</p>
+<ul>
+<li><nobr>Multiboot-compliant</nobr> bootloader sets the system <a href="http://www.gnu.org/software/grub/manual/multiboot/multiboot.html#Machine-state">to&nbsp;<nobr>well-defined</nobr> state</a>, most notably:
+<ul>
+<li>Transfer CPU to&nbsp;protected mode to&nbsp;allow you access all the memory</li>
+<li>Enable A20 line&nbsp;&mdash; an&nbsp;old quirk to&nbsp;access additional segment in&nbsp;real mode</li>
+<li>Global descriptor table and Interrupt descriptor table are undefined, so&nbsp;OS&nbsp;must setup its own</li>
+</ul></li>
+<li><nobr>Multiboot-compliant</nobr> OS&nbsp;kernels:
+<ul>
+<li>Can (and should) be&nbsp;in&nbsp;ELF format</li>
+<li>Must set only 12 bytes to&nbsp;correctly boot</li>
+</ul></li>
+</ul>
+<p>In&nbsp;general, booting multiboot compliant kernel is&nbsp;simple, especially if&nbsp;it’s&nbsp;in&nbsp;ELF format:</p>
+<ul>
+<li>Multiboot bootloader search first 8K bytes of&nbsp;kernel image for Multiboot header (find it&nbsp;by&nbsp;magic <code>0&times;1BADB002</code>)</li>
+<li>If&nbsp;the image is&nbsp;in&nbsp;ELF format it&nbsp;loads section according to&nbsp;the section table</li>
+<li>If&nbsp;the image is&nbsp;not in&nbsp;ELF format it&nbsp;loads kernel to&nbsp;address either supplied in&nbsp;address field or&nbsp;in&nbsp;the flags field.</li>
+</ul>
+<p>In&nbsp;our kernel’s&nbsp;text section we’ve&nbsp;done it:</p>
+<pre class="sourceCode nasm"><code class="sourceCode nasm">    MAGIC_NUMBER <span class="dt">equ</span> <span class="bn">0x1BADB002</span>     <span class="co">; define the magic number constant</span>
+    FLAGS        <span class="dt">equ</span><span class="bn"> 0x0            </span><span class="co">; multiboot flags</span>
+    CHECKSUM     <span class="dt">equ</span> -MAGIC_NUMBER  <span class="co">; calculate the checksum</span>
+                                    <span class="co">; (magic number + checksum + flags should equal 0)</span>
+
+    <span class="kw">section</span> .text:                  <span class="co">; start of the text (code) section</span>
+    <span class="kw">align</span> <span class="dv">4</span>                         <span class="co">; the code must be 4 byte aligned</span>
+        <span class="dt">dd</span> MAGIC_NUMBER             <span class="co">; write the magic number to the machine code,</span>
+        <span class="dt">dd</span> FLAGS                    <span class="co">; the flags,</span>
+        <span class="dt">dd</span> CHECKSUM                 <span class="co">; and the checksum</span></code></pre>
+<p>We&nbsp;didn’t&nbsp;specify any flags because we&nbsp;don’t&nbsp;need anything from bootloader like memory maps and stuff, and bootloader doesn’t&nbsp;need anything from us&nbsp;because we’re&nbsp;in&nbsp;ELF format. For other formats you must supply loading address in&nbsp;its multiboot header. Multiboot header is&nbsp;pretty simple:</p>
+<table summary>
+<tbody>
+<tr align="left">
+<td valign="top" width="10%">
+Offset </td>
+<td valign="top" width="10%">
+Type </td>
+<td valign="top" width="20%">
+Field Name
+</td>
+<td valign="top" width="50%">
+Note <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+0 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+magic </td>
+<td valign="top" width="50%">
+required <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+4 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+flags </td>
+<td valign="top" width="50%">
+required <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+8 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+checksum </td>
+<td valign="top" width="50%">
+required <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+12 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+header_addr </td>
+<td valign="top" width="50%">
+if&nbsp;flags[16] is&nbsp;set <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+16 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+load_addr </td>
+<td valign="top" width="50%">
+if&nbsp;flags[16] is&nbsp;set <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+20 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+load_end_addr </td>
+<td valign="top" width="50%">
+if&nbsp;flags[16] is&nbsp;set <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+24 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+bss_end_addr </td>
+<td valign="top" width="50%">
+if&nbsp;flags[16] is&nbsp;set <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+28 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+entry_addr </td>
+<td valign="top" width="50%">
+if&nbsp;flags[16] is&nbsp;set <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+32 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+mode_type </td>
+<td valign="top" width="50%">
+if&nbsp;flags[2] is&nbsp;set <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+36 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+width </td>
+<td valign="top" width="50%">
+if&nbsp;flags[2] is&nbsp;set <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+40 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+height </td>
+<td valign="top" width="50%">
+if&nbsp;flags[2] is&nbsp;set <br>
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+44 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+depth </td>
+<td valign="top" width="50%">
+if&nbsp;flags[2] is&nbsp;set <br>
+</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-booting">The booting</h2>
+<p>Now lets boot our kernel like a&nbsp;serious guys.</p>
+<p>First, we&nbsp;create ISO image with help of&nbsp;<code><nobr>grub2-mkrescue</nobr></code>. Create hierarchy like this:</p>
+<pre><code>isodir/
+&#9492;&#9472;&#9472; boot
+    &#9500;&#9472;&#9472; grub
+    &#9474;   &#9492;&#9472;&#9472; grub.cfg
+    &#9492;&#9472;&#9472; kernel</code></pre>
+<p>Where grub.cfg is:</p>
+<pre><code>menuentry &quot;kernel&quot; {
+    multiboot /boot/kernel
+}</code></pre>
+<p>And then invoke <code><nobr>grub2-mkrescue</nobr></code>:</p>
+<pre><code>grub2-mkrescue -o hello-kernel.iso isodir</code></pre>
+<p>And now we&nbsp;can boot it&nbsp;in&nbsp;any PC&nbsp;compatible machine:</p>
+<pre><code>qemu-system-i386 -cdrom hello-kernel.iso</code></pre>
+<p>We’ll&nbsp;see grub2 menu, where we&nbsp;can select our &laquo;kernel&raquo; and see the red ‘A’ letter.</p>
+<p>Isn’t&nbsp;it&nbsp;great?</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>My&nbsp;brain hurts: all these real/protected mode, A20 line, segmentation, etc. are so&nbsp;quirky. I&nbsp;hope ARM booting is&nbsp;not that complicated.<a href="#fnref1">&#8617;</a></p></li>
+</ol>
+</div>
+                        </div>
+                    </article>
+                </div>
+        </div>
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+    <div class="row">
+    &copy; 2015 Alex Dzyoba
+    </div>
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>
