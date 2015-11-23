@@ -30,6 +30,10 @@ pre {
     padding: 0.5em;
 }
 
+.comments {
+	padding: 1em;
+}
+
 .date {
     color: #666;
 }
