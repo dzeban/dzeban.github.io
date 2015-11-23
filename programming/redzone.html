@@ -142,8 +142,7 @@
 <p>You need this stack manipulation later to&nbsp;access your local vars by&nbsp;subtracting from <code>%rbp</code>. But we&nbsp;were subtratcting from <code>%rsp</code>, isn’t&nbsp;it&nbsp;strange?</p>
 <p>Wait a&nbsp;minute&hellip; I&nbsp;decided to&nbsp;draw stack frame and got it!</p>
 <div class="figure">
-<img src="/assets/img/red-zone.png" alt="Stack" />
-<p class="caption">Stack</p>
+<img src="/assets/img/red-zone.png" alt="Stack" /><p class="caption">Stack</p>
 </div>
 <p>Holy shucks! We&nbsp;are processing undefined memory. All instructions like this</p>
 <pre class="asm"><code>movdqa  -24(%rsp), %xmm0</code></pre>
@@ -173,23 +172,24 @@
                 </div>
         </div>
 		<div class="row comments">
-			<div id="disqus_thread"></div>
-			<script>
-				var disqus_config = function () {
-					this.page.url = "http://alex.dzyoba.com/programming/redzone.html";
-					this.page.identifier = "redzone"; 
-				};
-				(function() {  // DON'T EDIT BELOW THIS LINE
-					var d = document, s = d.createElement('script');
-					
-					s.src = '//crazyrants.disqus.com/embed.js';
-					
-					s.setAttribute('data-timestamp', +new Date());
-					(d.head || d.body).appendChild(s);
-				})();
-			</script>
-			<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      <div id="disqus_thread"></div>
+      <script>
+          var disqus_config = function () {
+                this.page.url = "http://alex.dzyoba.com/programming/redzone.html";
+                this.page.identifier = "redzone"; 
+          };
+          (function() {  // DON'T EDIT BELOW THIS LINE
+              var d = document, s = d.createElement('script');
+              
+              s.src = '//voluntarymadness.disqus.com/embed.js';
+              
+              s.setAttribute('data-timestamp', +new Date());
+              (d.head || d.body).appendChild(s);
+          })();
+      </script>
+      <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
 		</div>
+
         <div class="push"></div>
     </div>
     <div class="footer">

@@ -153,28 +153,23 @@ PerfTop:     361 irqs/sec  kernel:35.5%  exact:  0.0% [4000Hz cycles],  (all, 4 
 <pre><code># perf report</code></pre>
 <p>You will see a&nbsp;nice interactive TUI interface.</p>
 <div class="figure">
-<img src="/assets/img/perf-tui.png" alt="perf tui" />
-<p class="caption">perf tui</p>
+<img src="/assets/img/perf-tui.png" alt="perf tui" /><p class="caption">perf tui</p>
 </div>
 <p>You can zoom into pid/thread</p>
 <div class="figure">
-<img src="/assets/img/perf-zoom-into-thread.png" alt="perf zoom into thread" />
-<p class="caption">perf zoom into thread</p>
+<img src="/assets/img/perf-zoom-into-thread.png" alt="perf zoom into thread" /><p class="caption">perf zoom into thread</p>
 </div>
 <p>and see what’s&nbsp;going on&nbsp;there</p>
 <div class="figure">
-<img src="/assets/img/perf-thread-info.png" alt="perf thread info" />
-<p class="caption">perf thread info</p>
+<img src="/assets/img/perf-thread-info.png" alt="perf thread info" /><p class="caption">perf thread info</p>
 </div>
 <p>You can look into nice assembly code (this looks almost as&nbsp;in&nbsp;<a href="http://www.radare.org/r/">radare</a>)</p>
 <div class="figure">
-<img src="/assets/img/perf-assembly.png" alt="perf assembly" />
-<p class="caption">perf assembly</p>
+<img src="/assets/img/perf-assembly.png" alt="perf assembly" /><p class="caption">perf assembly</p>
 </div>
 <p>and run scripts on&nbsp;it&nbsp;to&nbsp;see, for example, function calls histogram:</p>
 <div class="figure">
-<img src="/assets/img/perf-histogram.png" alt="perf histogram" />
-<p class="caption">perf histogram</p>
+<img src="/assets/img/perf-histogram.png" alt="perf histogram" /><p class="caption">perf histogram</p>
 </div>
 <p>If&nbsp;it’s&nbsp;not enough to&nbsp;you, there are a&nbsp;lot of&nbsp;options both for <code>perf record</code> and <code>perf report</code> so&nbsp;play with it.</p>
 <h3 id="other">Other</h3>
@@ -220,13 +215,11 @@ PerfTop:     361 irqs/sec  kernel:35.5%  exact:  0.0% [4000Hz cycles],  (all, 4 
 <p>Now show me&nbsp;the profile:</p>
 <pre><code># perf report -g -T</code></pre>
 <div class="figure">
-<img src="/assets/img/perf-report-block-hasher.png" alt="perf report of block_hasher" />
-<p class="caption">perf report of&nbsp;block_hasher</p>
+<img src="/assets/img/perf-report-block-hasher.png" alt="perf report of block_hasher" /><p class="caption">perf report of&nbsp;block_hasher</p>
 </div>
 <p>Nothing much. I’ve&nbsp;looked into block_hasher threads, I’ve&nbsp;built a&nbsp;histogram, looked for vmlinux DSO, found instruction with most overhead</p>
 <div class="figure">
-<img src="/assets/img/perf-lock-acquire-assembly.png" alt="perf __lock_acquire" />
-<p class="caption">perf __lock_acquire</p>
+<img src="/assets/img/perf-lock-acquire-assembly.png" alt="perf __lock_acquire" /><p class="caption">perf __lock_acquire</p>
 </div>
 <p>and still can’t&nbsp;say I&nbsp;found what’s&nbsp;wrong. That’s&nbsp;because there is&nbsp;no&nbsp;real overhead, nothing is&nbsp;spinning in&nbsp;vain. Something is&nbsp;just plain sleeping.</p>
 <p>What we’ve&nbsp;done here and <a href="/linux/profiling-ftrace.html">before in&nbsp;ftrace part</a> is&nbsp;a&nbsp;hot spots analysis, i.e. we&nbsp;try to&nbsp;find places in&nbsp;our application or&nbsp;system that cause CPU to&nbsp;spin in&nbsp;useless cycles. Usually, it’s&nbsp;what you want but not today. We&nbsp;need to&nbsp;understand why <code>pread</code> is&nbsp;sleeping. And that’s&nbsp;what I&nbsp;call &laquo;latency profiling&raquo;.</p>
@@ -343,13 +336,11 @@ Samples: 10  of event &#39;sched:sched_switch&#39;, Event count (approx.): 31403
 # perf report -i perf.sched</code></pre>
 <p>I’ve&nbsp;inspected samples for <code>sched_switch</code> and <code>sched_stat_runtime</code> events (15K and 17K respectively) and found nothing. But then I&nbsp;looked in&nbsp;<code>sched_stat_iowait</code>.</p>
 <div class="figure">
-<img src="/assets/img/perf-sched-stat-iowait.png" alt="perf sched_stat_iowait" />
-<p class="caption">perf sched_stat_iowait</p>
+<img src="/assets/img/perf-sched-stat-iowait.png" alt="perf sched_stat_iowait" /><p class="caption">perf sched_stat_iowait</p>
 </div>
 <p>and there I&nbsp;found really suspicious thing:</p>
 <div class="figure">
-<img src="/assets/img/perf-dm-delay.png" alt="perf dm-delay" />
-<p class="caption">perf <nobr>dm-delay</nobr></p>
+<img src="/assets/img/perf-dm-delay.png" alt="perf dm-delay" /><p class="caption">perf <nobr>dm-delay</nobr></p>
 </div>
 <p>See? Almost all symbols come from &laquo;kernel.vmlinux&raquo; shared object, but one with strange name &laquo;0&times;000000005f8ccc27&raquo; comes from &laquo;dm_delay&raquo; object. Wait, what is&nbsp;&laquo;dm_delay&raquo;? Quick find gives us&nbsp;the answer:</p>
 <pre><code>&gt; dm-delay
@@ -389,23 +380,24 @@ delayed: 0 1000000 delay 1:7 0 30
                 </div>
         </div>
 		<div class="row comments">
-			<div id="disqus_thread"></div>
-			<script>
-				var disqus_config = function () {
-					this.page.url = "http://alex.dzyoba.com/linux/profiling-perf.html";
-					this.page.identifier = "profiling-perf"; 
-				};
-				(function() {  // DON'T EDIT BELOW THIS LINE
-					var d = document, s = d.createElement('script');
-					
-					s.src = '//crazyrants.disqus.com/embed.js';
-					
-					s.setAttribute('data-timestamp', +new Date());
-					(d.head || d.body).appendChild(s);
-				})();
-			</script>
-			<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+      <div id="disqus_thread"></div>
+      <script>
+          var disqus_config = function () {
+                this.page.url = "http://alex.dzyoba.com/linux/profiling-perf.html";
+                this.page.identifier = "profiling-perf"; 
+          };
+          (function() {  // DON'T EDIT BELOW THIS LINE
+              var d = document, s = d.createElement('script');
+              
+              s.src = '//voluntarymadness.disqus.com/embed.js';
+              
+              s.setAttribute('data-timestamp', +new Date());
+              (d.head || d.body).appendChild(s);
+          })();
+      </script>
+      <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
 		</div>
+
         <div class="push"></div>
     </div>
     <div class="footer">
