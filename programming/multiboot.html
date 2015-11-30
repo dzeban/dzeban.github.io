@@ -120,7 +120,8 @@ SECTIONS {
 <pre><code>$ qemu-system-i386 -kernel kernel</code></pre>
 <p>You’re&nbsp;got it:</p>
 <div class="figure">
-<img src="/assets/img/qemu-kernel.png" alt="QEMU direct kernel" /><p class="caption">QEMU direct kernel</p>
+<img src="/assets/img/qemu-kernel.png" alt="QEMU direct kernel" />
+<p class="caption">QEMU direct kernel</p>
 </div>
 <h2 id="the-multiboot-part">The multiboot part</h2>
 <p>When computer is&nbsp;being power up&nbsp;it&nbsp;starts executing code according to&nbsp;its &laquo;reset vector&raquo;. For modern x86 processors it&nbsp;is&nbsp;<code>0xFFFFFFF0</code>. At&nbsp;this address motherboard sets jump instruction to&nbsp;the BIOS code. CPU is&nbsp;in&nbsp;&laquo;Real mode&raquo; (16 bit addressing with segmentation (up&nbsp;to&nbsp;1MiB), no&nbsp;protection, no&nbsp;paging).</p>
@@ -158,73 +159,154 @@ SECTIONS {
         <span class="dt">dd</span> FLAGS                    <span class="co">; the flags,</span>
         <span class="dt">dd</span> CHECKSUM                 <span class="co">; and the checksum</span></code></pre>
 <p>We&nbsp;didn’t&nbsp;specify any flags because we&nbsp;don’t&nbsp;need anything from bootloader like memory maps and stuff, and bootloader doesn’t&nbsp;need anything from us&nbsp;because we’re&nbsp;in&nbsp;ELF format. For other formats you must supply loading address in&nbsp;its multiboot header. Multiboot header is&nbsp;pretty simple:</p>
-<table summary=""><tbody><tr align="left"><td valign="top" width="10%">
-Offset </td><td valign="top" width="10%">
-Type </td><td valign="top" width="20%">
+<table summary>
+<tbody>
+<tr align="left">
+<td valign="top" width="10%">
+Offset </td>
+<td valign="top" width="10%">
+Type </td>
+<td valign="top" width="20%">
 Field Name
-</td><td valign="top" width="50%">
+</td>
+<td valign="top" width="50%">
 Note <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-0 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-magic </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+0 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+magic </td>
+<td valign="top" width="50%">
 required <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-4 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-flags </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+4 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+flags </td>
+<td valign="top" width="50%">
 required <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-8 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-checksum </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+8 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+checksum </td>
+<td valign="top" width="50%">
 required <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-12 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-header_addr </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+12 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+header_addr </td>
+<td valign="top" width="50%">
 if&nbsp;flags[16] is&nbsp;set <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-16 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-load_addr </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+16 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+load_addr </td>
+<td valign="top" width="50%">
 if&nbsp;flags[16] is&nbsp;set <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-20 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-load_end_addr </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+20 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+load_end_addr </td>
+<td valign="top" width="50%">
 if&nbsp;flags[16] is&nbsp;set <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-24 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-bss_end_addr </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+24 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+bss_end_addr </td>
+<td valign="top" width="50%">
 if&nbsp;flags[16] is&nbsp;set <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-28 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-entry_addr </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+28 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+entry_addr </td>
+<td valign="top" width="50%">
 if&nbsp;flags[16] is&nbsp;set <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-32 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-mode_type </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+32 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+mode_type </td>
+<td valign="top" width="50%">
 if&nbsp;flags[2] is&nbsp;set <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-36 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-width </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+36 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+width </td>
+<td valign="top" width="50%">
 if&nbsp;flags[2] is&nbsp;set <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-40 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-height </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+40 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+height </td>
+<td valign="top" width="50%">
 if&nbsp;flags[2] is&nbsp;set <br>
-</td></tr><tr align="left"><td valign="top" width="10%">
-44 </td><td valign="top" width="10%">
-u32 </td><td valign="top" width="20%">
-depth </td><td valign="top" width="50%">
+</td>
+</tr>
+<tr align="left">
+<td valign="top" width="10%">
+44 </td>
+<td valign="top" width="10%">
+u32 </td>
+<td valign="top" width="20%">
+depth </td>
+<td valign="top" width="50%">
 if&nbsp;flags[2] is&nbsp;set <br>
-</td></tr></tbody></table>
+</td>
+</tr>
+</tbody>
+</table>
 <h2 id="the-booting">The booting</h2>
 <p>Now lets boot our kernel like a&nbsp;serious guys.</p>
 <p>First, we&nbsp;create ISO image with help of&nbsp;<code><nobr>grub2-mkrescue</nobr></code>. Create hierarchy like this:</p>

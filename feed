@@ -2,13 +2,243 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title type="text">Voluntary madness!</title>
   <id>http://alex.dzyoba.com/feed</id>
-  <updated>2015-09-28T00:00:00Z</updated>
+  <updated>2015-11-30T00:00:00Z</updated>
   <link href="http://alex.dzyoba.com" />
   <link href="http://alex.dzyoba.com/feed" rel="self" />
   <author>
     <name>Alex Dzyoba</name>
   </author>
   <generator>PyAtom</generator>
+  <entry xml:base="http://alex.dzyoba.com/feed">
+    <title type="text">Linux profiling. SystemTap</title>
+    <id>linux/profiling-systemtap.html</id>
+    <updated>2015-11-30T00:00:00Z</updated>
+    <link href="linux/profiling-systemtap.html" />
+    <author>
+      <name>Alex Dzyoba</name>
+    </author>
+    <content type="html">&lt;p&gt;TOC:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-intro.html"&gt;Intro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-gprof-gcov.html"&gt;Userspace profiling: gprof, gcov&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-valgrind.html"&gt;Userspace profiling: Valgrind&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
+&lt;li&gt;Various tools&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id="systemtap"&gt;SystemTap&lt;/h2&gt;
+&lt;p&gt;SystemTap is&amp;nbsp;a&amp;nbsp;profiling and debugging infrastructure &lt;a href="https://sourceware.org/systemtap/systemtap-ols.pdf"&gt;based on&amp;nbsp;kprobes&lt;/a&gt;. Essentially, it’s&amp;nbsp;a&amp;nbsp;scripting facility for kprobes. It&amp;nbsp;allows you to&amp;nbsp;dynamically instrument the kernel and user application to&amp;nbsp;track down complex and obscure problems in&amp;nbsp;system behavior.&lt;/p&gt;
+&lt;p&gt;With SystemTap you write a&amp;nbsp;tapscript in&amp;nbsp;a&amp;nbsp;special language inspired by&amp;nbsp;C, awk and dtrace. SystemTap language asks you to&amp;nbsp;write handlers for probes defined in&amp;nbsp;kernel or&amp;nbsp;userspace that will be&amp;nbsp;invoked when execution hits these probes. You can define your own functions and use extensive &lt;a href="https://sourceware.org/systemtap/tapsets/"&gt;tapsets&lt;/a&gt; library. Language provides you integers, strings, associative arrays and statistics, without requiring types and memory allocation. Comprehensive information about SystemTap language can be&amp;nbsp;found in&amp;nbsp;&lt;a href="https://sourceware.org/systemtap/langref/"&gt;language reference&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Scripts that you wrote are elaborated (resolving references to&amp;nbsp;tapsets, kernel and userspace symbols), translated to&amp;nbsp;C, wrapped with kprobes &lt;acronym title="Application programming interface" lang="en"&gt;API&lt;/acronym&gt; invocation, compiled into kernel module that, finally, is&amp;nbsp;loaded into kernel.&lt;/p&gt;
+&lt;p&gt;Script output and other data collected is&amp;nbsp;transferred from kernel to&amp;nbsp;userspace via &lt;nobr&gt;high-performance&lt;/nobr&gt; transport like relayfs or&amp;nbsp;netlink.&lt;/p&gt;
+&lt;h2 id="setup"&gt;Setup&lt;/h2&gt;
+&lt;p&gt;Installation part is&amp;nbsp;boring and depends on&amp;nbsp;your distro, on&amp;nbsp;Fedora it’s&amp;nbsp;as&amp;nbsp;simple as:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ dnf install systemtap&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You will need SystemTap runtime and client tools along with tapsets and other development files for building your modules.&lt;/p&gt;
+&lt;p&gt;Also, you will need kernel debug info:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ dnf debuginfo-install kernel&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;After installation, you may check if&amp;nbsp;it’s&amp;nbsp;working:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;stap -v -e &amp;#39;probe begin { println(&amp;quot;Started&amp;quot;) }&amp;#39;&lt;/code&gt;&lt;/pre&gt;
+&lt;h2 id="playground"&gt;Playground&lt;/h2&gt;
+&lt;p&gt;Various examples of&amp;nbsp;what SystemTap can do&amp;nbsp;can be&amp;nbsp;found &lt;a href="https://sourceware.org/systemtap/examples/keyword-index.html"&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;You can see call graphs with &lt;a href="https://sourceware.org/systemtap/examples/general/para-callgraph.stp"&gt;&lt;nobr&gt;para-callgraph&lt;/nobr&gt;.stp&lt;/a&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ stap para-callgraph.stp &amp;#39;process(&amp;quot;/home/avd/dev/block_hasher/block_hasher&amp;quot;).function(&amp;quot;*&amp;quot;)&amp;#39; \
+  -c &amp;#39;/home/avd/dev/block_hasher/block_hasher -d /dev/md0 -b 1048576 -t 10 -n 10000&amp;#39;
+
+     0 block_hasher(10792):-&amp;gt;_start 
+    11 block_hasher(10792): -&amp;gt;__libc_csu_init 
+    14 block_hasher(10792):  -&amp;gt;_init 
+    17 block_hasher(10792):  &amp;lt;-_init 
+    18 block_hasher(10792):  -&amp;gt;frame_dummy 
+    21 block_hasher(10792):   -&amp;gt;register_tm_clones 
+    23 block_hasher(10792):   &amp;lt;-register_tm_clones 
+    25 block_hasher(10792):  &amp;lt;-frame_dummy 
+    26 block_hasher(10792): &amp;lt;-__libc_csu_init 
+    31 block_hasher(10792): -&amp;gt;main argc=0x9 argv=0x7ffc78849278
+    44 block_hasher(10792):  -&amp;gt;bdev_open dev_path=0x7ffc78849130
+    88 block_hasher(10792):  &amp;lt;-bdev_open return=0x163b010
+     0 block_hasher(10796):-&amp;gt;thread_func arg=0x163b2c8
+     0 block_hasher(10797):-&amp;gt;thread_func arg=0x163b330
+     0 block_hasher(10795):-&amp;gt;thread_func arg=0x163b260
+     0 block_hasher(10798):-&amp;gt;thread_func arg=0x163b398
+     0 block_hasher(10799):-&amp;gt;thread_func arg=0x163b400
+     0 block_hasher(10800):-&amp;gt;thread_func arg=0x163b468
+     0 block_hasher(10801):-&amp;gt;thread_func arg=0x163b4d0
+     0 block_hasher(10802):-&amp;gt;thread_func arg=0x163b538
+     0 block_hasher(10803):-&amp;gt;thread_func arg=0x163b5a0
+     0 block_hasher(10804):-&amp;gt;thread_func arg=0x163b608
+407360 block_hasher(10799): -&amp;gt;time_diff start={...} end={...}
+407371 block_hasher(10799): &amp;lt;-time_diff 
+407559 block_hasher(10799):&amp;lt;-thread_func return=0x0
+436757 block_hasher(10795): -&amp;gt;time_diff start={...} end={...}
+436765 block_hasher(10795): &amp;lt;-time_diff 
+436872 block_hasher(10795):&amp;lt;-thread_func return=0x0
+489156 block_hasher(10797): -&amp;gt;time_diff start={...} end={...}
+489163 block_hasher(10797): &amp;lt;-time_diff 
+489277 block_hasher(10797):&amp;lt;-thread_func return=0x0
+506616 block_hasher(10803): -&amp;gt;time_diff start={...} end={...}
+506628 block_hasher(10803): &amp;lt;-time_diff 
+506754 block_hasher(10803):&amp;lt;-thread_func return=0x0
+526005 block_hasher(10801): -&amp;gt;time_diff start={...} end={...}
+526010 block_hasher(10801): &amp;lt;-time_diff 
+526075 block_hasher(10801):&amp;lt;-thread_func return=0x0
+9840716 block_hasher(10804): -&amp;gt;time_diff start={...} end={...}
+9840723 block_hasher(10804): &amp;lt;-time_diff 
+9840818 block_hasher(10804):&amp;lt;-thread_func return=0x0
+9857787 block_hasher(10802): -&amp;gt;time_diff start={...} end={...}
+9857792 block_hasher(10802): &amp;lt;-time_diff 
+9857895 block_hasher(10802):&amp;lt;-thread_func return=0x0
+9872655 block_hasher(10796): -&amp;gt;time_diff start={...} end={...}
+9872664 block_hasher(10796): &amp;lt;-time_diff 
+9872816 block_hasher(10796):&amp;lt;-thread_func return=0x0
+9875681 block_hasher(10798): -&amp;gt;time_diff start={...} end={...}
+9875686 block_hasher(10798): &amp;lt;-time_diff 
+9874408 block_hasher(10800): -&amp;gt;time_diff start={...} end={...}
+9874413 block_hasher(10800): &amp;lt;-time_diff 
+9875767 block_hasher(10798):&amp;lt;-thread_func return=0x0
+9874482 block_hasher(10800):&amp;lt;-thread_func return=0x0
+9876305 block_hasher(10792):  -&amp;gt;bdev_close dev=0x163b010
+10180742 block_hasher(10792):  &amp;lt;-bdev_close 
+10180801 block_hasher(10792): &amp;lt;-main return=0x0
+10180808 block_hasher(10792): -&amp;gt;__do_global_dtors_aux 
+10180814 block_hasher(10792):  -&amp;gt;deregister_tm_clones 
+10180817 block_hasher(10792):  &amp;lt;-deregister_tm_clones 
+10180819 block_hasher(10792): &amp;lt;-__do_global_dtors_aux 
+10180821 block_hasher(10792): -&amp;gt;_fini 
+10180823 block_hasher(10792): &amp;lt;-_fini 
+Pass 5: run completed in 20usr/3200sys/10716real ms.&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You can find generic source of&amp;nbsp;latency with &lt;a href="https://sourceware.org/systemtap/examples/profiling/latencytap.stp"&gt;latencytap.stp&lt;/a&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ stap -v latencytap.stp -c \
+&amp;#39;/home/avd/dev/block_hasher/block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000000&amp;#39;
+
+Reason                                            Count  Average(us)  Maximum(us) Percent%
+Reading from file                                   490        49311        53833      96%
+Userspace lock contention                             8       118734       929420       3%
+Page fault                                           17           27           65       0%
+unmapping memory                                      4           37           55       0%
+mprotect() system call                                6           25           45       0%
+                                                      4           19           37       0%
+                                                      3           23           49       0%
+Page fault                                            2           24           46       0%
+Page fault                                            2           20           36       0%&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Note: you may need to&amp;nbsp;change timer interval in&amp;nbsp;latencytap.stp:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;-probe timer.s(30) {
++probe timer.s(5) {&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;There is&amp;nbsp;even &lt;a href="https://sourceware.org/systemtap/examples/stapgames/2048.stp"&gt;2048 written in&amp;nbsp;SystemTap&lt;/a&gt;!&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/stap-2048.png" alt="SystemTap 2048" /&gt;
+&lt;p class="caption"&gt;SystemTap 2048&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;All in&amp;nbsp;all, it’s&amp;nbsp;simple and convenient. You can wrap your head around it&amp;nbsp;in&amp;nbsp;a&amp;nbsp;single day! And it&amp;nbsp;works as&amp;nbsp;you expect and this is&amp;nbsp;a&amp;nbsp;big deal because it&amp;nbsp;gives you certainty and confidence in&amp;nbsp;infirm ground of&amp;nbsp;profiling kernel problems.&lt;/p&gt;
+&lt;h2 id="profiling-io-latency-for-block_hasher"&gt;Profiling I/O latency for block_hasher&lt;/h2&gt;
+&lt;p&gt;So, how can we&amp;nbsp;use it&amp;nbsp;for profiling kernel, module or&amp;nbsp;userspace application? The thing is&amp;nbsp;that we&amp;nbsp;have almost unlimited power in&amp;nbsp;our hands. We&amp;nbsp;can do&amp;nbsp;whatever we&amp;nbsp;want and howsoever we&amp;nbsp;want, but we&amp;nbsp;must know what we&amp;nbsp;&lt;em&gt;want&lt;/em&gt; and express it&amp;nbsp;in&amp;nbsp;SystemTap language.&lt;/p&gt;
+&lt;p&gt;You have a&amp;nbsp;tapsets&amp;nbsp;&amp;mdash; standard library for SystemTap&amp;nbsp;&amp;mdash; that contains a&amp;nbsp;&lt;a href="https://sourceware.org/systemtap/tapsets/"&gt;massive variety&lt;/a&gt; of&amp;nbsp;probes and functions that are available for your tapscripts.&lt;/p&gt;
+&lt;p&gt;But, let’s&amp;nbsp;be&amp;nbsp;honest, nobody wants to&amp;nbsp;write scripts, everybody wants to&amp;nbsp;use scripts written by&amp;nbsp;someone who has expertise and who already spent a&amp;nbsp;lot of&amp;nbsp;time, debugged and tweaked the script.&lt;/p&gt;
+&lt;p&gt;Let’s&amp;nbsp;look what we&amp;nbsp;can find in&amp;nbsp;&lt;a href="https://sourceware.org/systemtap/examples/keyword-index.html#IO"&gt;SystemTap I/O examples&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;There is&amp;nbsp;one that seems legit: &lt;a href="https://sourceware.org/systemtap/examples/io/ioblktime.stp"&gt;&amp;laquo;ioblktime&amp;raquo;&lt;/a&gt;. Let’s&amp;nbsp;launch it:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;stap -v ioblktime.stp -o ioblktime -c \
+&amp;#39;/home/avd/dev/block_hasher/block_hasher -d /dev/md0 -b 1048576 -t 10 -n 10000&amp;#39;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here’s&amp;nbsp;what we’ve&amp;nbsp;got:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;device  rw total (us)      count   avg (us)
+  ram4   R     101628        981        103
+  ram5   R      99328        981        101
+  ram6   R      64973        974         66
+  ram2   R      57002        974         58
+  ram3   R      66635        974         68
+  ram0   R     101806        974        104
+  ram1   R      98470        974        101
+  ram7   R      64250        974         65
+  dm-0   R   48337401        974      49627
+   sda   W    3871495        376      10296
+   sda   R     125794         14       8985
+device  rw total (us)      count   avg (us)
+   sda   W     278560         18      15475&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We&amp;nbsp;see a&amp;nbsp;strange device &lt;nobr&gt;dm-0&lt;/nobr&gt;. Quick check:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ dmsetup info /dev/dm-0 
+Name:              delayed
+State:             ACTIVE
+Read Ahead:        256
+Tables present:    LIVE
+Open count:        1
+Event number:      0
+Major, minor:      253, 0
+Number of targets: 1&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;DeviceMapper’s&amp;nbsp;&amp;laquo;delayed&amp;raquo; target that we&amp;nbsp;saw &lt;a href="/linux/profiling-perf.html#dm-delay"&gt;previously&lt;/a&gt;. This target creates block device that identically maps to&amp;nbsp;disk, but delays each request by&amp;nbsp;given amount of&amp;nbsp;milliseconds. &lt;strong&gt;This is&amp;nbsp;a&amp;nbsp;cause of&amp;nbsp;our RAID problems: performance of&amp;nbsp;a&amp;nbsp;striped RAID is&amp;nbsp;a&amp;nbsp;performance of&amp;nbsp;the slowest disk.&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;I’ve&amp;nbsp;look for other examples, but they mostly show which process generates the most I/O.&lt;/p&gt;
+&lt;p&gt;Let’s&amp;nbsp;try to&amp;nbsp;write our own script!&lt;/p&gt;
+&lt;p&gt;There is&amp;nbsp;a&amp;nbsp;tapset dedicated for &lt;a href="https://sourceware.org/systemtap/tapsets/iosched.stp.html"&gt;I/O scheduler and block I/O&lt;/a&gt;. Let’s&amp;nbsp;use &lt;code&gt;probe:ioblock.end&lt;/code&gt; matching our RAID device and print backtrace.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;probe ioblock.end
+{
+    if (devname == &amp;quot;md0&amp;quot;) {
+        printf(&amp;quot;%s: %d\n&amp;quot;, devname, sector);
+        print_backtrace()
+    }
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Unfortunately, this won’t&amp;nbsp;work because RAID device request end up&amp;nbsp;in&amp;nbsp;concrete disk, so&amp;nbsp;we&amp;nbsp;have to&amp;nbsp;hook into &lt;code&gt;raid0&lt;/code&gt; module.&lt;/p&gt;
+&lt;p&gt;Dive into &lt;a href="http://lxr.free-electrons.com/source/drivers/md/raid0.c?v=4.2"&gt;&lt;code&gt;drivers/md/raid0.c&lt;/code&gt;&lt;/a&gt; and look to&amp;nbsp;&lt;a href="http://lxr.free-electrons.com/source/drivers/md/raid0.c?v=4.2#L507"&gt;&lt;code&gt;raid0_make_request&lt;/code&gt;&lt;/a&gt;. Core of&amp;nbsp;the RAID 0 is&amp;nbsp;encoded in&amp;nbsp;these lines:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;530                 if (sectors &amp;lt; bio_sectors(bio)) {
+531                         split = bio_split(bio, sectors, GFP_NOIO, fs_bio_set);
+532                         bio_chain(split, bio);
+533                 } else {
+534                         split = bio;
+535                 }
+536 
+537                 zone = find_zone(mddev-&amp;gt;private, &amp;amp;sector);
+538                 tmp_dev = map_sector(mddev, zone, sector, &amp;amp;sector);
+539                 split-&amp;gt;bi_bdev = tmp_dev-&amp;gt;bdev;
+540                 split-&amp;gt;bi_iter.bi_sector = sector + zone-&amp;gt;dev_start +
+541                         tmp_dev-&amp;gt;data_offset;
+                           ...
+548                         generic_make_request(split);&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;that tell us: &amp;laquo;split bio requests to&amp;nbsp;raid md&amp;nbsp;device, map it&amp;nbsp;to&amp;nbsp;particular disk and issue &lt;code&gt;generic_make_request&lt;/code&gt;&amp;raquo;.&lt;/p&gt;
+&lt;p&gt;Closer look to&amp;nbsp;&lt;code&gt;generic_make_request&lt;/code&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;1966         do {
+1967                 struct request_queue *q = bdev_get_queue(bio-&amp;gt;bi_bdev);
+1968 
+1969                 q-&amp;gt;make_request_fn(q, bio);
+1970 
+1971                 bio = bio_list_pop(current-&amp;gt;bio_list);
+1972         } while (bio);&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;will show us&amp;nbsp;that it&amp;nbsp;gets request queue from block device, in&amp;nbsp;our case a&amp;nbsp;particular disk, and issue &lt;code&gt;make_request_fn&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;This will lead us&amp;nbsp;to&amp;nbsp;see which block devices our RAID consists of:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ mdadm --misc -D /dev/md0 
+/dev/md0:
+        Version : 1.2
+  Creation Time : Mon Nov 30 11:15:51 2015
+     Raid Level : raid0
+     Array Size : 3989504 (3.80 GiB 4.09 GB)
+   Raid Devices : 8
+  Total Devices : 8
+    Persistence : Superblock is persistent
+
+    Update Time : Mon Nov 30 11:15:51 2015
+          State : clean 
+ Active Devices : 8
+Working Devices : 8
+ Failed Devices : 0
+  Spare Devices : 0
+
+     Chunk Size : 512K
+
+           Name : alien:0  (local to host alien)
+           UUID : d2960b14:bc29a1c5:040efdc6:39daf5cf
+         Events : 0
+
+    Number   Major   Minor   RaidDevice State
+       0       1        0        0      active sync   /dev/ram0
+       1       1        1        1      active sync   /dev/ram1
+       2       1        2        2      active sync   /dev/ram2
+       3       1        3        3      active sync   /dev/ram3
+       4       1        4        4      active sync   /dev/ram4
+       5       1        5        5      active sync   /dev/ram5
+       6       1        6        6      active sync   /dev/ram6
+       7     253        0        7      active sync   /dev/dm-0&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;and here we&amp;nbsp;go&amp;nbsp;&amp;mdash; last device is&amp;nbsp;our strange &lt;code&gt;/dev/&lt;nobr&gt;dm-0&lt;/nobr&gt;&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;And again, I&amp;nbsp;knew it&amp;nbsp;from the beginning, and tried to&amp;nbsp;come into the root of&amp;nbsp;the problem with SystemTap. But SystemTap was just a&amp;nbsp;motivation to&amp;nbsp;look into kernel code and think deeper, which is&amp;nbsp;nice, though. This again proofs that the best tool to&amp;nbsp;investigate any problem, be&amp;nbsp;that performance issue or&amp;nbsp;bug, is&amp;nbsp;your brain and experience.&lt;/p&gt;
+&lt;p&gt;Thanks for reading.&lt;/p&gt;</content>
+  </entry>
   <entry xml:base="http://alex.dzyoba.com/feed">
     <title type="text">Multiboot kernel</title>
     <id>programming/multiboot.html</id>
@@ -74,7 +304,8 @@ SECTIONS {
 &lt;pre&gt;&lt;code&gt;$ qemu-system-i386 -kernel kernel&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;You’re&amp;nbsp;got it:&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/qemu-kernel.png" alt="QEMU direct kernel" /&gt;&lt;p class="caption"&gt;QEMU direct kernel&lt;/p&gt;
+&lt;img src="/assets/img/qemu-kernel.png" alt="QEMU direct kernel" /&gt;
+&lt;p class="caption"&gt;QEMU direct kernel&lt;/p&gt;
 &lt;/div&gt;
 &lt;h2 id="the-multiboot-part"&gt;The multiboot part&lt;/h2&gt;
 &lt;p&gt;When computer is&amp;nbsp;being power up&amp;nbsp;it&amp;nbsp;starts executing code according to&amp;nbsp;its &amp;laquo;reset vector&amp;raquo;. For modern x86 processors it&amp;nbsp;is&amp;nbsp;&lt;code&gt;0xFFFFFFF0&lt;/code&gt;. At&amp;nbsp;this address motherboard sets jump instruction to&amp;nbsp;the BIOS code. CPU is&amp;nbsp;in&amp;nbsp;&amp;laquo;Real mode&amp;raquo; (16 bit addressing with segmentation (up&amp;nbsp;to&amp;nbsp;1MiB), no&amp;nbsp;protection, no&amp;nbsp;paging).&lt;/p&gt;
@@ -112,73 +343,154 @@ SECTIONS {
         &lt;span class="dt"&gt;dd&lt;/span&gt; FLAGS                    &lt;span class="co"&gt;; the flags,&lt;/span&gt;
         &lt;span class="dt"&gt;dd&lt;/span&gt; CHECKSUM                 &lt;span class="co"&gt;; and the checksum&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;We&amp;nbsp;didn’t&amp;nbsp;specify any flags because we&amp;nbsp;don’t&amp;nbsp;need anything from bootloader like memory maps and stuff, and bootloader doesn’t&amp;nbsp;need anything from us&amp;nbsp;because we’re&amp;nbsp;in&amp;nbsp;ELF format. For other formats you must supply loading address in&amp;nbsp;its multiboot header. Multiboot header is&amp;nbsp;pretty simple:&lt;/p&gt;
-&lt;table summary=""&gt;&lt;tbody&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-Offset &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-Type &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
+&lt;table summary&gt;
+&lt;tbody&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+Offset &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+Type &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
 Field Name
-&lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 Note &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-0 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-magic &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+0 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+magic &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 required &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-4 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-flags &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+4 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+flags &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 required &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-8 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-checksum &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+8 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+checksum &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 required &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-12 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-header_addr &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+12 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+header_addr &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 if&amp;nbsp;flags[16] is&amp;nbsp;set &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-16 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-load_addr &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+16 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+load_addr &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 if&amp;nbsp;flags[16] is&amp;nbsp;set &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-20 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-load_end_addr &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+20 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+load_end_addr &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 if&amp;nbsp;flags[16] is&amp;nbsp;set &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-24 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-bss_end_addr &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+24 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+bss_end_addr &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 if&amp;nbsp;flags[16] is&amp;nbsp;set &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-28 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-entry_addr &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+28 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+entry_addr &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 if&amp;nbsp;flags[16] is&amp;nbsp;set &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-32 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-mode_type &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+32 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+mode_type &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 if&amp;nbsp;flags[2] is&amp;nbsp;set &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-36 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-width &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+36 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+width &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 if&amp;nbsp;flags[2] is&amp;nbsp;set &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-40 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-height &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+40 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+height &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 if&amp;nbsp;flags[2] is&amp;nbsp;set &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;tr align="left"&gt;&lt;td valign="top" width="10%"&gt;
-44 &lt;/td&gt;&lt;td valign="top" width="10%"&gt;
-u32 &lt;/td&gt;&lt;td valign="top" width="20%"&gt;
-depth &lt;/td&gt;&lt;td valign="top" width="50%"&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr align="left"&gt;
+&lt;td valign="top" width="10%"&gt;
+44 &lt;/td&gt;
+&lt;td valign="top" width="10%"&gt;
+u32 &lt;/td&gt;
+&lt;td valign="top" width="20%"&gt;
+depth &lt;/td&gt;
+&lt;td valign="top" width="50%"&gt;
 if&amp;nbsp;flags[2] is&amp;nbsp;set &lt;br&gt;
-&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
 &lt;h2 id="the-booting"&gt;The booting&lt;/h2&gt;
 &lt;p&gt;Now lets boot our kernel like a&amp;nbsp;serious guys.&lt;/p&gt;
 &lt;p&gt;First, we&amp;nbsp;create ISO image with help of&amp;nbsp;&lt;code&gt;&lt;nobr&gt;grub2-mkrescue&lt;/nobr&gt;&lt;/code&gt;. Create hierarchy like this:&lt;/p&gt;
@@ -220,9 +532,8 @@ if&amp;nbsp;flags[2] is&amp;nbsp;set &lt;br&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Kernel profiling: perf&lt;/li&gt;
-&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
-&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
-&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-systemtap.html"&gt;Kernel profiling: SystemTap&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Various tools&lt;/li&gt;
 &lt;/ol&gt;
 &lt;h2 id="perf-overview"&gt;Perf overview&lt;/h2&gt;
 &lt;p&gt;Perf is&amp;nbsp;a&amp;nbsp;facility comprised of&amp;nbsp;kernel infrastructure for gathering various events and userspace tool to&amp;nbsp;get gathered data from the kernel and analyze it. It&amp;nbsp;is&amp;nbsp;like a&amp;nbsp;&lt;code&gt;gprof&lt;/code&gt;, but it&amp;nbsp;is&amp;nbsp;&lt;nobr&gt;non-invasive&lt;/nobr&gt;, &lt;nobr&gt;low-overhead&lt;/nobr&gt; and profile whole stack, including your app, libraries, system calls AND kernel with CPU!&lt;/p&gt;
@@ -302,23 +613,28 @@ PerfTop:     361 irqs/sec  kernel:35.5%  exact:  0.0% [4000Hz cycles],  (all, 4 
 &lt;pre&gt;&lt;code&gt;# perf report&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;You will see a&amp;nbsp;nice interactive TUI interface.&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/perf-tui.png" alt="perf tui" /&gt;&lt;p class="caption"&gt;perf tui&lt;/p&gt;
+&lt;img src="/assets/img/perf-tui.png" alt="perf tui" /&gt;
+&lt;p class="caption"&gt;perf tui&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;You can zoom into pid/thread&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/perf-zoom-into-thread.png" alt="perf zoom into thread" /&gt;&lt;p class="caption"&gt;perf zoom into thread&lt;/p&gt;
+&lt;img src="/assets/img/perf-zoom-into-thread.png" alt="perf zoom into thread" /&gt;
+&lt;p class="caption"&gt;perf zoom into thread&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;and see what’s&amp;nbsp;going on&amp;nbsp;there&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/perf-thread-info.png" alt="perf thread info" /&gt;&lt;p class="caption"&gt;perf thread info&lt;/p&gt;
+&lt;img src="/assets/img/perf-thread-info.png" alt="perf thread info" /&gt;
+&lt;p class="caption"&gt;perf thread info&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;You can look into nice assembly code (this looks almost as&amp;nbsp;in&amp;nbsp;&lt;a href="http://www.radare.org/r/"&gt;radare&lt;/a&gt;)&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/perf-assembly.png" alt="perf assembly" /&gt;&lt;p class="caption"&gt;perf assembly&lt;/p&gt;
+&lt;img src="/assets/img/perf-assembly.png" alt="perf assembly" /&gt;
+&lt;p class="caption"&gt;perf assembly&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;and run scripts on&amp;nbsp;it&amp;nbsp;to&amp;nbsp;see, for example, function calls histogram:&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/perf-histogram.png" alt="perf histogram" /&gt;&lt;p class="caption"&gt;perf histogram&lt;/p&gt;
+&lt;img src="/assets/img/perf-histogram.png" alt="perf histogram" /&gt;
+&lt;p class="caption"&gt;perf histogram&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;If&amp;nbsp;it’s&amp;nbsp;not enough to&amp;nbsp;you, there are a&amp;nbsp;lot of&amp;nbsp;options both for &lt;code&gt;perf record&lt;/code&gt; and &lt;code&gt;perf report&lt;/code&gt; so&amp;nbsp;play with it.&lt;/p&gt;
 &lt;h3 id="other"&gt;Other&lt;/h3&gt;
@@ -364,11 +680,13 @@ PerfTop:     361 irqs/sec  kernel:35.5%  exact:  0.0% [4000Hz cycles],  (all, 4 
 &lt;p&gt;Now show me&amp;nbsp;the profile:&lt;/p&gt;
 &lt;pre&gt;&lt;code&gt;# perf report -g -T&lt;/code&gt;&lt;/pre&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/perf-report-block-hasher.png" alt="perf report of block_hasher" /&gt;&lt;p class="caption"&gt;perf report of&amp;nbsp;block_hasher&lt;/p&gt;
+&lt;img src="/assets/img/perf-report-block-hasher.png" alt="perf report of block_hasher" /&gt;
+&lt;p class="caption"&gt;perf report of&amp;nbsp;block_hasher&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;Nothing much. I’ve&amp;nbsp;looked into block_hasher threads, I’ve&amp;nbsp;built a&amp;nbsp;histogram, looked for vmlinux DSO, found instruction with most overhead&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/perf-lock-acquire-assembly.png" alt="perf __lock_acquire" /&gt;&lt;p class="caption"&gt;perf __lock_acquire&lt;/p&gt;
+&lt;img src="/assets/img/perf-lock-acquire-assembly.png" alt="perf __lock_acquire" /&gt;
+&lt;p class="caption"&gt;perf __lock_acquire&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;and still can’t&amp;nbsp;say I&amp;nbsp;found what’s&amp;nbsp;wrong. That’s&amp;nbsp;because there is&amp;nbsp;no&amp;nbsp;real overhead, nothing is&amp;nbsp;spinning in&amp;nbsp;vain. Something is&amp;nbsp;just plain sleeping.&lt;/p&gt;
 &lt;p&gt;What we’ve&amp;nbsp;done here and &lt;a href="/linux/profiling-ftrace.html"&gt;before in&amp;nbsp;ftrace part&lt;/a&gt; is&amp;nbsp;a&amp;nbsp;hot spots analysis, i.e. we&amp;nbsp;try to&amp;nbsp;find places in&amp;nbsp;our application or&amp;nbsp;system that cause CPU to&amp;nbsp;spin in&amp;nbsp;useless cycles. Usually, it’s&amp;nbsp;what you want but not today. We&amp;nbsp;need to&amp;nbsp;understand why &lt;code&gt;pread&lt;/code&gt; is&amp;nbsp;sleeping. And that’s&amp;nbsp;what I&amp;nbsp;call &amp;laquo;latency profiling&amp;raquo;.&lt;/p&gt;
@@ -485,13 +803,15 @@ Samples: 10  of event &amp;#39;sched:sched_switch&amp;#39;, Event count (approx.
 # perf report -i perf.sched&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;I’ve&amp;nbsp;inspected samples for &lt;code&gt;sched_switch&lt;/code&gt; and &lt;code&gt;sched_stat_runtime&lt;/code&gt; events (15K and 17K respectively) and found nothing. But then I&amp;nbsp;looked in&amp;nbsp;&lt;code&gt;sched_stat_iowait&lt;/code&gt;.&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/perf-sched-stat-iowait.png" alt="perf sched_stat_iowait" /&gt;&lt;p class="caption"&gt;perf sched_stat_iowait&lt;/p&gt;
+&lt;img src="/assets/img/perf-sched-stat-iowait.png" alt="perf sched_stat_iowait" /&gt;
+&lt;p class="caption"&gt;perf sched_stat_iowait&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;and there I&amp;nbsp;found really suspicious thing:&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/perf-dm-delay.png" alt="perf dm-delay" /&gt;&lt;p class="caption"&gt;perf &lt;nobr&gt;dm-delay&lt;/nobr&gt;&lt;/p&gt;
+&lt;img src="/assets/img/perf-dm-delay.png" alt="perf dm-delay" /&gt;
+&lt;p class="caption"&gt;perf &lt;nobr&gt;dm-delay&lt;/nobr&gt;&lt;/p&gt;
 &lt;/div&gt;
-&lt;p&gt;See? Almost all symbols come from &amp;laquo;kernel.vmlinux&amp;raquo; shared object, but one with strange name &amp;laquo;0&amp;times;000000005f8ccc27&amp;raquo; comes from &amp;laquo;dm_delay&amp;raquo; object. Wait, what is&amp;nbsp;&amp;laquo;dm_delay&amp;raquo;? Quick find gives us&amp;nbsp;the answer:&lt;/p&gt;
+&lt;p&gt;See? Almost all symbols come from &amp;laquo;kernel.vmlinux&amp;raquo; shared object, but one with strange name &amp;laquo;0&amp;times;000000005f8ccc27&amp;raquo; comes from &amp;laquo;dm_delay&amp;raquo; object. Wait, what is&amp;nbsp;&amp;laquo;dm_delay&amp;raquo;? Quick find gives us&amp;nbsp;the answer: &lt;a name="dm-delay"&gt;&lt;/a&gt;&lt;/p&gt;
 &lt;pre&gt;&lt;code&gt;&amp;gt; dm-delay
 &amp;gt; ========
 &amp;gt;
@@ -838,12 +1158,14 @@ Range is 1000000
 &lt;/ul&gt;
 &lt;p&gt;As&amp;nbsp;for sorting here is&amp;nbsp;a&amp;nbsp;result table:&lt;/p&gt;
 &lt;table&gt;
+&lt;colgroup&gt;
 &lt;col width="14%" /&gt;
 &lt;col width="14%" /&gt;
 &lt;col width="14%" /&gt;
 &lt;col width="16%" /&gt;
 &lt;col width="28%" /&gt;
 &lt;col width="10%" /&gt;
+&lt;/colgroup&gt;
 &lt;thead&gt;
 &lt;tr class="header"&gt;
 &lt;th align="left"&gt;Test case&lt;/th&gt;
@@ -892,7 +1214,7 @@ Range is 1000000
 &lt;li id="fn2"&gt;&lt;p&gt;libmemrestrict gets a&amp;nbsp;configuration from environment. Common practice for libraries, for example &lt;code&gt;LD_PRELOAD&lt;/code&gt; and &lt;code&gt;LD_LIBRARY_PATH&lt;/code&gt; are &lt;nobr&gt;well-known&lt;/nobr&gt; environment variables for &lt;nobr&gt;ld-linux&lt;/nobr&gt;.so, and there is&amp;nbsp;also less known, but extremely useful &lt;code&gt;LD_DEBUG&lt;/code&gt; environment variable for &lt;a href="http://www.bnikolic.co.uk/blog/linux-ld-debug.html"&gt;linkage debugging&lt;/a&gt;.&lt;a href="#fnref2"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id="fn3"&gt;&lt;p&gt;It’s&amp;nbsp;strange because qsort is&amp;nbsp;&lt;nobr&gt;in-place&lt;/nobr&gt; and uses optimizations suggested by&amp;nbsp;Robert Sedgewick to, among others, guarantee O(log n) space complexity. You can dive into &lt;a href="https://sourceware.org/git/?p=glibc.git;a=blob;f=stdlib/qsort.c;h=04c25b984f74a8f738233cc6da8a738b6437833c;hb=b8079dd0d360648e4e8de48656c5c38972621072"&gt;glibc qsort implementation.&lt;/a&gt;&lt;a href="#fnref3"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id="fn4"&gt;&lt;p&gt;There is&amp;nbsp;a&amp;nbsp;strange behaviour though. For example, if&amp;nbsp;I&amp;nbsp;restrict memory for 5.3 MB&amp;nbsp;it&amp;nbsp;will work and &lt;em&gt;not&lt;/em&gt; require O(n) memory. I’m&amp;nbsp;still investigating on&amp;nbsp;this.&lt;a href="#fnref4"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
-&lt;li id="fn5"&gt;&lt;p&gt;&lt;a href="http://en.wikipedia.org/wiki/X86-64#Virtual_address_space_details"&gt;http://en.wikipedia.org/wiki/&lt;nobr&gt;X86-64&lt;/nobr&gt;#Virtual_address_space_details&lt;/a&gt;&lt;a href="#fnref5"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id="fn5"&gt;&lt;p&gt;&lt;a href="http://en.wikipedia.org/wiki/X86-64#Virtual_address_space_details" class="uri"&gt;http://en.wikipedia.org/wiki/&lt;nobr&gt;X86-64&lt;/nobr&gt;#Virtual_address_space_details&lt;/a&gt;&lt;a href="#fnref5"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id="fn6"&gt;&lt;p&gt;Note that &lt;strong&gt;MiB&lt;/strong&gt; is&amp;nbsp;2&lt;sup&gt;20&lt;/sup&gt; and &lt;strong&gt;MB&lt;/strong&gt; is&amp;nbsp;10&lt;sup&gt;6&lt;/sup&gt; = 1 million. So&amp;nbsp;500 MB&amp;nbsp;= 500&amp;nbsp;000&amp;nbsp;000 bytes which is&amp;nbsp;500&amp;nbsp;000&amp;nbsp;000 &amp;gt;&amp;gt; 20 = 476 MiB.&lt;a href="#fnref6"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id="fn7"&gt;&lt;p&gt;Plus extra 500 KB&amp;nbsp;for temporary strings holding chunks paths.&lt;a href="#fnref7"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id="fn8"&gt;&lt;p&gt;In&amp;nbsp;this way it’s&amp;nbsp;kind of&amp;nbsp;&lt;nobr&gt;N-way&lt;/nobr&gt; merge.&lt;a href="#fnref8"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
@@ -1469,9 +1791,8 @@ Failed after 21 allocations&lt;/code&gt;&lt;/pre&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;Kernel profiling: ftrace&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
-&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
-&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-systemtap.html"&gt;Kernel profiling: SystemTap&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Various tools&lt;/li&gt;
 &lt;/ol&gt;
 &lt;h2 id="ftrace"&gt;ftrace&lt;/h2&gt;
 &lt;p&gt;&lt;strong&gt;Ftrace&lt;/strong&gt; is&amp;nbsp;a&amp;nbsp;framework for tracing and profiling Linux kernel with features like that:&lt;/p&gt;
@@ -1750,9 +2071,8 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;li&gt;Kernel profiling: Intro&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
-&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
-&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-systemtap.html"&gt;Kernel profiling: SystemTap&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Various tools&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;Quick reminder. I’m&amp;nbsp;trying to&amp;nbsp;understand why my&amp;nbsp;nice little program is&amp;nbsp;reading from RAID so&amp;nbsp;slow. I’m&amp;nbsp;using various profiling tools to&amp;nbsp;inspect my&amp;nbsp;&lt;code&gt;block_hasher&lt;/code&gt; and get a&amp;nbsp;&lt;nobr&gt;hands-on&lt;/nobr&gt; experience with profilers.&lt;/p&gt;
 &lt;p&gt;So, we&amp;nbsp;reviewed userspace profiling and arrived to&amp;nbsp;main theme of&amp;nbsp;my&amp;nbsp;article series which is&amp;nbsp;kernel profiling: tools, profilers, facilities and methods of&amp;nbsp;profiling.&lt;/p&gt;
@@ -1930,7 +2250,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;p&gt;And in&amp;nbsp;addition to&amp;nbsp;that perf included &lt;em&gt;tracepoint&lt;/em&gt; support via &lt;code&gt;ftrace&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;To&amp;nbsp;access &lt;em&gt;perf_events&lt;/em&gt; there is&amp;nbsp;a&amp;nbsp;special syscall &lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/perf_event_open.html"&gt;&lt;code&gt;perf_event_open&lt;/code&gt;&lt;/a&gt;. You are passing the type of&amp;nbsp;event (hardware, kernel, tracepoint) and so&amp;nbsp;called config, where you specifies what exactly you want depending on&amp;nbsp;type. It’s&amp;nbsp;gonna be&amp;nbsp;function name in&amp;nbsp;case of&amp;nbsp;tracepoint, some CPU metric in&amp;nbsp;case of&amp;nbsp;hardware and so&amp;nbsp;on.&lt;/p&gt;
 &lt;p&gt;And on&amp;nbsp;top of&amp;nbsp;that there are a&amp;nbsp;whole lot of&amp;nbsp;stuff like event groups, filters, sampling, various output formats and others. And all of&amp;nbsp;that are &lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/abi_breakage.html"&gt;constantly breaking&lt;/a&gt;&lt;a href="#fn3" class="footnoteRef" id="fnref3"&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt;, that’s&amp;nbsp;why the only thing you can ask for perf_events is&amp;nbsp;special &lt;code&gt;perf&lt;/code&gt; utility&amp;nbsp;&amp;mdash; the only userspace utility that is&amp;nbsp;a&amp;nbsp;part of&amp;nbsp;kernel tree.&lt;/p&gt;
-&lt;p&gt;&lt;em&gt;perf_events and all things related to&amp;nbsp;it&amp;nbsp;spreads as&amp;nbsp;a&amp;nbsp;plague in&amp;nbsp;kernel and now &lt;code&gt;ftrace&lt;/code&gt; is&amp;nbsp;going to&amp;nbsp;be&amp;nbsp;part of&amp;nbsp;&lt;code&gt;perf&lt;/code&gt; (&lt;a href="http://thread.gmane.org/gmane.linux.kernel/1136520"&gt;1&lt;/a&gt;, &lt;a href="https://lkml.org/lkml/2013/10/16/15"&gt;2&lt;/a&gt;). Some people overreacting on&amp;nbsp;&lt;/em&gt;perf_ related things though it’s&amp;nbsp;useless because &lt;em&gt;perf&lt;/em&gt; is&amp;nbsp;developed by&amp;nbsp;kernel big fishes&amp;nbsp;&amp;mdash; Info Molnar&lt;a href="#fn4" class="footnoteRef" id="fnref4"&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt; and Peter Zijlstra.&lt;/p&gt;
+&lt;p&gt;_perf_events and all things related to&amp;nbsp;it&amp;nbsp;spreads as&amp;nbsp;a&amp;nbsp;plague in&amp;nbsp;kernel and now &lt;code&gt;ftrace&lt;/code&gt; is&amp;nbsp;going to&amp;nbsp;be&amp;nbsp;part of&amp;nbsp;&lt;code&gt;perf&lt;/code&gt; (&lt;a href="http://thread.gmane.org/gmane.linux.kernel/1136520"&gt;1&lt;/a&gt;, &lt;a href="https://lkml.org/lkml/2013/10/16/15"&gt;2&lt;/a&gt;). Some people overreacting on&amp;nbsp;&lt;em&gt;perf&lt;/em&gt; related things though it’s&amp;nbsp;useless because &lt;em&gt;perf&lt;/em&gt; is&amp;nbsp;developed by&amp;nbsp;kernel big fishes&amp;nbsp;&amp;mdash; Info Molnar&lt;a href="#fn4" class="footnoteRef" id="fnref4"&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt; and Peter Zijlstra.&lt;/p&gt;
 &lt;p&gt;I&amp;nbsp;really can’t&amp;nbsp;tell anything more about &lt;em&gt;perf_events&lt;/em&gt; in&amp;nbsp;isolation of&amp;nbsp;&lt;code&gt;perf&lt;/code&gt;, so&amp;nbsp;here I&amp;nbsp;finish.&lt;/p&gt;
 &lt;h2 id="summary"&gt;Summary&lt;/h2&gt;
 &lt;p&gt;There are a&amp;nbsp;few Linux kernel features that enables profiling:&lt;/p&gt;
@@ -1942,22 +2262,22 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;p&gt;All Linux kernel profilers uses combinations of&amp;nbsp;that features, read details in&amp;nbsp;article for particular profiler.&lt;/p&gt;
 &lt;h2 id="to-read"&gt;To&amp;nbsp;read&lt;/h2&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf"&gt;https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf"&gt;http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf" class="uri"&gt;https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf" class="uri"&gt;http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;em&gt;tracepoints&lt;/em&gt;: &lt;ul&gt;
 &lt;li&gt;&lt;a href="http://lxr.free-electrons.com/source/Documentation/trace/tracepoints.txt?v=3.13"&gt;Documentation/trace/tracepoints.txt&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="http://lttng.org/files/thesis/desnoyers-dissertation-2009-12-v27.pdf"&gt;http://lttng.org/files/thesis/desnoyers-dissertation-&lt;nobr&gt;2009-12-v27&lt;/nobr&gt;.pdf&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="http://lwn.net/Articles/379903/"&gt;http://lwn.net/Articles/379903/&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="http://lwn.net/Articles/381064/"&gt;http://lwn.net/Articles/381064/&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="http://lwn.net/Articles/383362/"&gt;http://lwn.net/Articles/383362/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lttng.org/files/thesis/desnoyers-dissertation-2009-12-v27.pdf" class="uri"&gt;http://lttng.org/files/thesis/desnoyers-dissertation-&lt;nobr&gt;2009-12-v27&lt;/nobr&gt;.pdf&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lwn.net/Articles/379903/" class="uri"&gt;http://lwn.net/Articles/379903/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lwn.net/Articles/381064/" class="uri"&gt;http://lwn.net/Articles/381064/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://lwn.net/Articles/383362/" class="uri"&gt;http://lwn.net/Articles/383362/&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;&lt;/li&gt;
 &lt;li&gt;&lt;em&gt;kprobes&lt;/em&gt;: &lt;ul&gt;
 &lt;li&gt;&lt;a href="http://lxr.free-electrons.com/source/Documentation/kprobes.txt?v=3.13"&gt;Documentation/kprobes.txt&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://lwn.net/Articles/132196/"&gt;https://lwn.net/Articles/132196/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://lwn.net/Articles/132196/" class="uri"&gt;https://lwn.net/Articles/132196/&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;&lt;/li&gt;
 &lt;li&gt;&lt;em&gt;perf_events&lt;/em&gt;: &lt;ul&gt;
-&lt;li&gt;&lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/"&gt;http://web.eece.maine.edu/~vweaver/projects/perf_events/&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://lwn.net/Articles/441209/"&gt;https://lwn.net/Articles/441209/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/" class="uri"&gt;http://web.eece.maine.edu/~vweaver/projects/perf_events/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://lwn.net/Articles/441209/" class="uri"&gt;https://lwn.net/Articles/441209/&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;div class="footnotes"&gt;
@@ -1986,13 +2306,12 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
-&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
-&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-systemtap.html"&gt;Kernel profiling: SystemTap&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Various tools&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;Quick reminder. I’m&amp;nbsp;trying to&amp;nbsp;understand why my&amp;nbsp;nice little program is&amp;nbsp;doing reading from RAID so&amp;nbsp;slow. I’m&amp;nbsp;using various profiling tools to&amp;nbsp;inspect my&amp;nbsp;&lt;code&gt;block_hasher&lt;/code&gt; and get a&amp;nbsp;&lt;nobr&gt;hands-on&lt;/nobr&gt; experience with profilers.&lt;/p&gt;
 &lt;h2 id="valgrind"&gt;Valgrind&lt;/h2&gt;
-&lt;p&gt;Countrary to&amp;nbsp;popular belief, &lt;em&gt;Valgrind is&amp;nbsp;not a&amp;nbsp;single tool, but a&amp;nbsp;suite of&amp;nbsp;such tools, with &lt;/em&gt;Memcheck_ as&amp;nbsp;default. By&amp;nbsp;the time of&amp;nbsp;writing &lt;em&gt;Valgrind&lt;/em&gt; consists of:&lt;/p&gt;
+&lt;p&gt;Countrary to&amp;nbsp;popular belief, _Valgrind is&amp;nbsp;not a&amp;nbsp;single tool, but a&amp;nbsp;suite of&amp;nbsp;such tools, with &lt;em&gt;Memcheck&lt;/em&gt; as&amp;nbsp;default. By&amp;nbsp;the time of&amp;nbsp;writing &lt;em&gt;Valgrind&lt;/em&gt; consists of:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Memcheck&amp;nbsp;&amp;mdash; memory management errors detection.&lt;/li&gt;
 &lt;li&gt;Cachegrind&amp;nbsp;&amp;mdash; CPU cache access profiling tool.&lt;/li&gt;
@@ -2268,9 +2587,8 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
-&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
-&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-systemtap.html"&gt;Kernel profiling: SystemTap&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Various tools&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;&lt;em&gt;gprof&lt;/em&gt; and &lt;em&gt;gcov&lt;/em&gt; is&amp;nbsp;a&amp;nbsp;classical profilers that are still in&amp;nbsp;wide use. Since the dawn of&amp;nbsp;time they were used by&amp;nbsp;hackers though now everybody shifts their focus to&amp;nbsp;dynamic profilers like Valgrind.&lt;/p&gt;
 &lt;h2 id="gprof"&gt;gprof&lt;/h2&gt;
@@ -2429,9 +2747,8 @@ block_hasher.c:creating &amp;#39;block_hasher.c.gcov&amp;#39;&lt;/code&gt;&lt;/p
 &lt;li&gt;&lt;a href="/linux/profiling-kernel.html"&gt;Kernel profiling: Intro&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-ftrace.html"&gt;Kernel profiling: ftrace&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href="/linux/profiling-perf.html"&gt;Kernel profiling: perf&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Kernel profiling: SystemTap&lt;/li&gt;
-&lt;li&gt;Kernel profiling: ktap&lt;/li&gt;
-&lt;li&gt;Vendor specific profiling: Intel VTune&lt;/li&gt;
+&lt;li&gt;&lt;a href="/linux/profiling-systemtap.html"&gt;Kernel profiling: SystemTap&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Various tools&lt;/li&gt;
 &lt;/ol&gt;
 &lt;h2 id="faq"&gt;FAQ&lt;/h2&gt;
 &lt;p&gt;&lt;strong&gt;Profiling&lt;/strong&gt;&amp;nbsp;&amp;mdash; dynamic analysis of&amp;nbsp;software, consisting of&amp;nbsp;gathering various metrics and calculating some statistical info from it. Usually, you do&amp;nbsp;profiling to&amp;nbsp;analyze performance though it’s&amp;nbsp;not the single case, e.g. there are works about profiling for &lt;a href="http://infoscience.epfl.ch/record/181628/files/eprof.pdf"&gt;energy consumption analysis&lt;/a&gt;.&lt;/p&gt;
@@ -2628,7 +2945,8 @@ T09: 29.88 MB/s f6eb529ee5b59824a657fb8de43c8c6d3e29cb00&lt;/code&gt;&lt;/pre&gt
 &lt;p&gt;You need this stack manipulation later to&amp;nbsp;access your local vars by&amp;nbsp;subtracting from &lt;code&gt;%rbp&lt;/code&gt;. But we&amp;nbsp;were subtratcting from &lt;code&gt;%rsp&lt;/code&gt;, isn’t&amp;nbsp;it&amp;nbsp;strange?&lt;/p&gt;
 &lt;p&gt;Wait a&amp;nbsp;minute&amp;hellip; I&amp;nbsp;decided to&amp;nbsp;draw stack frame and got it!&lt;/p&gt;
 &lt;div class="figure"&gt;
-&lt;img src="/assets/img/red-zone.png" alt="Stack" /&gt;&lt;p class="caption"&gt;Stack&lt;/p&gt;
+&lt;img src="/assets/img/red-zone.png" alt="Stack" /&gt;
+&lt;p class="caption"&gt;Stack&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;Holy shucks! We&amp;nbsp;are processing undefined memory. All instructions like this&lt;/p&gt;
 &lt;pre class="asm"&gt;&lt;code&gt;movdqa  -24(%rsp), %xmm0&lt;/code&gt;&lt;/pre&gt;

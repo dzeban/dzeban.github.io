@@ -71,9 +71,8 @@
 <li>Kernel profiling: Intro</li>
 <li><a href="/linux/profiling-ftrace.html">Kernel profiling: ftrace</a></li>
 <li><a href="/linux/profiling-perf.html">Kernel profiling: perf</a></li>
-<li>Kernel profiling: SystemTap</li>
-<li>Kernel profiling: ktap</li>
-<li>Vendor specific profiling: Intel VTune</li>
+<li><a href="/linux/profiling-systemtap.html">Kernel profiling: SystemTap</a></li>
+<li>Various tools</li>
 </ol>
 <p>Quick reminder. I’m&nbsp;trying to&nbsp;understand why my&nbsp;nice little program is&nbsp;reading from RAID so&nbsp;slow. I’m&nbsp;using various profiling tools to&nbsp;inspect my&nbsp;<code>block_hasher</code> and get a&nbsp;<nobr>hands-on</nobr> experience with profilers.</p>
 <p>So, we&nbsp;reviewed userspace profiling and arrived to&nbsp;main theme of&nbsp;my&nbsp;article series which is&nbsp;kernel profiling: tools, profilers, facilities and methods of&nbsp;profiling.</p>
@@ -251,7 +250,7 @@
 <p>And in&nbsp;addition to&nbsp;that perf included <em>tracepoint</em> support via <code>ftrace</code>.</p>
 <p>To&nbsp;access <em>perf_events</em> there is&nbsp;a&nbsp;special syscall <a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/perf_event_open.html"><code>perf_event_open</code></a>. You are passing the type of&nbsp;event (hardware, kernel, tracepoint) and so&nbsp;called config, where you specifies what exactly you want depending on&nbsp;type. It’s&nbsp;gonna be&nbsp;function name in&nbsp;case of&nbsp;tracepoint, some CPU metric in&nbsp;case of&nbsp;hardware and so&nbsp;on.</p>
 <p>And on&nbsp;top of&nbsp;that there are a&nbsp;whole lot of&nbsp;stuff like event groups, filters, sampling, various output formats and others. And all of&nbsp;that are <a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/abi_breakage.html">constantly breaking</a><a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a>, that’s&nbsp;why the only thing you can ask for perf_events is&nbsp;special <code>perf</code> utility&nbsp;&mdash; the only userspace utility that is&nbsp;a&nbsp;part of&nbsp;kernel tree.</p>
-<p><em>perf_events and all things related to&nbsp;it&nbsp;spreads as&nbsp;a&nbsp;plague in&nbsp;kernel and now <code>ftrace</code> is&nbsp;going to&nbsp;be&nbsp;part of&nbsp;<code>perf</code> (<a href="http://thread.gmane.org/gmane.linux.kernel/1136520">1</a>, <a href="https://lkml.org/lkml/2013/10/16/15">2</a>). Some people overreacting on&nbsp;</em>perf_ related things though it’s&nbsp;useless because <em>perf</em> is&nbsp;developed by&nbsp;kernel big fishes&nbsp;&mdash; Info Molnar<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> and Peter Zijlstra.</p>
+<p>_perf_events and all things related to&nbsp;it&nbsp;spreads as&nbsp;a&nbsp;plague in&nbsp;kernel and now <code>ftrace</code> is&nbsp;going to&nbsp;be&nbsp;part of&nbsp;<code>perf</code> (<a href="http://thread.gmane.org/gmane.linux.kernel/1136520">1</a>, <a href="https://lkml.org/lkml/2013/10/16/15">2</a>). Some people overreacting on&nbsp;<em>perf</em> related things though it’s&nbsp;useless because <em>perf</em> is&nbsp;developed by&nbsp;kernel big fishes&nbsp;&mdash; Info Molnar<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> and Peter Zijlstra.</p>
 <p>I&nbsp;really can’t&nbsp;tell anything more about <em>perf_events</em> in&nbsp;isolation of&nbsp;<code>perf</code>, so&nbsp;here I&nbsp;finish.</p>
 <h2 id="summary">Summary</h2>
 <p>There are a&nbsp;few Linux kernel features that enables profiling:</p>
@@ -263,22 +262,22 @@
 <p>All Linux kernel profilers uses combinations of&nbsp;that features, read details in&nbsp;article for particular profiler.</p>
 <h2 id="to-read">To&nbsp;read</h2>
 <ul>
-<li><a href="https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf">https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf</a></li>
-<li><a href="http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf">http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf</a></li>
+<li><a href="https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf" class="uri">https://events.linuxfoundation.org/sites/events/files/slides/kernel_profiling_debugging_tools_0.pdf</a></li>
+<li><a href="http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf" class="uri">http://events.linuxfoundation.org/sites/events/files/lcjp13_zannoni.pdf</a></li>
 <li><em>tracepoints</em>: <ul>
 <li><a href="http://lxr.free-electrons.com/source/Documentation/trace/tracepoints.txt?v=3.13">Documentation/trace/tracepoints.txt</a></li>
-<li><a href="http://lttng.org/files/thesis/desnoyers-dissertation-2009-12-v27.pdf">http://lttng.org/files/thesis/desnoyers-dissertation-<nobr>2009-12-v27</nobr>.pdf</a></li>
-<li><a href="http://lwn.net/Articles/379903/">http://lwn.net/Articles/379903/</a></li>
-<li><a href="http://lwn.net/Articles/381064/">http://lwn.net/Articles/381064/</a></li>
-<li><a href="http://lwn.net/Articles/383362/">http://lwn.net/Articles/383362/</a></li>
+<li><a href="http://lttng.org/files/thesis/desnoyers-dissertation-2009-12-v27.pdf" class="uri">http://lttng.org/files/thesis/desnoyers-dissertation-<nobr>2009-12-v27</nobr>.pdf</a></li>
+<li><a href="http://lwn.net/Articles/379903/" class="uri">http://lwn.net/Articles/379903/</a></li>
+<li><a href="http://lwn.net/Articles/381064/" class="uri">http://lwn.net/Articles/381064/</a></li>
+<li><a href="http://lwn.net/Articles/383362/" class="uri">http://lwn.net/Articles/383362/</a></li>
 </ul></li>
 <li><em>kprobes</em>: <ul>
 <li><a href="http://lxr.free-electrons.com/source/Documentation/kprobes.txt?v=3.13">Documentation/kprobes.txt</a></li>
-<li><a href="https://lwn.net/Articles/132196/">https://lwn.net/Articles/132196/</a></li>
+<li><a href="https://lwn.net/Articles/132196/" class="uri">https://lwn.net/Articles/132196/</a></li>
 </ul></li>
 <li><em>perf_events</em>: <ul>
-<li><a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/">http://web.eece.maine.edu/~vweaver/projects/perf_events/</a></li>
-<li><a href="https://lwn.net/Articles/441209/">https://lwn.net/Articles/441209/</a></li>
+<li><a href="http://web.eece.maine.edu/~vweaver/projects/perf_events/" class="uri">http://web.eece.maine.edu/~vweaver/projects/perf_events/</a></li>
+<li><a href="https://lwn.net/Articles/441209/" class="uri">https://lwn.net/Articles/441209/</a></li>
 </ul></li>
 </ul>
 <div class="footnotes">

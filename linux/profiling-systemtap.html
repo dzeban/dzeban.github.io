@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Linux profiling. SystemTap | Alex Dzyoba</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="page-header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">Alex Dzyoba</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Linux profiling. SystemTap</h2>
+                            <h6 class="post-meta">
+                              30 Nov 2015, in
+                              <a class="disabled" href="/categories/linux">linux</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>TOC:</p>
+<ol style="list-style-type: decimal">
+<li><a href="/linux/profiling-intro.html">Intro</a></li>
+<li><a href="/linux/profiling-gprof-gcov.html">Userspace profiling: gprof, gcov</a></li>
+<li><a href="/linux/profiling-valgrind.html">Userspace profiling: Valgrind</a></li>
+<li><a href="/linux/profiling-kernel.html">Kernel profiling: Intro</a></li>
+<li><a href="/linux/profiling-ftrace.html">Kernel profiling: ftrace</a></li>
+<li><a href="/linux/profiling-perf.html">Kernel profiling: perf</a></li>
+<li>Kernel profiling: SystemTap</li>
+<li>Various tools</li>
+</ol>
+<h2 id="systemtap">SystemTap</h2>
+<p>SystemTap is&nbsp;a&nbsp;profiling and debugging infrastructure <a href="https://sourceware.org/systemtap/systemtap-ols.pdf">based on&nbsp;kprobes</a>. Essentially, it’s&nbsp;a&nbsp;scripting facility for kprobes. It&nbsp;allows you to&nbsp;dynamically instrument the kernel and user application to&nbsp;track down complex and obscure problems in&nbsp;system behavior.</p>
+<p>With SystemTap you write a&nbsp;tapscript in&nbsp;a&nbsp;special language inspired by&nbsp;C, awk and dtrace. SystemTap language asks you to&nbsp;write handlers for probes defined in&nbsp;kernel or&nbsp;userspace that will be&nbsp;invoked when execution hits these probes. You can define your own functions and use extensive <a href="https://sourceware.org/systemtap/tapsets/">tapsets</a> library. Language provides you integers, strings, associative arrays and statistics, without requiring types and memory allocation. Comprehensive information about SystemTap language can be&nbsp;found in&nbsp;<a href="https://sourceware.org/systemtap/langref/">language reference</a>.</p>
+<p>Scripts that you wrote are elaborated (resolving references to&nbsp;tapsets, kernel and userspace symbols), translated to&nbsp;C, wrapped with kprobes <acronym title="Application programming interface" lang="en">API</acronym> invocation, compiled into kernel module that, finally, is&nbsp;loaded into kernel.</p>
+<p>Script output and other data collected is&nbsp;transferred from kernel to&nbsp;userspace via <nobr>high-performance</nobr> transport like relayfs or&nbsp;netlink.</p>
+<h2 id="setup">Setup</h2>
+<p>Installation part is&nbsp;boring and depends on&nbsp;your distro, on&nbsp;Fedora it’s&nbsp;as&nbsp;simple as:</p>
+<pre><code>$ dnf install systemtap</code></pre>
+<p>You will need SystemTap runtime and client tools along with tapsets and other development files for building your modules.</p>
+<p>Also, you will need kernel debug info:</p>
+<pre><code>$ dnf debuginfo-install kernel</code></pre>
+<p>After installation, you may check if&nbsp;it’s&nbsp;working:</p>
+<pre><code>stap -v -e &#39;probe begin { println(&quot;Started&quot;) }&#39;</code></pre>
+<h2 id="playground">Playground</h2>
+<p>Various examples of&nbsp;what SystemTap can do&nbsp;can be&nbsp;found <a href="https://sourceware.org/systemtap/examples/keyword-index.html">here</a>.</p>
+<p>You can see call graphs with <a href="https://sourceware.org/systemtap/examples/general/para-callgraph.stp"><nobr>para-callgraph</nobr>.stp</a>:</p>
+<pre><code>$ stap para-callgraph.stp &#39;process(&quot;/home/avd/dev/block_hasher/block_hasher&quot;).function(&quot;*&quot;)&#39; \
+  -c &#39;/home/avd/dev/block_hasher/block_hasher -d /dev/md0 -b 1048576 -t 10 -n 10000&#39;
+
+     0 block_hasher(10792):-&gt;_start 
+    11 block_hasher(10792): -&gt;__libc_csu_init 
+    14 block_hasher(10792):  -&gt;_init 
+    17 block_hasher(10792):  &lt;-_init 
+    18 block_hasher(10792):  -&gt;frame_dummy 
+    21 block_hasher(10792):   -&gt;register_tm_clones 
+    23 block_hasher(10792):   &lt;-register_tm_clones 
+    25 block_hasher(10792):  &lt;-frame_dummy 
+    26 block_hasher(10792): &lt;-__libc_csu_init 
+    31 block_hasher(10792): -&gt;main argc=0x9 argv=0x7ffc78849278
+    44 block_hasher(10792):  -&gt;bdev_open dev_path=0x7ffc78849130
+    88 block_hasher(10792):  &lt;-bdev_open return=0x163b010
+     0 block_hasher(10796):-&gt;thread_func arg=0x163b2c8
+     0 block_hasher(10797):-&gt;thread_func arg=0x163b330
+     0 block_hasher(10795):-&gt;thread_func arg=0x163b260
+     0 block_hasher(10798):-&gt;thread_func arg=0x163b398
+     0 block_hasher(10799):-&gt;thread_func arg=0x163b400
+     0 block_hasher(10800):-&gt;thread_func arg=0x163b468
+     0 block_hasher(10801):-&gt;thread_func arg=0x163b4d0
+     0 block_hasher(10802):-&gt;thread_func arg=0x163b538
+     0 block_hasher(10803):-&gt;thread_func arg=0x163b5a0
+     0 block_hasher(10804):-&gt;thread_func arg=0x163b608
+407360 block_hasher(10799): -&gt;time_diff start={...} end={...}
+407371 block_hasher(10799): &lt;-time_diff 
+407559 block_hasher(10799):&lt;-thread_func return=0x0
+436757 block_hasher(10795): -&gt;time_diff start={...} end={...}
+436765 block_hasher(10795): &lt;-time_diff 
+436872 block_hasher(10795):&lt;-thread_func return=0x0
+489156 block_hasher(10797): -&gt;time_diff start={...} end={...}
+489163 block_hasher(10797): &lt;-time_diff 
+489277 block_hasher(10797):&lt;-thread_func return=0x0
+506616 block_hasher(10803): -&gt;time_diff start={...} end={...}
+506628 block_hasher(10803): &lt;-time_diff 
+506754 block_hasher(10803):&lt;-thread_func return=0x0
+526005 block_hasher(10801): -&gt;time_diff start={...} end={...}
+526010 block_hasher(10801): &lt;-time_diff 
+526075 block_hasher(10801):&lt;-thread_func return=0x0
+9840716 block_hasher(10804): -&gt;time_diff start={...} end={...}
+9840723 block_hasher(10804): &lt;-time_diff 
+9840818 block_hasher(10804):&lt;-thread_func return=0x0
+9857787 block_hasher(10802): -&gt;time_diff start={...} end={...}
+9857792 block_hasher(10802): &lt;-time_diff 
+9857895 block_hasher(10802):&lt;-thread_func return=0x0
+9872655 block_hasher(10796): -&gt;time_diff start={...} end={...}
+9872664 block_hasher(10796): &lt;-time_diff 
+9872816 block_hasher(10796):&lt;-thread_func return=0x0
+9875681 block_hasher(10798): -&gt;time_diff start={...} end={...}
+9875686 block_hasher(10798): &lt;-time_diff 
+9874408 block_hasher(10800): -&gt;time_diff start={...} end={...}
+9874413 block_hasher(10800): &lt;-time_diff 
+9875767 block_hasher(10798):&lt;-thread_func return=0x0
+9874482 block_hasher(10800):&lt;-thread_func return=0x0
+9876305 block_hasher(10792):  -&gt;bdev_close dev=0x163b010
+10180742 block_hasher(10792):  &lt;-bdev_close 
+10180801 block_hasher(10792): &lt;-main return=0x0
+10180808 block_hasher(10792): -&gt;__do_global_dtors_aux 
+10180814 block_hasher(10792):  -&gt;deregister_tm_clones 
+10180817 block_hasher(10792):  &lt;-deregister_tm_clones 
+10180819 block_hasher(10792): &lt;-__do_global_dtors_aux 
+10180821 block_hasher(10792): -&gt;_fini 
+10180823 block_hasher(10792): &lt;-_fini 
+Pass 5: run completed in 20usr/3200sys/10716real ms.</code></pre>
+<p>You can find generic source of&nbsp;latency with <a href="https://sourceware.org/systemtap/examples/profiling/latencytap.stp">latencytap.stp</a>:</p>
+<pre><code>$ stap -v latencytap.stp -c \
+&#39;/home/avd/dev/block_hasher/block_hasher -d /dev/md0 -b 1048576 -t 10 -n 1000000&#39;
+
+Reason                                            Count  Average(us)  Maximum(us) Percent%
+Reading from file                                   490        49311        53833      96%
+Userspace lock contention                             8       118734       929420       3%
+Page fault                                           17           27           65       0%
+unmapping memory                                      4           37           55       0%
+mprotect() system call                                6           25           45       0%
+                                                      4           19           37       0%
+                                                      3           23           49       0%
+Page fault                                            2           24           46       0%
+Page fault                                            2           20           36       0%</code></pre>
+<p>Note: you may need to&nbsp;change timer interval in&nbsp;latencytap.stp:</p>
+<pre><code>-probe timer.s(30) {
++probe timer.s(5) {</code></pre>
+<p>There is&nbsp;even <a href="https://sourceware.org/systemtap/examples/stapgames/2048.stp">2048 written in&nbsp;SystemTap</a>!</p>
+<div class="figure">
+<img src="/assets/img/stap-2048.png" alt="SystemTap 2048" />
+<p class="caption">SystemTap 2048</p>
+</div>
+<p>All in&nbsp;all, it’s&nbsp;simple and convenient. You can wrap your head around it&nbsp;in&nbsp;a&nbsp;single day! And it&nbsp;works as&nbsp;you expect and this is&nbsp;a&nbsp;big deal because it&nbsp;gives you certainty and confidence in&nbsp;infirm ground of&nbsp;profiling kernel problems.</p>
+<h2 id="profiling-io-latency-for-block_hasher">Profiling I/O latency for block_hasher</h2>
+<p>So, how can we&nbsp;use it&nbsp;for profiling kernel, module or&nbsp;userspace application? The thing is&nbsp;that we&nbsp;have almost unlimited power in&nbsp;our hands. We&nbsp;can do&nbsp;whatever we&nbsp;want and howsoever we&nbsp;want, but we&nbsp;must know what we&nbsp;<em>want</em> and express it&nbsp;in&nbsp;SystemTap language.</p>
+<p>You have a&nbsp;tapsets&nbsp;&mdash; standard library for SystemTap&nbsp;&mdash; that contains a&nbsp;<a href="https://sourceware.org/systemtap/tapsets/">massive variety</a> of&nbsp;probes and functions that are available for your tapscripts.</p>
+<p>But, let’s&nbsp;be&nbsp;honest, nobody wants to&nbsp;write scripts, everybody wants to&nbsp;use scripts written by&nbsp;someone who has expertise and who already spent a&nbsp;lot of&nbsp;time, debugged and tweaked the script.</p>
+<p>Let’s&nbsp;look what we&nbsp;can find in&nbsp;<a href="https://sourceware.org/systemtap/examples/keyword-index.html#IO">SystemTap I/O examples</a>.</p>
+<p>There is&nbsp;one that seems legit: <a href="https://sourceware.org/systemtap/examples/io/ioblktime.stp">&laquo;ioblktime&raquo;</a>. Let’s&nbsp;launch it:</p>
+<pre><code>stap -v ioblktime.stp -o ioblktime -c \
+&#39;/home/avd/dev/block_hasher/block_hasher -d /dev/md0 -b 1048576 -t 10 -n 10000&#39;</code></pre>
+<p>Here’s&nbsp;what we’ve&nbsp;got:</p>
+<pre><code>device  rw total (us)      count   avg (us)
+  ram4   R     101628        981        103
+  ram5   R      99328        981        101
+  ram6   R      64973        974         66
+  ram2   R      57002        974         58
+  ram3   R      66635        974         68
+  ram0   R     101806        974        104
+  ram1   R      98470        974        101
+  ram7   R      64250        974         65
+  dm-0   R   48337401        974      49627
+   sda   W    3871495        376      10296
+   sda   R     125794         14       8985
+device  rw total (us)      count   avg (us)
+   sda   W     278560         18      15475</code></pre>
+<p>We&nbsp;see a&nbsp;strange device <nobr>dm-0</nobr>. Quick check:</p>
+<pre><code>$ dmsetup info /dev/dm-0 
+Name:              delayed
+State:             ACTIVE
+Read Ahead:        256
+Tables present:    LIVE
+Open count:        1
+Event number:      0
+Major, minor:      253, 0
+Number of targets: 1</code></pre>
+<p>DeviceMapper’s&nbsp;&laquo;delayed&raquo; target that we&nbsp;saw <a href="/linux/profiling-perf.html#dm-delay">previously</a>. This target creates block device that identically maps to&nbsp;disk, but delays each request by&nbsp;given amount of&nbsp;milliseconds. <strong>This is&nbsp;a&nbsp;cause of&nbsp;our RAID problems: performance of&nbsp;a&nbsp;striped RAID is&nbsp;a&nbsp;performance of&nbsp;the slowest disk.</strong></p>
+<p>I’ve&nbsp;look for other examples, but they mostly show which process generates the most I/O.</p>
+<p>Let’s&nbsp;try to&nbsp;write our own script!</p>
+<p>There is&nbsp;a&nbsp;tapset dedicated for <a href="https://sourceware.org/systemtap/tapsets/iosched.stp.html">I/O scheduler and block I/O</a>. Let’s&nbsp;use <code>probe:ioblock.end</code> matching our RAID device and print backtrace.</p>
+<pre><code>probe ioblock.end
+{
+    if (devname == &quot;md0&quot;) {
+        printf(&quot;%s: %d\n&quot;, devname, sector);
+        print_backtrace()
+    }
+}</code></pre>
+<p>Unfortunately, this won’t&nbsp;work because RAID device request end up&nbsp;in&nbsp;concrete disk, so&nbsp;we&nbsp;have to&nbsp;hook into <code>raid0</code> module.</p>
+<p>Dive into <a href="http://lxr.free-electrons.com/source/drivers/md/raid0.c?v=4.2"><code>drivers/md/raid0.c</code></a> and look to&nbsp;<a href="http://lxr.free-electrons.com/source/drivers/md/raid0.c?v=4.2#L507"><code>raid0_make_request</code></a>. Core of&nbsp;the RAID 0 is&nbsp;encoded in&nbsp;these lines:</p>
+<pre><code>530                 if (sectors &lt; bio_sectors(bio)) {
+531                         split = bio_split(bio, sectors, GFP_NOIO, fs_bio_set);
+532                         bio_chain(split, bio);
+533                 } else {
+534                         split = bio;
+535                 }
+536 
+537                 zone = find_zone(mddev-&gt;private, &amp;sector);
+538                 tmp_dev = map_sector(mddev, zone, sector, &amp;sector);
+539                 split-&gt;bi_bdev = tmp_dev-&gt;bdev;
+540                 split-&gt;bi_iter.bi_sector = sector + zone-&gt;dev_start +
+541                         tmp_dev-&gt;data_offset;
+                           ...
+548                         generic_make_request(split);</code></pre>
+<p>that tell us: &laquo;split bio requests to&nbsp;raid md&nbsp;device, map it&nbsp;to&nbsp;particular disk and issue <code>generic_make_request</code>&raquo;.</p>
+<p>Closer look to&nbsp;<code>generic_make_request</code></p>
+<pre><code>1966         do {
+1967                 struct request_queue *q = bdev_get_queue(bio-&gt;bi_bdev);
+1968 
+1969                 q-&gt;make_request_fn(q, bio);
+1970 
+1971                 bio = bio_list_pop(current-&gt;bio_list);
+1972         } while (bio);</code></pre>
+<p>will show us&nbsp;that it&nbsp;gets request queue from block device, in&nbsp;our case a&nbsp;particular disk, and issue <code>make_request_fn</code>.</p>
+<p>This will lead us&nbsp;to&nbsp;see which block devices our RAID consists of:</p>
+<pre><code>$ mdadm --misc -D /dev/md0 
+/dev/md0:
+        Version : 1.2
+  Creation Time : Mon Nov 30 11:15:51 2015
+     Raid Level : raid0
+     Array Size : 3989504 (3.80 GiB 4.09 GB)
+   Raid Devices : 8
+  Total Devices : 8
+    Persistence : Superblock is persistent
+
+    Update Time : Mon Nov 30 11:15:51 2015
+          State : clean 
+ Active Devices : 8
+Working Devices : 8
+ Failed Devices : 0
+  Spare Devices : 0
+
+     Chunk Size : 512K
+
+           Name : alien:0  (local to host alien)
+           UUID : d2960b14:bc29a1c5:040efdc6:39daf5cf
+         Events : 0
+
+    Number   Major   Minor   RaidDevice State
+       0       1        0        0      active sync   /dev/ram0
+       1       1        1        1      active sync   /dev/ram1
+       2       1        2        2      active sync   /dev/ram2
+       3       1        3        3      active sync   /dev/ram3
+       4       1        4        4      active sync   /dev/ram4
+       5       1        5        5      active sync   /dev/ram5
+       6       1        6        6      active sync   /dev/ram6
+       7     253        0        7      active sync   /dev/dm-0</code></pre>
+<p>and here we&nbsp;go&nbsp;&mdash; last device is&nbsp;our strange <code>/dev/<nobr>dm-0</nobr></code>.</p>
+<p>And again, I&nbsp;knew it&nbsp;from the beginning, and tried to&nbsp;come into the root of&nbsp;the problem with SystemTap. But SystemTap was just a&nbsp;motivation to&nbsp;look into kernel code and think deeper, which is&nbsp;nice, though. This again proofs that the best tool to&nbsp;investigate any problem, be&nbsp;that performance issue or&nbsp;bug, is&nbsp;your brain and experience.</p>
+<p>Thanks for reading.</p>
+                        </div>
+                    </article>
+                </div>
+        </div>
+		<div class="row comments">
+      <div id="disqus_thread"></div>
+      <script>
+          var disqus_config = function () {
+                this.page.url = "http://alex.dzyoba.com/linux/profiling-systemtap.html";
+                this.page.identifier = "profiling-systemtap"; 
+          };
+          (function() {  // DON'T EDIT BELOW THIS LINE
+              var d = document, s = d.createElement('script');
+              
+              s.src = '//voluntarymadness.disqus.com/embed.js';
+              
+              s.setAttribute('data-timestamp', +new Date());
+              (d.head || d.body).appendChild(s);
+          })();
+      </script>
+      <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+		</div>
+
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+		&copy; 2015 Alex Dzyoba / CC-BY 4.0
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>
