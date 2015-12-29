@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>OS kernel segmentation | Alex Dzyoba</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="page-header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">Alex Dzyoba</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>OS kernel segmentation</h2>
+                            <h6 class="post-meta">
+                              27 Dec 2015, in
+                              <a class="disabled" href="/categories/programming">programming</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>Previously, I&nbsp;had boot the <a href="/programming/multiboot.html">trivial Multiboot kernel</a>. Despite it&nbsp;was really fun, I&nbsp;need more than just showing a&nbsp;letter on&nbsp;a&nbsp;screen. My&nbsp;goal is&nbsp;to&nbsp;write a&nbsp;simple kernel with <nobr>Unix-ready</nobr> userspace.</p>
+<p>I&nbsp;have been writing my&nbsp;kernel for the last couple of&nbsp;months (on&nbsp;and off) and with help of&nbsp;<a href="http://wiki.osdev.org">OSDev wiki</a> I&nbsp;got a&nbsp;quite good kernel based on&nbsp;<a href="http://wiki.osdev.org/Meaty_Skeleton">meaty skeleton</a> and now I&nbsp;want to&nbsp;go&nbsp;further. But where to? My&nbsp;milestone is&nbsp;to&nbsp;make keyboard input working. This will require working interrupts, but it’s&nbsp;not the first thing to&nbsp;do.</p>
+<p>According to&nbsp;Multiboot specification after bootloader passed the control to&nbsp;our kernel, the machine is&nbsp;in&nbsp;pretty reasonable state except 3 things (quoting chapter <a href="https://www.gnu.org/software/grub/manual/multiboot/html_node/Machine-state.html#Machine-state">3.2. Machine state</a>):</p>
+<ul>
+<li>‘ESP’&nbsp;&mdash; The OS&nbsp;image must create its own stack as&nbsp;soon as&nbsp;it&nbsp;needs one.</li>
+<li>‘GDTR’&nbsp;&mdash; Even though the segment registers are set up&nbsp;as&nbsp;described above, the ‘GDTR’ may be&nbsp;invalid, so&nbsp;the OS&nbsp;image must not load any segment registers (even just reloading the same values!) until it&nbsp;sets up&nbsp;its own ‘GDT’.</li>
+<li>‘IDTR’ The OS&nbsp;image must leave interrupts disabled until it&nbsp;sets up&nbsp;its own IDT.</li>
+</ul>
+<p>Setting up&nbsp;a&nbsp;stack is&nbsp;simple&nbsp;&mdash; you just put 2 labels divided by&nbsp;your stack size. <a href="https://github.com/dzeban/hydra/blob/86b67dfe27001a9f21de64307eb6ec3395aecddd/arch/i386/boot.S#L15-L19">In&nbsp;&laquo;hydra&raquo; it’s&nbsp;16 KiB</a>:</p>
+<pre class="asm"><code># Reserve a stack for the initial thread.
+.section .bootstrap_stack, &quot;aw&quot;, @nobits
+stack_bottom:
+.skip 16384 # 16 KiB
+stack_top:</code></pre>
+<p>Next, we&nbsp;need to&nbsp;setup segmentation. We&nbsp;have to&nbsp;do&nbsp;this before setting up&nbsp;interrupts because each IDT descriptor gate must contain segment selector for destination code segment&nbsp;&mdash; a&nbsp;kernel code segment that we&nbsp;must setup.</p>
+<p>Nevertheless it&nbsp;almost certainly will work even without setting up&nbsp;GDT because Multiboot bootloader sets it&nbsp;by&nbsp;itself and we&nbsp;left with its configuration that usually will set up&nbsp;flat memory model. For example, here is&nbsp;the GDT that legacy grub set:</p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Index</th>
+<th align="left">Base</th>
+<th align="left">Size</th>
+<th align="left">DPL</th>
+<th align="left">Info</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">00 (Selector 0&times;0000)</td>
+<td align="left">0&times;0</td>
+<td align="left">0xfff0</td>
+<td align="left">0</td>
+<td align="left">Unused</td>
+</tr>
+<tr class="even">
+<td align="left">01 (Selector 0&times;0008)</td>
+<td align="left">0&times;0</td>
+<td align="left">0xffffffff</td>
+<td align="left">0</td>
+<td align="left"><nobr>32-bit</nobr> code</td>
+</tr>
+<tr class="odd">
+<td align="left">02 (Selector 0&times;0010)</td>
+<td align="left">0&times;0</td>
+<td align="left">0xffffffff</td>
+<td align="left">0</td>
+<td align="left"><nobr>32-bit</nobr> data</td>
+</tr>
+<tr class="even">
+<td align="left">03 (Selector 0&times;0018)</td>
+<td align="left">0&times;0</td>
+<td align="left">0xffff</td>
+<td align="left">0</td>
+<td align="left"><nobr>16-bit</nobr> code</td>
+</tr>
+<tr class="odd">
+<td align="left">04 (Selector 0&times;0020)</td>
+<td align="left">0&times;0</td>
+<td align="left">0xffff</td>
+<td align="left">0</td>
+<td align="left"><nobr>16-bit</nobr> data</td>
+</tr>
+</tbody>
+</table>
+<p>It’s&nbsp;fine for <nobr>kernel-only</nobr> mode because it&nbsp;has <nobr>32-bit</nobr> segments for code and data of&nbsp;size 2<sup>32</sup>, but no&nbsp;segments with DPL=3 and also <nobr>16-bit</nobr> code segments that we&nbsp;don’t&nbsp;want.</p>
+<p>But really it&nbsp;is&nbsp;just plain stupid to&nbsp;rely on&nbsp;undefined values, so&nbsp;we&nbsp;set up&nbsp;segmentation by&nbsp;ourselves.</p>
+<h2 id="segmentation-on-x86">Segmentation on&nbsp;x86</h2>
+<p>Segmentation is&nbsp;a&nbsp;technique used in&nbsp;x86 CPUs to&nbsp;expand amount of&nbsp;available memory. There are 2 different segmentation models depending on&nbsp;CPU mode&nbsp;&mdash; <nobr>real-address</nobr> model and protected model.</p>
+<h3 id="segmentation-in-real-mode">Segmentation in&nbsp;Real mode</h3>
+<p>Real mode is&nbsp;a&nbsp;<nobr>16-bit</nobr> Intel 8086 CPU mode, it’s&nbsp;a&nbsp;mode where processor starts working upon reset. With a&nbsp;<nobr>16-bit</nobr> processor you may address at&nbsp;most 2<sup>16</sup> = 64 KiB of&nbsp;memory which even by&nbsp;the times of&nbsp;1978 was way too small. So&nbsp;Intel decided to&nbsp;extend address space to&nbsp;1 MiB and made address bus 20 bits wide (<code>2</code><sup><code>20</code></sup><code>= 1048576 bytes = 1 MiB</code>). But you can’t&nbsp;address 20 bits wide address space with <nobr>16-bit</nobr> registers, you have to&nbsp;expand your registers by&nbsp;4 bits. This is&nbsp;where segmentation comes in.</p>
+<p>The idea of&nbsp;segmentation is&nbsp;to&nbsp;organize address space in&nbsp;chunks called segments, where your address from <nobr>16-bit</nobr> register would be&nbsp;an&nbsp;offset in&nbsp;the segment.</p>
+<p>With segmentation you use 2 registers to&nbsp;address memory: segment register and <nobr>general-purpose</nobr> register representing offset. Linear address (the one that will be&nbsp;issued on&nbsp;the address bus of&nbsp;CPU) is&nbsp;calculated like this:</p>
+<pre><code>Linear address = Segment &lt;&lt; 4 + Offset</code></pre>
+<div class="figure">
+<img src="/assets/img/real-mode-segmentation.png" alt="Real mode segmentation" />
+<p class="caption">Real mode segmentation</p>
+</div>
+<p>Note, that with this formula it’s&nbsp;up&nbsp;to&nbsp;you to&nbsp;choose segments size. The only limitation is&nbsp;that segments size is&nbsp;at&nbsp;least 16 bytes, implied by&nbsp;4 bit shift, and maximum of&nbsp;64 KiB implied by&nbsp;<code>Offset</code> size.</p>
+<p>In&nbsp;the example above we’ve&nbsp;used <strong>logical address</strong> <code>0&times;0002:0&times;0005</code> that gave us&nbsp;<strong>linear address</strong> <code>0&times;00025</code>. In&nbsp;my&nbsp;example I’ve&nbsp;chosen to&nbsp;use 32 bytes segments, but this is&nbsp;only my&nbsp;mental representation&nbsp;&mdash; how I&nbsp;choose to&nbsp;construct logical addresses. There are many ways to&nbsp;represent the same address with segmentation:</p>
+<pre><code>0x0000:0x0025 = 0x0 &lt;&lt; 14 + 0x25 = 0x00 + 0x25 = 0x00025
+0x0002:0x0025 = 0x2 &lt;&lt; 14 + 0x25 = 0x20 + 0x25 = 0x00025
+0xffff:0x0035 = 0xffff0 + 0x35 = 0x100025 = (Wrap around 20 bit) = 0x00025
+0xfffe:0x0045 = 0xfffe0 + 0x45 = 0x100025 = (Wrap around 20 bit) = 0x00025
+...</code></pre>
+<p>Note the wrap around part. this is&nbsp;where it&nbsp;starts to&nbsp;be&nbsp;complicated and it’s&nbsp;time to&nbsp;tell the fun story about <nobr>Gate-A20</nobr>.</p>
+<p>On&nbsp;Intel 8086 segment register loading was a&nbsp;slow operation, so&nbsp;some DOS programmers used <nobr>wrap-around</nobr> trick to&nbsp;avoid it&nbsp;and speed up&nbsp;the programs. Placing the code in&nbsp;high addresses of&nbsp;memory (close to&nbsp;1MiB) and accessing data in&nbsp;lower addresses (I/O buffers) was possible without reloading segment thanks to&nbsp;<nobr>wrap-around</nobr>.</p>
+<p>Now Intel introduces 80286 processor with <nobr>24-bit</nobr> address bus. CPU started in&nbsp;real mode assuming <nobr>20-bit</nobr> address space and then you could switch to&nbsp;protected mode and enjoy all 16 MiB of&nbsp;RAM available for your <nobr>24-bit</nobr> addresses. But nobody forced you to&nbsp;switch to&nbsp;protected mode. You could still use your old programs written for Real mode. Unfortunately, 80286 processor had bug&nbsp;&mdash; in&nbsp;Real mode it&nbsp;didn’t&nbsp;zero out 21st address line&nbsp;&mdash; A20 line (starting from A0). So&nbsp;<nobr>wrap-around</nobr> trick was not longer working. All those tricky speedy DOS programs were broken!</p>
+<p>IBM that was selling PC/AT computers with 80286 fixed this bug by&nbsp;inserting logic gate on&nbsp;A20 line between CPU and system bus that can be&nbsp;controlled from software. On&nbsp;reset BIOS enables A20 line to&nbsp;count system memory and then disables it&nbsp;back before passing control to&nbsp;operating CPU, thus enabling <nobr>wrap-around</nobr> trick. Yay! Read more shenanigans about A20 <a href="http://www.win.tue.nl/~aeb/linux/kbd/A20.html">here</a>.</p>
+<p>So, from now on&nbsp;all x86 and x86_64 PCs has this <nobr>Gate-A20</nobr>. Enabling it&nbsp;is&nbsp;one of&nbsp;the required things to&nbsp;switch into protected mode.</p>
+<p>Needless to&nbsp;say that Multiboot compatible bootloader enables it&nbsp;and switching into protected mode before passing control to&nbsp;the kernel.</p>
+<h3 id="segmentation-in-protected-mode">Segmentation in&nbsp;Protected mode</h3>
+<p>As&nbsp;you might saw in&nbsp;previous section, segmentation is&nbsp;awkward and <nobr>error-prone</nobr> mechanism for memory organization and protection. Intel had understood it&nbsp;quickly and in&nbsp;80386 introduced <strong>paging</strong>&nbsp;&mdash; flexible and powerful system for real memory management. Paging is&nbsp;available only in&nbsp;<strong>protected mode</strong>&nbsp;&mdash; successor of&nbsp;the real mode that was introduced in&nbsp;80286, providing new features in&nbsp;segmentation like segment limit checking, <nobr>read-only</nobr> and <nobr>execute-only</nobr> segments and 4 privilege levels (CPU rings).</p>
+<p>Although paging is&nbsp;<em>the</em> mechanism for memory management, when operating in&nbsp;protected mode all memory references are subject of&nbsp;segmentation for the sake of&nbsp;backward compatibility. And it&nbsp;drastically differs from segmentation in&nbsp;real mode.</p>
+<p>In&nbsp;protected mode, instead of&nbsp;segment base, segment register holds a&nbsp;segment selector, value used to&nbsp;index segments table called <strong>Global Descriptor Table (GDT)</strong>. This selector chooses entry in&nbsp;GDT called <strong>Segment Descriptor</strong>. Segment descriptor is&nbsp;a&nbsp;8 bytes structure that contains base address of&nbsp;the segment and various fields used for various design choices howsoever exotic they are.</p>
+<div class="figure">
+<img src="/assets/img/segment-descriptor.png" alt="Segment descriptor" />
+<p class="caption">Segment descriptor</p>
+</div>
+<p>GDT is&nbsp;located in&nbsp;memory (on&nbsp;8 bytes boundary) and pointed by&nbsp;<code>gdtr</code> register.</p>
+<p>All memory operations either explicitly or&nbsp;implicitly contains segment registers. CPU uses segment register to&nbsp;fetch segment selector from GDT, finds out that segment base address and add offset from memory operand to&nbsp;it.</p>
+<div class="figure">
+<img src="/assets/img/protected-mode-segmentation.png" alt="Protected mode segmentation" />
+<p class="caption">Protected mode segmentation</p>
+</div>
+<p>You can mimic <nobr>real-mode</nobr> segmentation model by&nbsp;configuring overlapping segments. And actually, absolute most of&nbsp;operating systems do&nbsp;this. They setup all segments from 0 to&nbsp;4 GiB, thus fully overlapping and carry out memory management to&nbsp;paging.</p>
+<h2 id="how-to-configure-segmentation-in-protected-mode">How to&nbsp;configure segmentation in&nbsp;protected mode</h2>
+<p>First of&nbsp;all, lets make it&nbsp;clear&nbsp;&mdash; there are a&nbsp;lot of&nbsp;stuff. When I&nbsp;was reading Intel System programming manual, my&nbsp;head started hurting. And actually, you don’t&nbsp;need all this stuff because it’s&nbsp;segmentation and you want to&nbsp;set it&nbsp;up&nbsp;so&nbsp;it&nbsp;will just work and prepare system for paging.</p>
+<p>In&nbsp;most cases, you will need at&nbsp;least 4 segments:</p>
+<ol start="0" style="list-style-type: decimal">
+<li>Null segment (required by&nbsp;Intel)</li>
+<li>Kernel code segment</li>
+<li>Kernel data segment</li>
+<li>Userspace code segment</li>
+<li>Userspace data segment</li>
+</ol>
+<p>This structure not only sane, but is&nbsp;also required if&nbsp;you want to&nbsp;use <code>SYSCALL</code>/<code>SYSRET</code>&nbsp;&mdash; fast system call mechanism without CPU exception overhead of&nbsp;<code>int 0&times;80</code>.</p>
+<p>These 4 segments are <nobr>&laquo;non-system&raquo;</nobr>, as&nbsp;defined by&nbsp;a&nbsp;flag <code>S</code> in&nbsp;segment descriptor. You use such segments for normal code and data, both for kernel and userspace. There are also &laquo;system&raquo; segments that has special meaning for CPU. Intel CPUs support 6 system descriptors types of&nbsp;which you should have at&nbsp;least one <nobr>Task-state</nobr> segment (TSS) for each CPU (core) in&nbsp;the system. TSS is&nbsp;used to&nbsp;implement <nobr>multi-tasking</nobr> and I’ll&nbsp;cover it&nbsp;in&nbsp;later articles.</p>
+<p>Four segments that we&nbsp;set up&nbsp;differs in&nbsp;flags. Code segments are execute/read only, while data segments are read/write. Kernel segments differs from userspace by&nbsp;DPL&nbsp;&mdash; descriptor privilege level. Privilege levels form <em>CPU protection rings</em>. Intel CPUs have 4 rings, where 0 is&nbsp;the most privileged and 3 is&nbsp;least privileged.</p>
+<div class="figure">
+<img src="http://static.duartes.org/img/blogPosts/x86rings.png" alt="Lovely CPU rings image courtesy of Gustavo Duartes" />
+<p class="caption">Lovely CPU rings image courtesy of&nbsp;<a href="http://duartes.org/gustavo/blog/about/">Gustavo Duartes</a></p>
+</div>
+<p>CPU rings is&nbsp;a&nbsp;way to&nbsp;protect privileged code such as&nbsp;operating system kernel from direct access of&nbsp;wild userspace. Usually, you create kernel segments in&nbsp;a&nbsp;ring 0, and userspace segments in&nbsp;ring 3. It’s&nbsp;not that it’s&nbsp;impossible to&nbsp;access kernel code from userspace, it&nbsp;is, but there is&nbsp;a&nbsp;well defined, controlled by&nbsp;kernel, mechanism involving (among other things) switch from ring 3 to&nbsp;ring 0.</p>
+<p>Besides DPL (descriptor privilege level) that is&nbsp;stored in&nbsp;segment descriptor itself there are also CPL (Current Privilege Level) and RPL (Requested Privilege Level). CPL is&nbsp;stored in&nbsp;CS&nbsp;and SS&nbsp;segment registers. RPL is&nbsp;encoded in&nbsp;segment selector. Before loading segment selector into segment register CPU performs privilege check, using this formula</p>
+<pre><code>MAX(CPL, RPL) &lt;= DPL</code></pre>
+<p>Because RPL is&nbsp;under calling software control, it&nbsp;may be&nbsp;used to&nbsp;tamper privileged software. To&nbsp;prevent this CPL is&nbsp;used in&nbsp;access checking.</p>
+<p>Lets look how control is&nbsp;transferred between code segments. We&nbsp;will look into simplest case of&nbsp;control transfer with far jmp/call, Special instructions SYSENTER/SYSEXIT, interrupts/exceptions and task switching is&nbsp;another topic.</p>
+<p>Far jmp/call instructions in&nbsp;contrast to&nbsp;near jmp/call contains segment selector as&nbsp;part of&nbsp;operand. Here are examples</p>
+<pre><code>jmp eax      ; Near jump
+jmp 0x10:eax ; Far jump</code></pre>
+<p>When you issue far jmp/call CPU takes CPL from CS, RPL from segment selector encoded into far instruction operand and DPL from target segment descriptor that is&nbsp;found by&nbsp;offset from segment selector. Then it&nbsp;performs privilege check. If&nbsp;it&nbsp;was successful, segment selector is&nbsp;loaded into segment register. From now you’re&nbsp;in&nbsp;a&nbsp;new segment and EIP is&nbsp;an&nbsp;offset in&nbsp;this segment. Called procedure is&nbsp;executed in&nbsp;its own stack. Each privilege level has its own stack. Fourth privilege level stack is&nbsp;pointed by&nbsp;SS&nbsp;and ESP register, while stack for privilege levels 2, 1 and 0 is&nbsp;stored in&nbsp;TSS.</p>
+<p>Finally, lets see how it’s&nbsp;all working.</p>
+<p>As&nbsp;you might saw, things got more complicated and conversion from logical to&nbsp;linear address (without paging it’ll&nbsp;be&nbsp;physical address) now goes like this:</p>
+<ol style="list-style-type: decimal">
+<li>Logical address is&nbsp;split in&nbsp;2 parts: segment selector and offset</li>
+<li>If&nbsp;it’s&nbsp;not a&nbsp;control transfer instruction (far jmp/call, SYSENTER/SYSCALL, call gate, TSS or&nbsp;task gate) then go&nbsp;to&nbsp;step 8.</li>
+<li>If&nbsp;it’s&nbsp;a&nbsp;control transfer instruction then load CPL from CS, RPL from segment selector and DPL from descriptor pointed by&nbsp;segment selector.</li>
+<li>Perform access check: <code>MAX(CPL,RPL) &lt;= DPL</code>.</li>
+<li>If&nbsp;it’s&nbsp;not successful, then generate <code>#GF</code> exception (General Protection Fault)</li>
+<li>Otherwise, load segment register with segment selector.</li>
+<li>Fetch based address, limit and access information and cache in&nbsp;hidden part of&nbsp;segment register</li>
+<li>Finally, add current segment base address taken from segment register (actually cached value from hidden part of&nbsp;segment register) and offset taken from logical address (instruction operand), producing linear address.</li>
+</ol>
+<p>Note, that without segments switching address translation is&nbsp;pretty straightforward: take base address and add offset. Segment switching is&nbsp;a&nbsp;real pain, so&nbsp;most operating systems avoids it&nbsp;and set up&nbsp;just 4 segments&nbsp;&mdash; minimum amount to&nbsp;please CPU and protect kernel from userspace.</p>
+<h2 id="segments-layout-examples">Segments layout examples</h2>
+<h3 id="linux-kernel">Linux kernel</h3>
+<p>Linux kernel describes segment descriptor as&nbsp;desc_struct structure in&nbsp;<a href="http://lxr.free-electrons.com/source/arch/x86/include/asm/desc_defs.h?v=4.2#L14">arch/x86/include/asm/desc_defs.h</a></p>
+<pre class="sourceCode c"><code class="sourceCode c"><span class="kw">struct</span> desc_struct {
+        <span class="kw">union</span> {
+                <span class="kw">struct</span> {
+                        <span class="dt">unsigned</span> <span class="dt">int</span> a;
+                        <span class="dt">unsigned</span> <span class="dt">int</span> b;
+                };
+                <span class="kw">struct</span> {
+                        u16 limit0;
+                        u16 base0;
+                        <span class="dt">unsigned</span> base1: <span class="dv">8</span>, type: <span class="dv">4</span>, s: <span class="dv">1</span>, dpl: <span class="dv">2</span>, p: <span class="dv">1</span>;
+                        <span class="dt">unsigned</span> limit: <span class="dv">4</span>, avl: <span class="dv">1</span>, l: <span class="dv">1</span>, d: <span class="dv">1</span>, g: <span class="dv">1</span>, base2: <span class="dv">8</span>;
+                };
+        };
+} __attribute__((packed));
+
+<span class="ot">#define GDT_ENTRY_INIT(flags, base, limit) { { { \</span>
+<span class="ot">        .a = ((limit) &amp; 0xffff) | (((base) &amp; 0xffff) &lt;&lt; 16), \</span>
+<span class="ot">        .b = (((base) &amp; 0xff0000) &gt;&gt; 16) | (((flags) &amp; 0xf0ff) &lt;&lt; 8) | \</span>
+<span class="ot">            ((limit) &amp; 0xf0000) | ((base) &amp; 0xff000000), \</span>
+<span class="ot">    } } }</span></code></pre>
+<p>GDT itself defined in&nbsp;<a href="http://lxr.free-electrons.com/source/arch/x86/kernel/cpu/common.c?v=4.2#L94">arch/x86/kernel/cpu/common.c</a>:</p>
+<pre class="sourceCode c"><code class="sourceCode c">.gdt = { 
+    [GDT_ENTRY_KERNEL_CS]           = GDT_ENTRY_INIT(<span class="bn">0xc09a</span>, <span class="dv">0</span>, <span class="bn">0xfffff</span>),
+    [GDT_ENTRY_KERNEL_DS]           = GDT_ENTRY_INIT(<span class="bn">0xc092</span>, <span class="dv">0</span>, <span class="bn">0xfffff</span>),
+    [GDT_ENTRY_DEFAULT_USER_CS]     = GDT_ENTRY_INIT(<span class="bn">0xc0fa</span>, <span class="dv">0</span>, <span class="bn">0xfffff</span>),
+    [GDT_ENTRY_DEFAULT_USER_DS]     = GDT_ENTRY_INIT(<span class="bn">0xc0f2</span>, <span class="dv">0</span>, <span class="bn">0xfffff</span>),
+...</code></pre>
+<p>Basically, there is&nbsp;a&nbsp;flat memory model with 4 segments from <code>0</code> to&nbsp;<code>0xfffff * granularity</code>, where granularity flag set to&nbsp;1 specifies 4096 increments, thus giving us&nbsp;limit of&nbsp;4 GiB. Userspace and kernel segments differs in&nbsp;DPL only.</p>
+<h3 id="first-linux-version-0.01">First Linux version 0.01</h3>
+<p>In&nbsp;the Linux version 0.01 there were no&nbsp;userspace segments. In&nbsp;<a href="http://code.metager.de/source/xref/linux/historic/0.01/boot/head.s#171">boot/head.s</a></p>
+<pre class="asm"><code>_gdt:   .quad 0x0000000000000000    /* NULL descriptor */
+    .quad 0x00c09a00000007ff    /* 8Mb */
+    .quad 0x00c09200000007ff    /* 8Mb */
+    .quad 0x0000000000000000    /* TEMPORARY - don&#39;t use */
+    .fill 252,8,0           /* space for LDT&#39;s and TSS&#39;s etc */</code></pre>
+<p>Unfortunately, I&nbsp;wasn’t&nbsp;able to&nbsp;track down how userspace was set up&nbsp;(TSS only?).</p>
+<h3 id="netbsd">NetBSD</h3>
+<p>NetBSD kernel defines 4 segments as&nbsp;everybody. In&nbsp;<a href="http://nxr.netbsd.org/xref/src/sys/arch/i386/include/segments.h#285">sys/arch/i386/include/segments.h</a></p>
+<pre class="sourceCode c"><code class="sourceCode c"><span class="ot">#define GNULL_SEL   0   </span><span class="co">/* Null descriptor */</span>
+<span class="ot">#define GCODE_SEL   1   </span><span class="co">/* Kernel code descriptor */</span>
+<span class="ot">#define GDATA_SEL   2   </span><span class="co">/* Kernel data descriptor */</span>
+<span class="ot">#define GUCODE_SEL  3   </span><span class="co">/* User code descriptor */</span>
+<span class="ot">#define GUDATA_SEL  4   </span><span class="co">/* User data descriptor */</span>
+...</code></pre>
+<p>Segments are set up&nbsp;in&nbsp;<a href="http://nxr.netbsd.org/xref/src/sys/arch/i386/i386/machdep.c#953">sys/arch/i386/i386/machdep.c</a>, function <code>initgdt</code>:</p>
+<pre class="sourceCode c"><code class="sourceCode c">setsegment(&amp;gdt[GCODE_SEL].sd, <span class="dv">0</span>, <span class="bn">0xfffff</span>, SDT_MEMERA, SEL_KPL, <span class="dv">1</span>, <span class="dv">1</span>);
+setsegment(&amp;gdt[GDATA_SEL].sd, <span class="dv">0</span>, <span class="bn">0xfffff</span>, SDT_MEMRWA, SEL_KPL, <span class="dv">1</span>, <span class="dv">1</span>);
+setsegment(&amp;gdt[GUCODE_SEL].sd, <span class="dv">0</span>, x86_btop(I386_MAX_EXE_ADDR) - <span class="dv">1</span>,
+    SDT_MEMERA, SEL_UPL, <span class="dv">1</span>, <span class="dv">1</span>);
+setsegment(&amp;gdt[GUCODEBIG_SEL].sd, <span class="dv">0</span>, <span class="bn">0xfffff</span>,
+    SDT_MEMERA, SEL_UPL, <span class="dv">1</span>, <span class="dv">1</span>);
+setsegment(&amp;gdt[GUDATA_SEL].sd, <span class="dv">0</span>, <span class="bn">0xfffff</span>,
+    SDT_MEMRWA, SEL_UPL, <span class="dv">1</span>, <span class="dv">1</span>);</code></pre>
+<p>Where <code>setsegment</code> has <a href="http://nxr.netbsd.org/xref/src/sys/arch/i386/i386/machdep.c#907">following signature</a>:</p>
+<pre class="sourceCode c"><code class="sourceCode c"><span class="dt">void</span>
+setsegment(<span class="kw">struct</span> segment_descriptor *sd, <span class="dt">const</span> <span class="dt">void</span> *base, size_t limit,
+    <span class="dt">int</span> type, <span class="dt">int</span> dpl, <span class="dt">int</span> def32, <span class="dt">int</span> gran)</code></pre>
+<h3 id="openbsd">OpenBSD</h3>
+<p>Similar to&nbsp;NetBSD, but segments order is&nbsp;different. In&nbsp;<a href="http://bxr.su/OpenBSD/sys/arch/i386/include/segments.h#211">sys/arch/i386/include/segments.h</a>:</p>
+<pre class="sourceCode c"><code class="sourceCode c"><span class="co">/*</span>
+<span class="co"> * Entries in the Global Descriptor Table (GDT)</span>
+<span class="co"> */</span>
+<span class="ot">#define GNULL_SEL   0   </span><span class="co">/* Null descriptor */</span>
+<span class="ot">#define GCODE_SEL   1   </span><span class="co">/* Kernel code descriptor */</span>
+<span class="ot">#define GDATA_SEL   2   </span><span class="co">/* Kernel data descriptor */</span>
+<span class="ot">#define GLDT_SEL    3   </span><span class="co">/* Default LDT descriptor */</span>
+<span class="ot">#define GCPU_SEL    4   </span><span class="co">/* per-CPU segment */</span>
+<span class="ot">#define GUCODE_SEL  5   </span><span class="co">/* User code descriptor (a stack short) */</span>
+<span class="ot">#define GUDATA_SEL  6   </span><span class="co">/* User data descriptor */</span>
+...</code></pre>
+<p>As&nbsp;you can see, userspace code and data segments are at&nbsp;positions 5 and 6 in&nbsp;GDT. I&nbsp;don’t&nbsp;know how <code>SYSENTER/SYSEXIT</code> will work here because you set the value of&nbsp;<code>SYSENTER</code> segment in&nbsp;<code>IA32_SYSENTER_CS</code> MSR. All other segments are calculated as&nbsp;offset from this MSR, e.g. <code>SYSEXIT</code> target segment is&nbsp;an&nbsp;16 bytes offset&nbsp;&mdash; GDT entry that is&nbsp;after next to&nbsp;<code>SYSENTER</code> segment. In&nbsp;this case <code>SYSEXIT</code> will hit LDT. Some help from OpenBSD kernel folks will be&nbsp;great here.</p>
+<p>Everything else is&nbsp;same.</p>
+<h3 id="xv6">xv6</h3>
+<p>xv6 is&nbsp;a&nbsp;<nobr>re-implementation</nobr> of&nbsp;Dennis Ritchie’s&nbsp;and Ken Thompson’s&nbsp;Unix Version 6 (v6). It’s&nbsp;a&nbsp;small operating system that is&nbsp;taught in&nbsp;MIT.</p>
+<p>It’s&nbsp;really pleasant to&nbsp;read it’s&nbsp;source code. There is&nbsp;a&nbsp;<a href="http://code.metager.de/source/xref/mit/xv6/main.c#14"><code>main</code></a> in&nbsp;main.c that calls <a href="http://code.metager.de/source/xref/mit/xv6/vm.c#14"><code>seginit</code></a> in&nbsp;vm.c</p>
+<p>This function sets up&nbsp;6 segments:</p>
+<pre class="sourceCode c"><code class="sourceCode c"><span class="ot">#define SEG_KCODE 1  </span><span class="co">// kernel code</span>
+<span class="ot">#define SEG_KDATA 2  </span><span class="co">// kernel data+stack</span>
+<span class="ot">#define SEG_KCPU  3  </span><span class="co">// kernel per-cpu data</span>
+<span class="ot">#define SEG_UCODE 4  </span><span class="co">// user code</span>
+<span class="ot">#define SEG_UDATA 5  </span><span class="co">// user data+stack</span>
+<span class="ot">#define SEG_TSS   6  </span><span class="co">// this process&#39;s task state</span></code></pre>
+<p>like this</p>
+<pre class="sourceCode c"><code class="sourceCode c"><span class="co">// Map &quot;logical&quot; addresses to virtual addresses using identity map.</span>
+<span class="co">// Cannot share a CODE descriptor for both kernel and user</span>
+<span class="co">// because it would have to have DPL_USR, but the CPU forbids</span>
+<span class="co">// an interrupt from CPL=0 to DPL=3.</span>
+c = &amp;cpus[cpunum()];
+c-&gt;gdt[SEG_KCODE] = SEG(STA_X|STA_R, <span class="dv">0</span>, <span class="bn">0xffffffff</span>, <span class="dv">0</span>);
+c-&gt;gdt[SEG_KDATA] = SEG(STA_W, <span class="dv">0</span>, <span class="bn">0xffffffff</span>, <span class="dv">0</span>);
+c-&gt;gdt[SEG_UCODE] = SEG(STA_X|STA_R, <span class="dv">0</span>, <span class="bn">0xffffffff</span>, DPL_USER);
+c-&gt;gdt[SEG_UDATA] = SEG(STA_W, <span class="dv">0</span>, <span class="bn">0xffffffff</span>, DPL_USER);
+
+<span class="co">// Map cpu, and curproc</span>
+c-&gt;gdt[SEG_KCPU] = SEG(STA_W, &amp;c-&gt;cpu, <span class="dv">8</span>, <span class="dv">0</span>);</code></pre>
+<p>Four segments for kernel and userspace code and data, one for TSS, nice and simple code, clear logic, great OS&nbsp;for education.</p>
+<h2 id="to-read">To&nbsp;read</h2>
+<ul>
+<li>Intel<sup><small>&reg;</small></sup> 64 and <nobr>IA-32</nobr> Architectures Software Developer’s&nbsp;Manual Volume 3a</li>
+<li>Gustavo Duartes articles are great as&nbsp;usual (why he’s&nbsp;not writing anymore?):
+<ul>
+<li><a href="http://duartes.org/gustavo/blog/post/memory-translation-and-segmentation/">Memory Translation and Segmentation</a></li>
+<li><a href="http://duartes.org/gustavo/blog/post/cpu-rings-privilege-and-protection/">CPU Rings, Privilege, and Protection</a></li>
+</ul></li>
+<li>OsDev wiki topics for GDT:
+<ul>
+<li><a href="http://wiki.osdev.org/GDT_Tutorial">GDT Tutorial</a></li>
+<li><a href="http://wiki.osdev.org/GDT">Global Descriptor Table</a></li>
+</ul></li>
+</ul>
+                        </div>
+                    </article>
+                </div>
+        </div>
+		<div class="row comments">
+      <div id="disqus_thread"></div>
+      <script>
+          var disqus_config = function () {
+                this.page.url = "http://alex.dzyoba.com/programming/os-segmentation.html";
+                this.page.identifier = "os-segmentation"; 
+          };
+          (function() {  // DON'T EDIT BELOW THIS LINE
+              var d = document, s = d.createElement('script');
+              
+              s.src = '//voluntarymadness.disqus.com/embed.js';
+              
+              s.setAttribute('data-timestamp', +new Date());
+              (d.head || d.body).appendChild(s);
+          })();
+      </script>
+      <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+		</div>
+
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+		&copy; 2015 Alex Dzyoba / CC-BY 4.0
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>
