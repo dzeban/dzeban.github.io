@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>On dynamic arrays | Alex Dzyoba</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="page-header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">Alex Dzyoba</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>On dynamic arrays</h2>
+                            <h6 class="post-meta">
+                              26 Jun 2016, in
+                              <a class="disabled" href="/categories/programming">programming</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>I&nbsp;was reading Skiena’s&nbsp;&laquo;Algorithm Design Manual&raquo;, it’s&nbsp;an&nbsp;amazing book by&nbsp;the way, and run into this comparison (chapter 3.1.3) of&nbsp;linked lists and arrays:</p>
+<pre><code>The relative advantages of linked lists over static arrays include:
+• Overflow on linked structures can never occur unless the memory is actually full
+• Insertions and deletions are simpler than for contiguous (array) lists.
+• With large records, moving pointers is easier and faster than moving the items themselves.
+
+while the relative advantages of arrays include:
+• Linked structures require extra space for storing pointer fields.
+• Linked lists do not allow efficient random access to items.
+• Arrays allow better memory locality and cache performance than random pointer jumping.</code></pre>
+<p>Mr. Skiena gives a&nbsp;comprehensive comparison but unfortunately doesn’t&nbsp;stress enough the last point. As&nbsp;a&nbsp;system programmer, I&nbsp;know that memory access patterns, effective caching and exploiting CPU pipelines can be&nbsp;and <em>is</em> a&nbsp;game changer, and I&nbsp;would like to&nbsp;illustrate it&nbsp;here.</p>
+<p>Let’s&nbsp;make a&nbsp;simple test and compare the performance of&nbsp;linked list and dynamic array data structures on&nbsp;basic operations like inserting and searching.</p>
+<p>I’ll&nbsp;use Java as&nbsp;a&nbsp;perfect computer science playground tool. In&nbsp;Java, we&nbsp;have <code>LinkedList</code> and <code>ArrayList</code>&nbsp;&mdash; classes that implement linked list and dynamic array correspondingly, and both implement the same <code>List</code> interface.</p>
+<p>Our tests will include:</p>
+<ol style="list-style-type: decimal">
+<li>Allocation by&nbsp;inserting 1 million random elements.</li>
+<li>Inserting 10&nbsp;000 elements in&nbsp;random places.</li>
+<li>Inserting 10&nbsp;000 elements to&nbsp;the head.</li>
+<li>Inserting 10&nbsp;000 elements to&nbsp;the tail.</li>
+<li>Searching for a&nbsp;10&nbsp;000 random elements.</li>
+<li>Deleting all elements.</li>
+</ol>
+<p>Sources are at&nbsp;my&nbsp;CS&nbsp;playground in&nbsp;<a href="https://github.com/dzeban/cs/tree/master/ds/list-perf"><code>ds/<nobr>list-perf</nobr></code> dir</a>. There is&nbsp;Maven project, so&nbsp;you can just do&nbsp;<code>mvn package</code> and get a&nbsp;jar. Tests are quite simple, for example, here is&nbsp;the random insertion test:</p>
+<pre class="sourceCode java"><code class="sourceCode java"><span class="kw">package com.dzyoba.alex;</span>
+
+<span class="kw">import java.util.List;</span>
+<span class="kw">import java.util.Random;</span>
+
+<span class="kw">public</span> <span class="kw">class</span> TestInsert <span class="kw">implements</span> Runnable {
+    <span class="kw">private</span> List&lt;Integer&gt; list;
+    <span class="kw">private</span> <span class="dt">int</span> listSize;
+    <span class="kw">private</span> <span class="dt">int</span> randomOps;
+
+    <span class="kw">public</span> <span class="fu">TestInsert</span>(List&lt;Integer&gt; list, <span class="dt">int</span> randomOps) {
+        <span class="kw">this</span>.<span class="fu">list</span> = list;
+        <span class="kw">this</span>.<span class="fu">randomOps</span> = randomOps;
+    }
+
+    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">run</span>() {
+        <span class="dt">int</span> index, element;
+        <span class="dt">int</span> listSize = list.<span class="fu">size</span>();
+        Random randGen = <span class="kw">new</span> Random();
+        <span class="kw">for</span> (<span class="dt">int</span> i = <span class="dv">0</span>; i &lt; randomOps; i++) {
+            index = randGen.<span class="fu">nextInt</span>(listSize);
+            element = randGen.<span class="fu">nextInt</span>(listSize);
+            list.<span class="fu">add</span>(index, element);
+        }
+    }
+}</code></pre>
+<p>It’s&nbsp;working using <code>List</code> interface (yay, polymorphism!), so&nbsp;we&nbsp;can pass <code>LinkedList</code> and <code>ArrayList</code> without changing anything. It&nbsp;runs tests in&nbsp;the order mentioned above (allocation-&gt;insertions-&gt;search-&gt;delete) several times and calculating min/median/max of&nbsp;all test results.</p>
+<p>Alright, enough words, let’s&nbsp;run it!</p>
+<pre><code>$ time java -cp target/TestList-1.0-SNAPSHOT.jar com.dzyoba.alex.TestList
+Testing LinkedList
+Allocation: 7/22/442 ms
+Insert: 9428/11125/23574 ms
+InsertHead: 0/1/3 ms
+InsertTail: 0/1/2 ms
+Search: 25069/27087/50759 ms
+Delete: 6/7/13 ms
+------------------
+
+Testing ArrayList
+Allocation: 6/8/29 ms
+Insert: 1676/1761/2254 ms
+InsertHead: 4333/4615/5855 ms
+InsertTail: 0/0/2 ms
+Search: 9321/9579/11140 ms
+Delete: 0/1/5 ms
+
+real    10m31.750s
+user    10m36.737s
+sys 0m1.011s</code></pre>
+<p>You can see with the naked eye that <code>LinkedList</code> loses. But let me&nbsp;show you nice box plots:</p>
+<p><a href="https://plot.ly/~dzeban/6.embed">Allocation and delete</a>:</p>
+<iframe width="600" height="500" frameborder="0" scrolling="no" src="https://plot.ly/~dzeban/6.embed?autosize=True">
+</iframe>
+<p><a href="https://plot.ly/~dzeban/8.embed">Insertions</a></p>
+<iframe width="600" height="500" frameborder="0" scrolling="no" src="https://plot.ly/~dzeban/8.embed?autosize=True">
+</iframe>
+<p><a href="https://plot.ly/~dzeban/10.embed">Search</a></p>
+<iframe width="600" height="500" frameborder="0" scrolling="no" src="https://plot.ly/~dzeban/10.embed?autosize=True">
+</iframe>
+<p>And here is&nbsp;the link to&nbsp;<a href="https://plot.ly/~dzeban/2.embed">all tests combined</a>.</p>
+<p>In&nbsp;all operations, <code>LinkedList</code> sucks horribly. The only exception is&nbsp;the insert to&nbsp;the head, but that’s&nbsp;a&nbsp;playing against <nobr>worst-case</nobr> of&nbsp;dynamic array&nbsp;&mdash; it&nbsp;has to&nbsp;copy the whole array every time.</p>
+<p>To&nbsp;explain this, we’ll&nbsp;dive a&nbsp;little bit into implementation. I’ll&nbsp;use OpenJDK sources of&nbsp;Java 8.</p>
+<p>So, <code>ArrayList</code> and <code>LinkedList</code> sources are in&nbsp;<a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/">src/share/classes/java/util</a></p>
+<p><code>LinkedList</code> in&nbsp;Java is&nbsp;implemented as&nbsp;a&nbsp;<nobr>doubly-linked</nobr> list via <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/LinkedList.java#969"><code>Node</code> inner class</a>:</p>
+<pre class="sourceCode java"><code class="sourceCode java"><span class="kw">private</span> <span class="dt">static</span> <span class="kw">class</span> Node&lt;E&gt; {
+    E item;
+    Node&lt;E&gt; next;
+    Node&lt;E&gt; prev;
+
+    Node(Node&lt;E&gt; prev, E element, Node&lt;E&gt; next) {
+        <span class="kw">this</span>.<span class="fu">item</span> = element;
+        <span class="kw">this</span>.<span class="fu">next</span> = next;
+        <span class="kw">this</span>.<span class="fu">prev</span> = prev;
+    }
+}</code></pre>
+<p>Now, let’s&nbsp;look at&nbsp;what’s&nbsp;happening under the hood in&nbsp;the simple allocation test.</p>
+<pre class="sourceCode java"><code class="sourceCode java"><span class="kw">for</span> (<span class="dt">int</span> i = <span class="dv">0</span>; i &lt; listSize; i++) {
+    list.<span class="fu">add</span>(i);
+}</code></pre>
+<p>It&nbsp;invokes <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/LinkedList.java#329"><code>add</code></a> method which invokes <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/LinkedList.java#137"><code>linkLast</code></a> method in&nbsp;JDK:</p>
+<pre class="sourceCode java"><code class="sourceCode java"><span class="kw">public</span> <span class="dt">boolean</span> <span class="fu">add</span>(E e) {
+    <span class="fu">linkLast</span>(e);
+    <span class="kw">return</span> <span class="kw">true</span>;
+}
+
+<span class="dt">void</span> <span class="fu">linkLast</span>(E e) {
+    <span class="dt">final</span> Node&lt;E&gt; l = last;
+    <span class="dt">final</span> Node&lt;E&gt; newNode = <span class="kw">new</span> Node&lt;&gt;(l, e, <span class="kw">null</span>);
+    last = newNode;
+    <span class="kw">if</span> (l == <span class="kw">null</span>)
+        first = newNode;
+    <span class="kw">else</span>
+        l.<span class="fu">next</span> = newNode;
+    size++;
+    modCount++;
+}</code></pre>
+<p>Essentially, allocation in&nbsp;<code>LinkedList</code> is&nbsp;a&nbsp;<strong>constant time operation</strong>. <code>LinkedList</code> class maintains the tail pointer, so&nbsp;to&nbsp;insert it&nbsp;just has to&nbsp;allocate a&nbsp;new object and update 2 pointers. It&nbsp;<strong>shouldn’t&nbsp;be&nbsp;that slow</strong>! But why does it&nbsp;happens? Let’s&nbsp;compare with <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/ArrayList.java#207"><code>ArrayList</code></a>.</p>
+<pre class="sourceCode java"><code class="sourceCode java"><span class="kw">public</span> <span class="dt">boolean</span> <span class="fu">add</span>(E e) {
+    <span class="fu">ensureCapacityInternal</span>(size + <span class="dv">1</span>);  <span class="co">// Increments modCount!!</span>
+    elementData[size++] = e;
+    <span class="kw">return</span> <span class="kw">true</span>;
+}
+
+<span class="kw">private</span> <span class="dt">void</span> <span class="fu">ensureCapacityInternal</span>(<span class="dt">int</span> minCapacity) {
+    <span class="kw">if</span> (elementData == EMPTY_ELEMENTDATA) {
+        minCapacity = Math.<span class="fu">max</span>(DEFAULT_CAPACITY, minCapacity);
+    }
+
+    <span class="fu">ensureExplicitCapacity</span>(minCapacity);
+}
+
+<span class="kw">private</span> <span class="dt">void</span> <span class="fu">ensureExplicitCapacity</span>(<span class="dt">int</span> minCapacity) {
+    modCount++;
+
+    <span class="co">// overflow-conscious code</span>
+    <span class="kw">if</span> (minCapacity - elementData.<span class="fu">length</span> &gt; <span class="dv">0</span>)
+        <span class="fu">grow</span>(minCapacity);
+}
+
+<span class="kw">private</span> <span class="dt">void</span> <span class="fu">grow</span>(<span class="dt">int</span> minCapacity) {
+    <span class="co">// overflow-conscious code</span>
+    <span class="dt">int</span> oldCapacity = elementData.<span class="fu">length</span>;
+    <span class="dt">int</span> newCapacity = oldCapacity + (oldCapacity &gt;&gt; <span class="dv">1</span>);
+    <span class="kw">if</span> (newCapacity - minCapacity &lt; <span class="dv">0</span>)
+        newCapacity = minCapacity;
+    <span class="kw">if</span> (newCapacity - MAX_ARRAY_SIZE &gt; <span class="dv">0</span>)
+        newCapacity = <span class="fu">hugeCapacity</span>(minCapacity);
+    <span class="co">// minCapacity is usually close to size, so this is a win:</span>
+    elementData = Arrays.<span class="fu">copyOf</span>(elementData, newCapacity);
+}</code></pre>
+<p><code>ArrayList</code> in&nbsp;Java is, indeed, a&nbsp;dynamic array that increases its size in&nbsp;1.5 each grow with the initial capacity of&nbsp;10. Also this <code>//<nobr>overflow-conscious</nobr> code</code> is&nbsp;actually pretty funny. You can read why is&nbsp;that so&nbsp;<a href="http://stackoverflow.com/questions/33147339/difference-between-if-a-b-0-and-if-a-b">here</a>)</p>
+<p>The resizing itself is&nbsp;done via <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/Arrays.java#3260"><code>Arrays.copyOf</code></a> which calls <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/lang/System.java#480"><code>System.arraycopy</code></a> which is&nbsp;a&nbsp;Java <em>native</em> method. Implementation of&nbsp;native methods is&nbsp;not part of&nbsp;JDK, it’s&nbsp;a&nbsp;particular JVM function. Let’s&nbsp;grab Hotspot source code and look into it.</p>
+<p>Long story short&nbsp;&mdash; it’s&nbsp;in&nbsp;<a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/share/vm/oops/typeArrayKlass.cpp#128"><code>TypeArrayKlass:copy_array</code></a> method that invokes <a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/share/vm/utilities/copy.cpp#29"><code>Copy:conjoint_memory_atomic</code></a>. This one is&nbsp;looking for alignment, namely there are variant for long, int, short and bytes(unaligned) copy. We’ll&nbsp;look plain int variant&nbsp;&mdash; <a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/share/vm/utilities/copy.hpp#137"><code>conjoint_jints_atomic</code></a> which is&nbsp;a&nbsp;wrapper for <a href="http://code.metager.de/source/xref/openjdk/jdk6/hotspot/src/os_cpu/linux_x86/vm/copy_linux_x86.inline.hpp#229"><code>pd_conjoint_jints_atomic</code></a>. This one is&nbsp;OS&nbsp;and CPU specific. Looking for Linux variant we’ll&nbsp;find a&nbsp;call to&nbsp;<a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/os_cpu/linux_x86/vm/linux_x86_32.s#420"><code>_Copy_conjoint_jints_atomic</code></a>. And the last one is&nbsp;an&nbsp;assembly beast!</p>
+<pre class="sourceCode gnuassembler"><code class="sourceCode gnuassembler">        <span class="co"># Support for void Copy::conjoint_jints_atomic(void* from,</span>
+        <span class="co">#                                              void* to,</span>
+        <span class="co">#                                              size_t count)</span>
+        <span class="co"># Equivalent to</span>
+        <span class="co">#   arrayof_conjoint_jints</span>
+        <span class="kw">.p2align</span> <span class="dv">4</span>,,<span class="dv">15</span>
+    <span class="kw">.type</span>    _Copy_conjoint_jints_atomic,<span class="co">@function</span>
+    <span class="kw">.type</span>    _Copy_arrayof_conjoint_jints,<span class="co">@function</span>
+<span class="kw">_Copy_conjoint_jints_atomic:</span>
+<span class="kw">_Copy_arrayof_conjoint_jints:</span>
+        pushl    %esi
+        movl     <span class="dv">4+12</span>(%esp),%ecx      <span class="co"># count</span>
+        pushl    %edi
+        movl     <span class="dv">8</span>+ <span class="dv">4</span>(%esp),%esi      <span class="co"># from</span>
+        movl     <span class="dv">8</span>+ <span class="dv">8</span>(%esp),%edi      <span class="co"># to</span>
+        cmpl     %esi,%edi
+        leal     -<span class="dv">4</span>(%esi,%ecx,<span class="dv">4</span>),%eax <span class="co"># from + count*4 - 4</span>
+        jbe      ci_CopyRight
+        cmpl     %eax,%edi
+        jbe      ci_CopyLeft 
+<span class="kw">ci_CopyRight:</span>
+        cmpl     $32,%ecx
+        jbe      2f                   <span class="co"># &lt;= 32 dwords</span>
+        rep<span class="co">;     smovl</span>
+        popl     %edi
+        popl     %esi
+        ret
+        <span class="kw">.space</span> <span class="dv">10</span>
+<span class="kw">2:</span>      subl     %esi,%edi
+        jmp      4f
+        <span class="kw">.p2align</span> <span class="dv">4</span>,,<span class="dv">15</span>
+<span class="kw">3:</span>      movl     (%esi),%edx
+        movl     %edx,(%edi,%esi,<span class="dv">1</span>)
+        addl     $4,%esi
+<span class="kw">4:</span>      subl     $1,%ecx
+        jge      3b
+        popl     %edi
+        popl     %esi
+        ret
+<span class="kw">ci_CopyLeft:</span>
+        std
+        leal     -<span class="dv">4</span>(%edi,%ecx,<span class="dv">4</span>),%edi <span class="co"># to + count*4 - 4</span>
+        cmpl     $32,%ecx
+        ja       4f                   <span class="co"># &gt; 32 dwords</span>
+        subl     %eax,%edi            <span class="co"># eax == from + count*4 - 4</span>
+        jmp      3f
+        <span class="kw">.p2align</span> <span class="dv">4</span>,,<span class="dv">15</span>
+<span class="kw">2:</span>      movl     (%eax),%edx
+        movl     %edx,(%edi,%eax,<span class="dv">1</span>)
+        subl     $4,%eax
+<span class="kw">3:</span>      subl     $1,%ecx
+        jge      2b
+        cld
+        popl     %edi
+        popl     %esi
+        ret
+<span class="kw">4:</span>      movl     %eax,%esi            <span class="co"># from + count*4 - 4</span>
+        rep<span class="co">;     smovl</span>
+        cld
+        popl     %edi
+        popl     %esi
+        ret</code></pre>
+<p>The point is&nbsp;<strong>not</strong> that VM&nbsp;languages are slower, but that random memory access kills performance. The essence of&nbsp;<code>conjoint_jints_atomic</code> is&nbsp;<code>rep; smovl</code><a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>. And if&nbsp;CPU really loves something it&nbsp;is&nbsp;<code>rep</code> instructions. For this, CPU can pipeline, prefetch, cache and do&nbsp;all the things it&nbsp;was built for&nbsp;&mdash; streaming calculations and predictable memory access. Just read the awesome <a href="http://www.lighterra.com/papers/modernmicroprocessors/">&laquo;Modern Microprocessors. A&nbsp;90 Minute Guide!&raquo;</a>.</p>
+<p>What it’s&nbsp;all mean is&nbsp;that for application <code>rep smovl</code> is&nbsp;not really a&nbsp;linear operation, but somewhat constant. Let’s&nbsp;illustrate the last point. For a&nbsp;list of&nbsp;1&nbsp;000&nbsp;000 elements let’s&nbsp;do&nbsp;insertion to&nbsp;the head of&nbsp;the list for 100, 1000 and 10000 elements. On&nbsp;my&nbsp;machine I’ve&nbsp;got the next samples:</p>
+<ul>
+<li>100 TestInsertHead: [41, 42, 42, 43, 46]</li>
+<li>1000 TestInsertHead: [409, 409, 411, 411, 412]</li>
+<li>10000 TestInsertHead: [4163, 4166, 4175, 4198, 4204]</li>
+</ul>
+<p>Each 10 times increase results in&nbsp;the same 10 times increase of&nbsp;operations because it’s&nbsp;&laquo;10 * O(1)&raquo;.</p>
+<p>Experienced developers are engineers and they know that <a href="http://www.stevemcconnell.com/psd/04-senotcs.htm">computer science is&nbsp;not software engineering</a> . What’s&nbsp;good in&nbsp;theory might be&nbsp;wrong in&nbsp;practice because you don’t&nbsp;take into account all the factors. To&nbsp;succeed in&nbsp;the real world, knowledge of&nbsp;the underlying system and how it&nbsp;works is&nbsp;incredibly important and can be&nbsp;a&nbsp;game changer.</p>
+<p>And it’s&nbsp;not only my&nbsp;opinion, a&nbsp;couple of&nbsp;years ago<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> there was a&nbsp;link on&nbsp;Reddit&nbsp;&mdash; <a href="https://www.reddit.com/r/programming/comments/25xpre/bjarne_stroustrup_why_you_should_avoid_linked/">Bjarne Stroustrup: Why you should avoid LinkedLists</a>. And I&nbsp;agree with his points. But, of&nbsp;course, be&nbsp;sane, don’t&nbsp;blindly trust anyone or&nbsp;anything&nbsp;&mdash; measure, measure, measure.</p>
+<p>And Here I&nbsp;would like to&nbsp;leave you with my&nbsp;<nobr>all-time</nobr> favorite <a href="http://scholar.harvard.edu/files/mickens/files/thenightwatch.pdf">&laquo;The Night Watch&raquo; by&nbsp;James Mickens</a>.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>gas requires <code>rep</code> instruction to&nbsp;be&nbsp;on&nbsp;2 lines, but with the semicolon, you can workaround this<a href="#fnref1">&#8617;</a></p></li>
+<li id="fn2"><p>Gosh, I&nbsp;still remember this link!<a href="#fnref2">&#8617;</a></p></li>
+</ol>
+</div>
+                        </div>
+                    </article>
+                </div>
+        </div>
+		<!--
+		<div class="row comments">
+      <a class="muut" href="https://muut.com/i/alex-dzyoba-blog/general" type="dynamic">Comments</a>
+      <script src="//cdn.muut.com/1/moot.min.js"></script>
+		</div>
+		-->
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+		&copy; 2016 Alex Dzyoba / CC-BY 4.0
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+</body>
+</html>
