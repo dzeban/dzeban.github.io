@@ -6,6 +6,7 @@ code {
     font-weight: normal;
     color: black;
     font-size: 1rem;
+    font-family: Monospace;
 }
 
 pre {
