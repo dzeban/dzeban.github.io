@@ -136,16 +136,19 @@ real    10m31.750s
 user    10m36.737s
 sys 0m1.011s</code></pre>
 <p>You can see with the naked eye that <code>LinkedList</code> loses. But let me&nbsp;show you nice box plots:</p>
-<p><a href="https://plot.ly/~dzeban/6.embed">Allocation and delete</a>:</p>
-<iframe width="600" height="500" frameborder="0" scrolling="no" src="https://plot.ly/~dzeban/6.embed?autosize=True">
-</iframe>
-<p><a href="https://plot.ly/~dzeban/8.embed">Insertions</a></p>
-<iframe width="600" height="500" frameborder="0" scrolling="no" src="https://plot.ly/~dzeban/8.embed?autosize=True">
-</iframe>
-<p><a href="https://plot.ly/~dzeban/10.embed">Search</a></p>
-<iframe width="600" height="500" frameborder="0" scrolling="no" src="https://plot.ly/~dzeban/10.embed?autosize=True">
-</iframe>
-<p>And here is&nbsp;the link to&nbsp;<a href="https://plot.ly/~dzeban/2.embed">all tests combined</a>.</p>
+<div class="figure">
+<img src="/assets/img/dynamic-array/allocation_delete.png" alt="Allocation and delete in LinkedList and ArrayList" />
+<p class="caption">Allocation and delete in&nbsp;LinkedList and ArrayList</p>
+</div>
+<div class="figure">
+<img src="/assets/img/dynamic-array/insert.png" alt="Insert in LinkedList and ArrayList" />
+<p class="caption">Insert in&nbsp;LinkedList and ArrayList</p>
+</div>
+<div class="figure">
+<img src="/assets/img/dynamic-array/search.png" alt="Search in LinkedList and ArrayList" />
+<p class="caption">Search in&nbsp;LinkedList and ArrayList</p>
+</div>
+<p>And here is&nbsp;the link to&nbsp;<a href="https://plot.ly/~dzeban/2/linked-list-vs-array-list/">all tests combined</a></p>
 <p>In&nbsp;all operations, <code>LinkedList</code> sucks horribly. The only exception is&nbsp;the insert to&nbsp;the head, but that’s&nbsp;a&nbsp;playing against <nobr>worst-case</nobr> of&nbsp;dynamic array&nbsp;&mdash; it&nbsp;has to&nbsp;copy the whole array every time.</p>
 <p>To&nbsp;explain this, we’ll&nbsp;dive a&nbsp;little bit into implementation. I’ll&nbsp;use OpenJDK sources of&nbsp;Java 8.</p>
 <p>So, <code>ArrayList</code> and <code>LinkedList</code> sources are in&nbsp;<a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/">src/share/classes/java/util</a></p>
