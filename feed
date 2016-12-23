@@ -40,7 +40,7 @@ while the relative advantages of arrays include:
 &lt;li&gt;Deleting all elements.&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;Sources are at&amp;nbsp;my&amp;nbsp;CS&amp;nbsp;playground in&amp;nbsp;&lt;a href="https://github.com/dzeban/cs/tree/master/ds/list-perf"&gt;&lt;code&gt;ds/&lt;nobr&gt;list-perf&lt;/nobr&gt;&lt;/code&gt; dir&lt;/a&gt;. There is&amp;nbsp;Maven project, so&amp;nbsp;you can just do&amp;nbsp;&lt;code&gt;mvn package&lt;/code&gt; and get a&amp;nbsp;jar. Tests are quite simple, for example, here is&amp;nbsp;the random insertion test:&lt;/p&gt;
-&lt;pre class="sourceCode java"&gt;&lt;code class="sourceCode java"&gt;&lt;span class="kw"&gt;package com.dzyoba.alex;&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode java"&gt;&lt;code class="sourceCode java"&gt;&lt;span class="kw"&gt;package com.dzyoba.alex;&lt;/span&gt;
 
 &lt;span class="kw"&gt;import java.util.List;&lt;/span&gt;
 &lt;span class="kw"&gt;import java.util.Random;&lt;/span&gt;
@@ -65,7 +65,7 @@ while the relative advantages of arrays include:
             list.&lt;span class="fu"&gt;add&lt;/span&gt;(index, element);
         }
     }
-}&lt;/code&gt;&lt;/pre&gt;
+}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;It’s&amp;nbsp;working using &lt;code&gt;List&lt;/code&gt; interface (yay, polymorphism!), so&amp;nbsp;we&amp;nbsp;can pass &lt;code&gt;LinkedList&lt;/code&gt; and &lt;code&gt;ArrayList&lt;/code&gt; without changing anything. It&amp;nbsp;runs tests in&amp;nbsp;the order mentioned above (allocation-&amp;gt;insertions-&amp;gt;search-&amp;gt;delete) several times and calculating min/median/max of&amp;nbsp;all test results.&lt;/p&gt;
 &lt;p&gt;Alright, enough words, let’s&amp;nbsp;run it!&lt;/p&gt;
 &lt;pre&gt;&lt;code&gt;$ time java -cp target/TestList-1.0-SNAPSHOT.jar com.dzyoba.alex.TestList
@@ -107,7 +107,7 @@ sys 0m1.011s&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;To&amp;nbsp;explain this, we’ll&amp;nbsp;dive a&amp;nbsp;little bit into implementation. I’ll&amp;nbsp;use OpenJDK sources of&amp;nbsp;Java 8.&lt;/p&gt;
 &lt;p&gt;So, &lt;code&gt;ArrayList&lt;/code&gt; and &lt;code&gt;LinkedList&lt;/code&gt; sources are in&amp;nbsp;&lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/"&gt;src/share/classes/java/util&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;&lt;code&gt;LinkedList&lt;/code&gt; in&amp;nbsp;Java is&amp;nbsp;implemented as&amp;nbsp;a&amp;nbsp;&lt;nobr&gt;doubly-linked&lt;/nobr&gt; list via &lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/LinkedList.java#969"&gt;&lt;code&gt;Node&lt;/code&gt; inner class&lt;/a&gt;:&lt;/p&gt;
-&lt;pre class="sourceCode java"&gt;&lt;code class="sourceCode java"&gt;&lt;span class="kw"&gt;private&lt;/span&gt; &lt;span class="dt"&gt;static&lt;/span&gt; &lt;span class="kw"&gt;class&lt;/span&gt; Node&amp;lt;E&amp;gt; {
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode java"&gt;&lt;code class="sourceCode java"&gt;&lt;span class="kw"&gt;private&lt;/span&gt; &lt;span class="dt"&gt;static&lt;/span&gt; &lt;span class="kw"&gt;class&lt;/span&gt; Node&amp;lt;E&amp;gt; {
     E item;
     Node&amp;lt;E&amp;gt; next;
     Node&amp;lt;E&amp;gt; prev;
@@ -117,13 +117,13 @@ sys 0m1.011s&lt;/code&gt;&lt;/pre&gt;
         &lt;span class="kw"&gt;this&lt;/span&gt;.&lt;span class="fu"&gt;next&lt;/span&gt; = next;
         &lt;span class="kw"&gt;this&lt;/span&gt;.&lt;span class="fu"&gt;prev&lt;/span&gt; = prev;
     }
-}&lt;/code&gt;&lt;/pre&gt;
+}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Now, let’s&amp;nbsp;look at&amp;nbsp;what’s&amp;nbsp;happening under the hood in&amp;nbsp;the simple allocation test.&lt;/p&gt;
-&lt;pre class="sourceCode java"&gt;&lt;code class="sourceCode java"&gt;&lt;span class="kw"&gt;for&lt;/span&gt; (&lt;span class="dt"&gt;int&lt;/span&gt; i = &lt;span class="dv"&gt;0&lt;/span&gt;; i &amp;lt; listSize; i++) {
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode java"&gt;&lt;code class="sourceCode java"&gt;&lt;span class="kw"&gt;for&lt;/span&gt; (&lt;span class="dt"&gt;int&lt;/span&gt; i = &lt;span class="dv"&gt;0&lt;/span&gt;; i &amp;lt; listSize; i++) {
     list.&lt;span class="fu"&gt;add&lt;/span&gt;(i);
-}&lt;/code&gt;&lt;/pre&gt;
+}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;It&amp;nbsp;invokes &lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/LinkedList.java#329"&gt;&lt;code&gt;add&lt;/code&gt;&lt;/a&gt; method which invokes &lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/LinkedList.java#137"&gt;&lt;code&gt;linkLast&lt;/code&gt;&lt;/a&gt; method in&amp;nbsp;JDK:&lt;/p&gt;
-&lt;pre class="sourceCode java"&gt;&lt;code class="sourceCode java"&gt;&lt;span class="kw"&gt;public&lt;/span&gt; &lt;span class="dt"&gt;boolean&lt;/span&gt; &lt;span class="fu"&gt;add&lt;/span&gt;(E e) {
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode java"&gt;&lt;code class="sourceCode java"&gt;&lt;span class="kw"&gt;public&lt;/span&gt; &lt;span class="dt"&gt;boolean&lt;/span&gt; &lt;span class="fu"&gt;add&lt;/span&gt;(E e) {
     &lt;span class="fu"&gt;linkLast&lt;/span&gt;(e);
     &lt;span class="kw"&gt;return&lt;/span&gt; &lt;span class="kw"&gt;true&lt;/span&gt;;
 }
@@ -138,9 +138,9 @@ sys 0m1.011s&lt;/code&gt;&lt;/pre&gt;
         l.&lt;span class="fu"&gt;next&lt;/span&gt; = newNode;
     size++;
     modCount++;
-}&lt;/code&gt;&lt;/pre&gt;
+}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Essentially, allocation in&amp;nbsp;&lt;code&gt;LinkedList&lt;/code&gt; is&amp;nbsp;a&amp;nbsp;&lt;strong&gt;constant time operation&lt;/strong&gt;. &lt;code&gt;LinkedList&lt;/code&gt; class maintains the tail pointer, so&amp;nbsp;to&amp;nbsp;insert it&amp;nbsp;just has to&amp;nbsp;allocate a&amp;nbsp;new object and update 2 pointers. It&amp;nbsp;&lt;strong&gt;shouldn’t&amp;nbsp;be&amp;nbsp;that slow&lt;/strong&gt;! But why does it&amp;nbsp;happens? Let’s&amp;nbsp;compare with &lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/ArrayList.java#207"&gt;&lt;code&gt;ArrayList&lt;/code&gt;&lt;/a&gt;.&lt;/p&gt;
-&lt;pre class="sourceCode java"&gt;&lt;code class="sourceCode java"&gt;&lt;span class="kw"&gt;public&lt;/span&gt; &lt;span class="dt"&gt;boolean&lt;/span&gt; &lt;span class="fu"&gt;add&lt;/span&gt;(E e) {
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode java"&gt;&lt;code class="sourceCode java"&gt;&lt;span class="kw"&gt;public&lt;/span&gt; &lt;span class="dt"&gt;boolean&lt;/span&gt; &lt;span class="fu"&gt;add&lt;/span&gt;(E e) {
     &lt;span class="fu"&gt;ensureCapacityInternal&lt;/span&gt;(size + &lt;span class="dv"&gt;1&lt;/span&gt;);  &lt;span class="co"&gt;// Increments modCount!!&lt;/span&gt;
     elementData[size++] = e;
     &lt;span class="kw"&gt;return&lt;/span&gt; &lt;span class="kw"&gt;true&lt;/span&gt;;
@@ -172,11 +172,11 @@ sys 0m1.011s&lt;/code&gt;&lt;/pre&gt;
         newCapacity = &lt;span class="fu"&gt;hugeCapacity&lt;/span&gt;(minCapacity);
     &lt;span class="co"&gt;// minCapacity is usually close to size, so this is a win:&lt;/span&gt;
     elementData = Arrays.&lt;span class="fu"&gt;copyOf&lt;/span&gt;(elementData, newCapacity);
-}&lt;/code&gt;&lt;/pre&gt;
+}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;&lt;code&gt;ArrayList&lt;/code&gt; in&amp;nbsp;Java is, indeed, a&amp;nbsp;dynamic array that increases its size in&amp;nbsp;1.5 each grow with the initial capacity of&amp;nbsp;10. Also this &lt;code&gt;//&lt;nobr&gt;overflow-conscious&lt;/nobr&gt; code&lt;/code&gt; is&amp;nbsp;actually pretty funny. You can read why is&amp;nbsp;that so&amp;nbsp;&lt;a href="http://stackoverflow.com/questions/33147339/difference-between-if-a-b-0-and-if-a-b"&gt;here&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;The resizing itself is&amp;nbsp;done via &lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/Arrays.java#3260"&gt;&lt;code&gt;Arrays.copyOf&lt;/code&gt;&lt;/a&gt; which calls &lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/lang/System.java#480"&gt;&lt;code&gt;System.arraycopy&lt;/code&gt;&lt;/a&gt; which is&amp;nbsp;a&amp;nbsp;Java &lt;em&gt;native&lt;/em&gt; method. Implementation of&amp;nbsp;native methods is&amp;nbsp;not part of&amp;nbsp;JDK, it’s&amp;nbsp;a&amp;nbsp;particular JVM function. Let’s&amp;nbsp;grab Hotspot source code and look into it.&lt;/p&gt;
 &lt;p&gt;Long story short&amp;nbsp;&amp;mdash; it’s&amp;nbsp;in&amp;nbsp;&lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/share/vm/oops/typeArrayKlass.cpp#128"&gt;&lt;code&gt;TypeArrayKlass:copy_array&lt;/code&gt;&lt;/a&gt; method that invokes &lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/share/vm/utilities/copy.cpp#29"&gt;&lt;code&gt;Copy:conjoint_memory_atomic&lt;/code&gt;&lt;/a&gt;. This one is&amp;nbsp;looking for alignment, namely there are variant for long, int, short and bytes(unaligned) copy. We’ll&amp;nbsp;look plain int variant&amp;nbsp;&amp;mdash; &lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/share/vm/utilities/copy.hpp#137"&gt;&lt;code&gt;conjoint_jints_atomic&lt;/code&gt;&lt;/a&gt; which is&amp;nbsp;a&amp;nbsp;wrapper for &lt;a href="http://code.metager.de/source/xref/openjdk/jdk6/hotspot/src/os_cpu/linux_x86/vm/copy_linux_x86.inline.hpp#229"&gt;&lt;code&gt;pd_conjoint_jints_atomic&lt;/code&gt;&lt;/a&gt;. This one is&amp;nbsp;OS&amp;nbsp;and CPU specific. Looking for Linux variant we’ll&amp;nbsp;find a&amp;nbsp;call to&amp;nbsp;&lt;a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/os_cpu/linux_x86/vm/linux_x86_32.s#420"&gt;&lt;code&gt;_Copy_conjoint_jints_atomic&lt;/code&gt;&lt;/a&gt;. And the last one is&amp;nbsp;an&amp;nbsp;assembly beast!&lt;/p&gt;
-&lt;pre class="sourceCode gnuassembler"&gt;&lt;code class="sourceCode gnuassembler"&gt;        &lt;span class="co"&gt;# Support for void Copy::conjoint_jints_atomic(void* from,&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode gnuassembler"&gt;&lt;code class="sourceCode gnuassembler"&gt;        &lt;span class="co"&gt;# Support for void Copy::conjoint_jints_atomic(void* from,&lt;/span&gt;
         &lt;span class="co"&gt;#                                              void* to,&lt;/span&gt;
         &lt;span class="co"&gt;#                                              size_t count)&lt;/span&gt;
         &lt;span class="co"&gt;# Equivalent to&lt;/span&gt;
@@ -237,7 +237,7 @@ sys 0m1.011s&lt;/code&gt;&lt;/pre&gt;
         cld
         popl     %edi
         popl     %esi
-        ret&lt;/code&gt;&lt;/pre&gt;
+        ret&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;The point is&amp;nbsp;&lt;strong&gt;not&lt;/strong&gt; that VM&amp;nbsp;languages are slower, but that random memory access kills performance. The essence of&amp;nbsp;&lt;code&gt;conjoint_jints_atomic&lt;/code&gt; is&amp;nbsp;&lt;code&gt;rep; smovl&lt;/code&gt;&lt;a href="#fn1" class="footnoteRef" id="fnref1"&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt;. And if&amp;nbsp;CPU really loves something it&amp;nbsp;is&amp;nbsp;&lt;code&gt;rep&lt;/code&gt; instructions. For this, CPU can pipeline, prefetch, cache and do&amp;nbsp;all the things it&amp;nbsp;was built for&amp;nbsp;&amp;mdash; streaming calculations and predictable memory access. Just read the awesome &lt;a href="http://www.lighterra.com/papers/modernmicroprocessors/"&gt;&amp;laquo;Modern Microprocessors. A&amp;nbsp;90 Minute Guide!&amp;raquo;&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;What it’s&amp;nbsp;all mean is&amp;nbsp;that for application &lt;code&gt;rep smovl&lt;/code&gt; is&amp;nbsp;not really a&amp;nbsp;linear operation, but somewhat constant. Let’s&amp;nbsp;illustrate the last point. For a&amp;nbsp;list of&amp;nbsp;1&amp;nbsp;000&amp;nbsp;000 elements let’s&amp;nbsp;do&amp;nbsp;insertion to&amp;nbsp;the head of&amp;nbsp;the list for 100, 1000 and 10000 elements. On&amp;nbsp;my&amp;nbsp;machine I’ve&amp;nbsp;got the next samples:&lt;/p&gt;
 &lt;ul&gt;
@@ -556,7 +556,7 @@ jmp 0x10:eax ; Far jump&lt;/code&gt;&lt;/pre&gt;
 &lt;h2 id="segments-layout-examples"&gt;Segments layout examples&lt;/h2&gt;
 &lt;h3 id="linux-kernel"&gt;Linux kernel&lt;/h3&gt;
 &lt;p&gt;Linux kernel describes segment descriptor as&amp;nbsp;desc_struct structure in&amp;nbsp;&lt;a href="http://lxr.free-electrons.com/source/arch/x86/include/asm/desc_defs.h?v=4.2#L14"&gt;arch/x86/include/asm/desc_defs.h&lt;/a&gt;&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="kw"&gt;struct&lt;/span&gt; desc_struct {
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="kw"&gt;struct&lt;/span&gt; desc_struct {
         &lt;span class="kw"&gt;union&lt;/span&gt; {
                 &lt;span class="kw"&gt;struct&lt;/span&gt; {
                         &lt;span class="dt"&gt;unsigned&lt;/span&gt; &lt;span class="dt"&gt;int&lt;/span&gt; a;
@@ -575,14 +575,14 @@ jmp 0x10:eax ; Far jump&lt;/code&gt;&lt;/pre&gt;
 &lt;span class="ot"&gt;        .a = ((limit) &amp;amp; 0xffff) | (((base) &amp;amp; 0xffff) &amp;lt;&amp;lt; 16), \&lt;/span&gt;
 &lt;span class="ot"&gt;        .b = (((base) &amp;amp; 0xff0000) &amp;gt;&amp;gt; 16) | (((flags) &amp;amp; 0xf0ff) &amp;lt;&amp;lt; 8) | \&lt;/span&gt;
 &lt;span class="ot"&gt;            ((limit) &amp;amp; 0xf0000) | ((base) &amp;amp; 0xff000000), \&lt;/span&gt;
-&lt;span class="ot"&gt;    } } }&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;span class="ot"&gt;    } } }&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;GDT itself defined in&amp;nbsp;&lt;a href="http://lxr.free-electrons.com/source/arch/x86/kernel/cpu/common.c?v=4.2#L94"&gt;arch/x86/kernel/cpu/common.c&lt;/a&gt;:&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;.gdt = { 
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;.gdt = { 
     [GDT_ENTRY_KERNEL_CS]           = GDT_ENTRY_INIT(&lt;span class="bn"&gt;0xc09a&lt;/span&gt;, &lt;span class="dv"&gt;0&lt;/span&gt;, &lt;span class="bn"&gt;0xfffff&lt;/span&gt;),
     [GDT_ENTRY_KERNEL_DS]           = GDT_ENTRY_INIT(&lt;span class="bn"&gt;0xc092&lt;/span&gt;, &lt;span class="dv"&gt;0&lt;/span&gt;, &lt;span class="bn"&gt;0xfffff&lt;/span&gt;),
     [GDT_ENTRY_DEFAULT_USER_CS]     = GDT_ENTRY_INIT(&lt;span class="bn"&gt;0xc0fa&lt;/span&gt;, &lt;span class="dv"&gt;0&lt;/span&gt;, &lt;span class="bn"&gt;0xfffff&lt;/span&gt;),
     [GDT_ENTRY_DEFAULT_USER_DS]     = GDT_ENTRY_INIT(&lt;span class="bn"&gt;0xc0f2&lt;/span&gt;, &lt;span class="dv"&gt;0&lt;/span&gt;, &lt;span class="bn"&gt;0xfffff&lt;/span&gt;),
-...&lt;/code&gt;&lt;/pre&gt;
+...&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Basically, there is&amp;nbsp;a&amp;nbsp;flat memory model with 4 segments from &lt;code&gt;0&lt;/code&gt; to&amp;nbsp;&lt;code&gt;0xfffff * granularity&lt;/code&gt;, where granularity flag set to&amp;nbsp;1 specifies 4096 increments, thus giving us&amp;nbsp;limit of&amp;nbsp;4 GiB. Userspace and kernel segments differs in&amp;nbsp;DPL only.&lt;/p&gt;
 &lt;h3 id="first-linux-version-0.01"&gt;First Linux version 0.01&lt;/h3&gt;
 &lt;p&gt;In&amp;nbsp;the Linux version 0.01 there were no&amp;nbsp;userspace segments. In&amp;nbsp;&lt;a href="http://code.metager.de/source/xref/linux/historic/0.01/boot/head.s#171"&gt;boot/head.s&lt;/a&gt;&lt;/p&gt;
@@ -594,28 +594,28 @@ jmp 0x10:eax ; Far jump&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Unfortunately, I&amp;nbsp;wasn’t&amp;nbsp;able to&amp;nbsp;track down how userspace was set up&amp;nbsp;(TSS only?).&lt;/p&gt;
 &lt;h3 id="netbsd"&gt;NetBSD&lt;/h3&gt;
 &lt;p&gt;NetBSD kernel defines 4 segments as&amp;nbsp;everybody. In&amp;nbsp;&lt;a href="http://nxr.netbsd.org/xref/src/sys/arch/i386/include/segments.h#285"&gt;sys/arch/i386/include/segments.h&lt;/a&gt;&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="ot"&gt;#define GNULL_SEL   0   &lt;/span&gt;&lt;span class="co"&gt;/* Null descriptor */&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="ot"&gt;#define GNULL_SEL   0   &lt;/span&gt;&lt;span class="co"&gt;/* Null descriptor */&lt;/span&gt;
 &lt;span class="ot"&gt;#define GCODE_SEL   1   &lt;/span&gt;&lt;span class="co"&gt;/* Kernel code descriptor */&lt;/span&gt;
 &lt;span class="ot"&gt;#define GDATA_SEL   2   &lt;/span&gt;&lt;span class="co"&gt;/* Kernel data descriptor */&lt;/span&gt;
 &lt;span class="ot"&gt;#define GUCODE_SEL  3   &lt;/span&gt;&lt;span class="co"&gt;/* User code descriptor */&lt;/span&gt;
 &lt;span class="ot"&gt;#define GUDATA_SEL  4   &lt;/span&gt;&lt;span class="co"&gt;/* User data descriptor */&lt;/span&gt;
-...&lt;/code&gt;&lt;/pre&gt;
+...&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Segments are set up&amp;nbsp;in&amp;nbsp;&lt;a href="http://nxr.netbsd.org/xref/src/sys/arch/i386/i386/machdep.c#953"&gt;sys/arch/i386/i386/machdep.c&lt;/a&gt;, function &lt;code&gt;initgdt&lt;/code&gt;:&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;setsegment(&amp;amp;gdt[GCODE_SEL].sd, &lt;span class="dv"&gt;0&lt;/span&gt;, &lt;span class="bn"&gt;0xfffff&lt;/span&gt;, SDT_MEMERA, SEL_KPL, &lt;span class="dv"&gt;1&lt;/span&gt;, &lt;span class="dv"&gt;1&lt;/span&gt;);
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;setsegment(&amp;amp;gdt[GCODE_SEL].sd, &lt;span class="dv"&gt;0&lt;/span&gt;, &lt;span class="bn"&gt;0xfffff&lt;/span&gt;, SDT_MEMERA, SEL_KPL, &lt;span class="dv"&gt;1&lt;/span&gt;, &lt;span class="dv"&gt;1&lt;/span&gt;);
 setsegment(&amp;amp;gdt[GDATA_SEL].sd, &lt;span class="dv"&gt;0&lt;/span&gt;, &lt;span class="bn"&gt;0xfffff&lt;/span&gt;, SDT_MEMRWA, SEL_KPL, &lt;span class="dv"&gt;1&lt;/span&gt;, &lt;span class="dv"&gt;1&lt;/span&gt;);
 setsegment(&amp;amp;gdt[GUCODE_SEL].sd, &lt;span class="dv"&gt;0&lt;/span&gt;, x86_btop(I386_MAX_EXE_ADDR) - &lt;span class="dv"&gt;1&lt;/span&gt;,
     SDT_MEMERA, SEL_UPL, &lt;span class="dv"&gt;1&lt;/span&gt;, &lt;span class="dv"&gt;1&lt;/span&gt;);
 setsegment(&amp;amp;gdt[GUCODEBIG_SEL].sd, &lt;span class="dv"&gt;0&lt;/span&gt;, &lt;span class="bn"&gt;0xfffff&lt;/span&gt;,
     SDT_MEMERA, SEL_UPL, &lt;span class="dv"&gt;1&lt;/span&gt;, &lt;span class="dv"&gt;1&lt;/span&gt;);
 setsegment(&amp;amp;gdt[GUDATA_SEL].sd, &lt;span class="dv"&gt;0&lt;/span&gt;, &lt;span class="bn"&gt;0xfffff&lt;/span&gt;,
-    SDT_MEMRWA, SEL_UPL, &lt;span class="dv"&gt;1&lt;/span&gt;, &lt;span class="dv"&gt;1&lt;/span&gt;);&lt;/code&gt;&lt;/pre&gt;
+    SDT_MEMRWA, SEL_UPL, &lt;span class="dv"&gt;1&lt;/span&gt;, &lt;span class="dv"&gt;1&lt;/span&gt;);&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Where &lt;code&gt;setsegment&lt;/code&gt; has &lt;a href="http://nxr.netbsd.org/xref/src/sys/arch/i386/i386/machdep.c#907"&gt;following signature&lt;/a&gt;:&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="dt"&gt;void&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="dt"&gt;void&lt;/span&gt;
 setsegment(&lt;span class="kw"&gt;struct&lt;/span&gt; segment_descriptor *sd, &lt;span class="dt"&gt;const&lt;/span&gt; &lt;span class="dt"&gt;void&lt;/span&gt; *base, size_t limit,
-    &lt;span class="dt"&gt;int&lt;/span&gt; type, &lt;span class="dt"&gt;int&lt;/span&gt; dpl, &lt;span class="dt"&gt;int&lt;/span&gt; def32, &lt;span class="dt"&gt;int&lt;/span&gt; gran)&lt;/code&gt;&lt;/pre&gt;
+    &lt;span class="dt"&gt;int&lt;/span&gt; type, &lt;span class="dt"&gt;int&lt;/span&gt; dpl, &lt;span class="dt"&gt;int&lt;/span&gt; def32, &lt;span class="dt"&gt;int&lt;/span&gt; gran)&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;h3 id="openbsd"&gt;OpenBSD&lt;/h3&gt;
 &lt;p&gt;Similar to&amp;nbsp;NetBSD, but segments order is&amp;nbsp;different. In&amp;nbsp;&lt;a href="http://bxr.su/OpenBSD/sys/arch/i386/include/segments.h#211"&gt;sys/arch/i386/include/segments.h&lt;/a&gt;:&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="co"&gt;/*&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="co"&gt;/*&lt;/span&gt;
 &lt;span class="co"&gt; * Entries in the Global Descriptor Table (GDT)&lt;/span&gt;
 &lt;span class="co"&gt; */&lt;/span&gt;
 &lt;span class="ot"&gt;#define GNULL_SEL   0   &lt;/span&gt;&lt;span class="co"&gt;/* Null descriptor */&lt;/span&gt;
@@ -625,21 +625,21 @@ setsegment(&lt;span class="kw"&gt;struct&lt;/span&gt; segment_descriptor *sd, &l
 &lt;span class="ot"&gt;#define GCPU_SEL    4   &lt;/span&gt;&lt;span class="co"&gt;/* per-CPU segment */&lt;/span&gt;
 &lt;span class="ot"&gt;#define GUCODE_SEL  5   &lt;/span&gt;&lt;span class="co"&gt;/* User code descriptor (a stack short) */&lt;/span&gt;
 &lt;span class="ot"&gt;#define GUDATA_SEL  6   &lt;/span&gt;&lt;span class="co"&gt;/* User data descriptor */&lt;/span&gt;
-...&lt;/code&gt;&lt;/pre&gt;
+...&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;As&amp;nbsp;you can see, userspace code and data segments are at&amp;nbsp;positions 5 and 6 in&amp;nbsp;GDT. I&amp;nbsp;don’t&amp;nbsp;know how &lt;code&gt;SYSENTER/SYSEXIT&lt;/code&gt; will work here because you set the value of&amp;nbsp;&lt;code&gt;SYSENTER&lt;/code&gt; segment in&amp;nbsp;&lt;code&gt;IA32_SYSENTER_CS&lt;/code&gt; MSR. All other segments are calculated as&amp;nbsp;offset from this MSR, e.g. &lt;code&gt;SYSEXIT&lt;/code&gt; target segment is&amp;nbsp;an&amp;nbsp;16 bytes offset&amp;nbsp;&amp;mdash; GDT entry that is&amp;nbsp;after next to&amp;nbsp;&lt;code&gt;SYSENTER&lt;/code&gt; segment. In&amp;nbsp;this case &lt;code&gt;SYSEXIT&lt;/code&gt; will hit LDT. Some help from OpenBSD kernel folks will be&amp;nbsp;great here.&lt;/p&gt;
 &lt;p&gt;Everything else is&amp;nbsp;same.&lt;/p&gt;
 &lt;h3 id="xv6"&gt;xv6&lt;/h3&gt;
 &lt;p&gt;xv6 is&amp;nbsp;a&amp;nbsp;&lt;nobr&gt;re-implementation&lt;/nobr&gt; of&amp;nbsp;Dennis Ritchie’s&amp;nbsp;and Ken Thompson’s&amp;nbsp;Unix Version 6 (v6). It’s&amp;nbsp;a&amp;nbsp;small operating system that is&amp;nbsp;taught in&amp;nbsp;MIT.&lt;/p&gt;
 &lt;p&gt;It’s&amp;nbsp;really pleasant to&amp;nbsp;read it’s&amp;nbsp;source code. There is&amp;nbsp;a&amp;nbsp;&lt;a href="http://code.metager.de/source/xref/mit/xv6/main.c#14"&gt;&lt;code&gt;main&lt;/code&gt;&lt;/a&gt; in&amp;nbsp;main.c that calls &lt;a href="http://code.metager.de/source/xref/mit/xv6/vm.c#14"&gt;&lt;code&gt;seginit&lt;/code&gt;&lt;/a&gt; in&amp;nbsp;vm.c&lt;/p&gt;
 &lt;p&gt;This function sets up&amp;nbsp;6 segments:&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="ot"&gt;#define SEG_KCODE 1  &lt;/span&gt;&lt;span class="co"&gt;// kernel code&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="ot"&gt;#define SEG_KCODE 1  &lt;/span&gt;&lt;span class="co"&gt;// kernel code&lt;/span&gt;
 &lt;span class="ot"&gt;#define SEG_KDATA 2  &lt;/span&gt;&lt;span class="co"&gt;// kernel data+stack&lt;/span&gt;
 &lt;span class="ot"&gt;#define SEG_KCPU  3  &lt;/span&gt;&lt;span class="co"&gt;// kernel per-cpu data&lt;/span&gt;
 &lt;span class="ot"&gt;#define SEG_UCODE 4  &lt;/span&gt;&lt;span class="co"&gt;// user code&lt;/span&gt;
 &lt;span class="ot"&gt;#define SEG_UDATA 5  &lt;/span&gt;&lt;span class="co"&gt;// user data+stack&lt;/span&gt;
-&lt;span class="ot"&gt;#define SEG_TSS   6  &lt;/span&gt;&lt;span class="co"&gt;// this process&amp;#39;s task state&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;span class="ot"&gt;#define SEG_TSS   6  &lt;/span&gt;&lt;span class="co"&gt;// this process&amp;#39;s task state&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;like this&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="co"&gt;// Map &amp;quot;logical&amp;quot; addresses to virtual addresses using identity map.&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="co"&gt;// Map &amp;quot;logical&amp;quot; addresses to virtual addresses using identity map.&lt;/span&gt;
 &lt;span class="co"&gt;// Cannot share a CODE descriptor for both kernel and user&lt;/span&gt;
 &lt;span class="co"&gt;// because it would have to have DPL_USR, but the CPU forbids&lt;/span&gt;
 &lt;span class="co"&gt;// an interrupt from CPL=0 to DPL=3.&lt;/span&gt;
@@ -650,7 +650,7 @@ c-&amp;gt;gdt[SEG_UCODE] = SEG(STA_X|STA_R, &lt;span class="dv"&gt;0&lt;/span&gt
 c-&amp;gt;gdt[SEG_UDATA] = SEG(STA_W, &lt;span class="dv"&gt;0&lt;/span&gt;, &lt;span class="bn"&gt;0xffffffff&lt;/span&gt;, DPL_USER);
 
 &lt;span class="co"&gt;// Map cpu, and curproc&lt;/span&gt;
-c-&amp;gt;gdt[SEG_KCPU] = SEG(STA_W, &amp;amp;c-&amp;gt;cpu, &lt;span class="dv"&gt;8&lt;/span&gt;, &lt;span class="dv"&gt;0&lt;/span&gt;);&lt;/code&gt;&lt;/pre&gt;
+c-&amp;gt;gdt[SEG_KCPU] = SEG(STA_W, &amp;amp;c-&amp;gt;cpu, &lt;span class="dv"&gt;8&lt;/span&gt;, &lt;span class="dv"&gt;0&lt;/span&gt;);&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Four segments for kernel and userspace code and data, one for TSS, nice and simple code, clear logic, great OS&amp;nbsp;for education.&lt;/p&gt;
 &lt;h2 id="to-read"&gt;To&amp;nbsp;read&lt;/h2&gt;
 &lt;ul&gt;
@@ -908,7 +908,7 @@ Working Devices : 8
     <content type="html">&lt;p&gt;As&amp;nbsp;a&amp;nbsp;headcase, in&amp;nbsp;my&amp;nbsp;spare time (among other things) I’m&amp;nbsp;writing an&amp;nbsp;operating system kernel. There is&amp;nbsp;nothing much at&amp;nbsp;this moment because I’m&amp;nbsp;digging into boot process of&amp;nbsp;x86 system&lt;a href="#fn1" class="footnoteRef" id="fnref1"&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt;. And, to&amp;nbsp;commit my&amp;nbsp;knowledge so&amp;nbsp;far, I’ll&amp;nbsp;explain first simple but really important steps of&amp;nbsp;booting trivial kernel.&lt;/p&gt;
 &lt;h2 id="the-kernel"&gt;The &amp;laquo;kernel&amp;raquo;&lt;/h2&gt;
 &lt;p&gt;For illustrations I’m&amp;nbsp;gonna use &amp;laquo;Hello world&amp;raquo; kernel that is&amp;nbsp;written in&amp;nbsp;NASM assembly (grab the source &lt;a href="http://github.com/dzeban/hello-kernel"&gt;from github&lt;/a&gt;):&lt;/p&gt;
-&lt;pre class="sourceCode nasm"&gt;&lt;code class="sourceCode nasm"&gt;    &lt;span class="kw"&gt;global&lt;/span&gt; start                    &lt;span class="co"&gt;; the entry symbol for ELF&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode nasm"&gt;&lt;code class="sourceCode nasm"&gt;    &lt;span class="kw"&gt;global&lt;/span&gt; start                    &lt;span class="co"&gt;; the entry symbol for ELF&lt;/span&gt;
 
     MAGIC_NUMBER &lt;span class="dt"&gt;equ&lt;/span&gt; &lt;span class="bn"&gt;0x1BADB002&lt;/span&gt;     &lt;span class="co"&gt;; define the magic number constant&lt;/span&gt;
     FLAGS        &lt;span class="dt"&gt;equ&lt;/span&gt;&lt;span class="bn"&gt; 0x0            &lt;/span&gt;&lt;span class="co"&gt;; multiboot flags&lt;/span&gt;
@@ -938,7 +938,7 @@ Working Devices : 8
       &lt;span class="kw"&gt;mov&lt;/span&gt; [&lt;span class="kw"&gt;ebx&lt;/span&gt;], &lt;span class="kw"&gt;eax&lt;/span&gt;
 
 &lt;span class="fu"&gt;    .loop:&lt;/span&gt;
-        &lt;span class="kw"&gt;jmp&lt;/span&gt; .&lt;span class="kw"&gt;loop&lt;/span&gt;                   &lt;span class="co"&gt;; loop forever&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+        &lt;span class="kw"&gt;jmp&lt;/span&gt; .&lt;span class="kw"&gt;loop&lt;/span&gt;                   &lt;span class="co"&gt;; loop forever&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;This kernel works with VGA buffer&amp;nbsp;&amp;mdash; it&amp;nbsp;clears the screen from the old BIOS messages and print capital ‘A’ letter in&amp;nbsp;red. After it, it&amp;nbsp;just loop forever.&lt;/p&gt;
 &lt;p&gt;Compile it&amp;nbsp;with&lt;/p&gt;
 &lt;pre&gt;&lt;code&gt;nasm -f elf32 kernel.S -o kernel.o&lt;/code&gt;&lt;/pre&gt;
@@ -990,7 +990,7 @@ SECTIONS {
 &lt;li&gt;If&amp;nbsp;the image is&amp;nbsp;not in&amp;nbsp;ELF format it&amp;nbsp;loads kernel to&amp;nbsp;address either supplied in&amp;nbsp;address field or&amp;nbsp;in&amp;nbsp;the flags field.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;In&amp;nbsp;our kernel’s&amp;nbsp;text section we’ve&amp;nbsp;done it:&lt;/p&gt;
-&lt;pre class="sourceCode nasm"&gt;&lt;code class="sourceCode nasm"&gt;    MAGIC_NUMBER &lt;span class="dt"&gt;equ&lt;/span&gt; &lt;span class="bn"&gt;0x1BADB002&lt;/span&gt;     &lt;span class="co"&gt;; define the magic number constant&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode nasm"&gt;&lt;code class="sourceCode nasm"&gt;    MAGIC_NUMBER &lt;span class="dt"&gt;equ&lt;/span&gt; &lt;span class="bn"&gt;0x1BADB002&lt;/span&gt;     &lt;span class="co"&gt;; define the magic number constant&lt;/span&gt;
     FLAGS        &lt;span class="dt"&gt;equ&lt;/span&gt;&lt;span class="bn"&gt; 0x0            &lt;/span&gt;&lt;span class="co"&gt;; multiboot flags&lt;/span&gt;
     CHECKSUM     &lt;span class="dt"&gt;equ&lt;/span&gt; -MAGIC_NUMBER  &lt;span class="co"&gt;; calculate the checksum&lt;/span&gt;
                                     &lt;span class="co"&gt;; (magic number + checksum + flags should equal 0)&lt;/span&gt;
@@ -999,7 +999,7 @@ SECTIONS {
     &lt;span class="kw"&gt;align&lt;/span&gt; &lt;span class="dv"&gt;4&lt;/span&gt;                         &lt;span class="co"&gt;; the code must be 4 byte aligned&lt;/span&gt;
         &lt;span class="dt"&gt;dd&lt;/span&gt; MAGIC_NUMBER             &lt;span class="co"&gt;; write the magic number to the machine code,&lt;/span&gt;
         &lt;span class="dt"&gt;dd&lt;/span&gt; FLAGS                    &lt;span class="co"&gt;; the flags,&lt;/span&gt;
-        &lt;span class="dt"&gt;dd&lt;/span&gt; CHECKSUM                 &lt;span class="co"&gt;; and the checksum&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+        &lt;span class="dt"&gt;dd&lt;/span&gt; CHECKSUM                 &lt;span class="co"&gt;; and the checksum&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;We&amp;nbsp;didn’t&amp;nbsp;specify any flags because we&amp;nbsp;don’t&amp;nbsp;need anything from bootloader like memory maps and stuff, and bootloader doesn’t&amp;nbsp;need anything from us&amp;nbsp;because we’re&amp;nbsp;in&amp;nbsp;ELF format. For other formats you must supply loading address in&amp;nbsp;its multiboot header. Multiboot header is&amp;nbsp;pretty simple:&lt;/p&gt;
 &lt;table summary&gt;
 &lt;tbody&gt;
@@ -2758,7 +2758,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;p&gt;Tracepoint&amp;nbsp;&amp;mdash; it’s&amp;nbsp;a&amp;nbsp;place in&amp;nbsp;code where you can bind your callback. &lt;em&gt;Tracepoints&lt;/em&gt; can be&amp;nbsp;disabled (no&amp;nbsp;callback) and enabled (has callback). There might be&amp;nbsp;several callbacks though it’s&amp;nbsp;still lightweight&amp;nbsp;&amp;mdash; when callback disabled it’s&amp;nbsp;actually looks like &lt;code&gt;if&amp;nbsp;(unlikely(tracepoint.enabled))&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;&lt;em&gt;Tracepoint&lt;/em&gt; output is&amp;nbsp;written in&amp;nbsp;ring buffer that is&amp;nbsp;export through &lt;em&gt;debugfs&lt;/em&gt; at&amp;nbsp;&lt;code&gt;/sys/kernel/debug/tracing/trace&lt;/code&gt;. There are also whole tree of&amp;nbsp;traceable events at&amp;nbsp;&lt;code&gt;/sys/kernel/debug/tracing/events&lt;/code&gt; that exports control files to&amp;nbsp;enable/disable particular event.&lt;/p&gt;
 &lt;p&gt;Despite of&amp;nbsp;it’s&amp;nbsp;name &lt;em&gt;tracepoints&lt;/em&gt; are base for &lt;nobr&gt;event-based&lt;/nobr&gt; profiling because besides traceing you can do&amp;nbsp;anything in&amp;nbsp;callback, e.g. timestamping and measuring resource usage. Linux kernel is&amp;nbsp;already (since &lt;nobr&gt;2.6.28&lt;/nobr&gt;) instrumented with that tracepoints in&amp;nbsp;many places. For example, &lt;a href="http://lxr.free-electrons.com/source/mm/slab.c?v=3.12#L3714"&gt;&lt;code&gt;__do_kmalloc&lt;/code&gt;&lt;/a&gt;:&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="co"&gt;/**&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="co"&gt;/**&lt;/span&gt;
 &lt;span class="co"&gt; * __do_kmalloc - allocate memory&lt;/span&gt;
 &lt;span class="co"&gt; * &lt;/span&gt;@size:&lt;span class="co"&gt; how many bytes of memory are required.&lt;/span&gt;
 &lt;span class="co"&gt; * &lt;/span&gt;@flags:&lt;span class="co"&gt; the type of memory to allocate (see kmalloc).&lt;/span&gt;
@@ -2784,7 +2784,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
                       size, cachep-&amp;gt;size, flags);
 
         &lt;span class="kw"&gt;return&lt;/span&gt; ret;
-}&lt;/code&gt;&lt;/pre&gt;
+}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;&lt;code&gt;trace_kmalloc&lt;/code&gt; is&amp;nbsp;&lt;em&gt;tracepoint&lt;/em&gt;. There are many others in&amp;nbsp;other critical parts of&amp;nbsp;kernel such as&amp;nbsp;schedulers, block I/O, networking and even interrupt handlers. All of&amp;nbsp;them are used by&amp;nbsp;most profilers because they have minimal overhead, fires by&amp;nbsp;event and saves you from modifying kernel.&lt;/p&gt;
 &lt;p&gt;Ok, so&amp;nbsp;by&amp;nbsp;now you may be&amp;nbsp;eager to&amp;nbsp;insert in&amp;nbsp;all of&amp;nbsp;your kernel modules and profile it&amp;nbsp;to&amp;nbsp;hell, but BEWARE. If&amp;nbsp;you want to&amp;nbsp;add &lt;em&gt;tracepoints&lt;/em&gt; you must have a&amp;nbsp;lot of&amp;nbsp;patience and skills because writing your own tracepoints is&amp;nbsp;really ugly and awkward. You can see examples at&amp;nbsp;&lt;a href="http://lxr.free-electrons.com/source/samples/trace_events/?v=3.13"&gt;&lt;em&gt;samples/trace_events/&lt;/em&gt;&lt;/a&gt;. Under the hood &lt;em&gt;tracepoints&lt;/em&gt; are C&amp;nbsp;macros black magic that only bold and fearless persons could understand.&lt;/p&gt;
 &lt;p&gt;And even if&amp;nbsp;you do&amp;nbsp;all that crazy macro declarations and struct definitions it&amp;nbsp;might just simply not work at&amp;nbsp;all if&amp;nbsp;you have &lt;code&gt;CONFIG_MODULE_SIG=y&lt;/code&gt; and don’t&amp;nbsp;sign module. It&amp;nbsp;might seem kinda strange configuration but in&amp;nbsp;reality it’s&amp;nbsp;a&amp;nbsp;default for all major distributions including Fedora and Ubuntu. That said, after 9 circles of&amp;nbsp;hell, you will end up&amp;nbsp;with nothing.&lt;/p&gt;
@@ -2794,7 +2794,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;/blockquote&gt;
 &lt;p&gt;Now I’m&amp;nbsp;gonna explain why it’s&amp;nbsp;happening. So&amp;nbsp;if&amp;nbsp;you tired of&amp;nbsp;&lt;em&gt;tracepoints&lt;/em&gt; just skip to&amp;nbsp;read about &lt;a href="#kprobes"&gt;&lt;em&gt;kprobes&lt;/em&gt;&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;Ok, so&amp;nbsp;some time ago while preparing kernel 3.1&lt;a href="#fn2" class="footnoteRef" id="fnref2"&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt; these code was added:&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="dt"&gt;static&lt;/span&gt; &lt;span class="dt"&gt;int&lt;/span&gt; tracepoint_module_coming(&lt;span class="kw"&gt;struct&lt;/span&gt; module *mod)
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="dt"&gt;static&lt;/span&gt; &lt;span class="dt"&gt;int&lt;/span&gt; tracepoint_module_coming(&lt;span class="kw"&gt;struct&lt;/span&gt; module *mod)
 {
           &lt;span class="kw"&gt;struct&lt;/span&gt; tp_module *tp_mod, *iter;
           &lt;span class="dt"&gt;int&lt;/span&gt; ret = &lt;span class="dv"&gt;0&lt;/span&gt;;
@@ -2804,15 +2804,15 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;span class="co"&gt;           * module header (for forced load), to make sure we don&amp;#39;t cause a crash.&lt;/span&gt;
 &lt;span class="co"&gt;           */&lt;/span&gt;
           &lt;span class="kw"&gt;if&lt;/span&gt; (mod-&amp;gt;taints)
-                  &lt;span class="kw"&gt;return&lt;/span&gt; &lt;span class="dv"&gt;0&lt;/span&gt;;&lt;/code&gt;&lt;/pre&gt;
+                  &lt;span class="kw"&gt;return&lt;/span&gt; &lt;span class="dv"&gt;0&lt;/span&gt;;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;If&amp;nbsp;module is&amp;nbsp;tainted we&amp;nbsp;will NOT write ANY tracepoints. Later it&amp;nbsp;became more adequate&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="co"&gt;/*&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="co"&gt;/*&lt;/span&gt;
 &lt;span class="co"&gt; * We skip modules that taint the kernel, especially those with different&lt;/span&gt;
 &lt;span class="co"&gt; * module headers (for forced load), to make sure we don&amp;#39;t cause a crash.&lt;/span&gt;
 &lt;span class="co"&gt; * Staging and out-of-tree GPL modules are fine.&lt;/span&gt;
 &lt;span class="co"&gt; */&lt;/span&gt;
 &lt;span class="kw"&gt;if&lt;/span&gt; (mod-&amp;gt;taints &amp;amp; ~((&lt;span class="dv"&gt;1&lt;/span&gt; &amp;lt;&amp;lt; TAINT_OOT_MODULE) | (&lt;span class="dv"&gt;1&lt;/span&gt; &amp;lt;&amp;lt; TAINT_CRAP)))
-        &lt;span class="kw"&gt;return&lt;/span&gt; &lt;span class="dv"&gt;0&lt;/span&gt;;&lt;/code&gt;&lt;/pre&gt;
+        &lt;span class="kw"&gt;return&lt;/span&gt; &lt;span class="dv"&gt;0&lt;/span&gt;;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Like, ok&amp;nbsp;it&amp;nbsp;may be&amp;nbsp;&lt;nobr&gt;out-of-tree&lt;/nobr&gt; (&lt;code&gt;TAINT_OOT_MODULE&lt;/code&gt;) or&amp;nbsp;staginig(&lt;code&gt;TAINT_CRAP&lt;/code&gt;) but any others are &lt;nobr&gt;no-no&lt;/nobr&gt;.&lt;/p&gt;
 &lt;p&gt;Seems legit, right? Now what whould you think will be&amp;nbsp;if&amp;nbsp;your kernel is&amp;nbsp;compiled with &lt;code&gt;CONFIG_MODULE_SIG&lt;/code&gt; enabled and your pretty module is&amp;nbsp;not signed? Well, module loader will set &lt;code&gt;TAINT_FORCES_MODULE&lt;/code&gt; flag for it. And now your pretty module will never pass the condition in&amp;nbsp;&lt;code&gt;tracepoint_module_coming&lt;/code&gt; and never show you any tracepoints output. And as&amp;nbsp;I&amp;nbsp;said earlier this stupid option is&amp;nbsp;set for all major distributions including Fedora and Ubuntu since kernel version 3.1.&lt;/p&gt;
 &lt;p&gt;If&amp;nbsp;you think&amp;nbsp;&amp;mdash; &amp;laquo;Well, lets sign goddamn module!&amp;raquo;&amp;nbsp;&amp;mdash; you’re&amp;nbsp;wrong. Modules must be&amp;nbsp;signed with kernel &lt;strong&gt;private&lt;/strong&gt; key that are held by&amp;nbsp;your Linux distro vendor and, of&amp;nbsp;course, not available for you.&lt;/p&gt;
@@ -2887,12 +2887,12 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;li&gt;After all we&amp;nbsp;restore registers, copies back instruction at&amp;nbsp;A&amp;nbsp;and continues execution.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;Our handler usually gets as&amp;nbsp;an&amp;nbsp;argument adress where breakpoint happened and registers values in&amp;nbsp;&lt;code&gt;pt_args&lt;/code&gt; structures. &lt;em&gt;kprobes&lt;/em&gt; handler prototype:&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;    &lt;span class="kw"&gt;typedef&lt;/span&gt; &lt;span class="dt"&gt;int&lt;/span&gt; (*kprobe_break_handler_t) (&lt;span class="kw"&gt;struct&lt;/span&gt; kprobe *, &lt;span class="kw"&gt;struct&lt;/span&gt; pt_regs *);&lt;/code&gt;&lt;/pre&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;    &lt;span class="kw"&gt;typedef&lt;/span&gt; &lt;span class="dt"&gt;int&lt;/span&gt; (*kprobe_break_handler_t) (&lt;span class="kw"&gt;struct&lt;/span&gt; kprobe *, &lt;span class="kw"&gt;struct&lt;/span&gt; pt_regs *);&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;In&amp;nbsp;most cases except debugging this info is&amp;nbsp;useless because we&amp;nbsp;have &lt;em&gt;jprobes&lt;/em&gt;. &lt;em&gt;jprobes&lt;/em&gt; handler has exactly the same prototype as&amp;nbsp;and intercepting function. For example, this is&amp;nbsp;handler for &lt;code&gt;do_fork&lt;/code&gt;:&lt;/p&gt;
-&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;    &lt;span class="co"&gt;/* Proxy routine having the same arguments as actual do_fork() routine */&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;    &lt;span class="co"&gt;/* Proxy routine having the same arguments as actual do_fork() routine */&lt;/span&gt;
     &lt;span class="dt"&gt;static&lt;/span&gt; &lt;span class="dt"&gt;long&lt;/span&gt; jdo_fork(&lt;span class="dt"&gt;unsigned&lt;/span&gt; &lt;span class="dt"&gt;long&lt;/span&gt; clone_flags, &lt;span class="dt"&gt;unsigned&lt;/span&gt; &lt;span class="dt"&gt;long&lt;/span&gt; stack_start,
               &lt;span class="kw"&gt;struct&lt;/span&gt; pt_regs *regs, &lt;span class="dt"&gt;unsigned&lt;/span&gt; &lt;span class="dt"&gt;long&lt;/span&gt; stack_size,
-              &lt;span class="dt"&gt;int&lt;/span&gt; __user *parent_tidptr, &lt;span class="dt"&gt;int&lt;/span&gt; __user *child_tidptr)&lt;/code&gt;&lt;/pre&gt;
+              &lt;span class="dt"&gt;int&lt;/span&gt; __user *parent_tidptr, &lt;span class="dt"&gt;int&lt;/span&gt; __user *child_tidptr)&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Also &lt;em&gt;jprobes&lt;/em&gt; doesn’t&amp;nbsp;causes interrupts because it&amp;nbsp;works with help of&amp;nbsp;&lt;code&gt;setjmp/longjmp&lt;/code&gt; that are much more lightweight.&lt;/p&gt;
 &lt;p&gt;And finally the most convenient tool for profiling are &lt;em&gt;kretprobes&lt;/em&gt;. It&amp;nbsp;allows you to&amp;nbsp;register 2 handlers&amp;nbsp;&amp;mdash; one to&amp;nbsp;invoke on&amp;nbsp;function start and the other to&amp;nbsp;invoke in&amp;nbsp;the end. But really cool feature is&amp;nbsp;that it&amp;nbsp;allows you to&amp;nbsp;save state between those 2 calls, like timestamp or&amp;nbsp;counters.&lt;/p&gt;
 &lt;p&gt;Instead of&amp;nbsp;thousand words&amp;nbsp;&amp;mdash; look at&amp;nbsp;absolutely astonishing samples at&amp;nbsp;&lt;a href="http://lxr.free-electrons.com/source/samples/kprobes/?v=3.13"&gt;&lt;em&gt;samples/kprobes&lt;/em&gt;&lt;/a&gt;.&lt;/p&gt;
@@ -3011,7 +3011,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;pre&gt;&lt;code&gt;total heap usage: 43 allocs, 42 frees, 10,491,624 bytes allocated&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;I&amp;nbsp;have somewhere forgotten to&amp;nbsp;call &lt;code&gt;free&lt;/code&gt;. And that’s&amp;nbsp;true, in&amp;nbsp;&lt;code&gt;bdev_open&lt;/code&gt; I’m&amp;nbsp;allocating struct for &lt;code&gt;block_device&lt;/code&gt; but in&amp;nbsp;&lt;code&gt;bdev_close&lt;/code&gt; it’s&amp;nbsp;not freeing. By&amp;nbsp;the way, it’s&amp;nbsp;interesting that &lt;em&gt;Memcheck&lt;/em&gt; reports about 16 bytes loss, while &lt;code&gt;block_device&lt;/code&gt; is&amp;nbsp;&lt;code&gt;int&lt;/code&gt; and &lt;code&gt;off_t&lt;/code&gt; that should occupy &lt;code&gt;4 + 8 = 12&lt;/code&gt; bytes. Where are 4 more bytes? Structs are 8 byte aligned (for 64 bit system), that’s&amp;nbsp;why &lt;code&gt;int&lt;/code&gt; field are padded with 4 bytes.&lt;/p&gt;
 &lt;p&gt;Anyway, I’ve&amp;nbsp;&lt;a href="https://github.com/dzeban/block_hasher/commit/f86fa71c45c3a59ced99b74b44a30cb8d94ba72d"&gt;fixed&lt;/a&gt; memory leak:&lt;/p&gt;
-&lt;pre class="sourceCode diff"&gt;&lt;code class="sourceCode diff"&gt;&lt;span class="dt"&gt;@@ -240,6 +241,9 @@ void bdev_close( struct block_device *dev )&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode diff"&gt;&lt;code class="sourceCode diff"&gt;&lt;span class="dt"&gt;@@ -240,6 +241,9 @@ void bdev_close( struct block_device *dev )&lt;/span&gt;
          perror(&amp;quot;close&amp;quot;);
      }
  
@@ -3019,7 +3019,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;span class="ot"&gt;+    dev = NULL;&lt;/span&gt;
 &lt;span class="ot"&gt;+&lt;/span&gt;
      return;
- }&lt;/code&gt;&lt;/pre&gt;
+ }&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Check:&lt;/p&gt;
 &lt;pre&gt;&lt;code&gt;[root@simplex block_hasher]# valgrind --leak-check=full ./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000
 ==15178== Memcheck, a memory error detector
@@ -3188,7 +3188,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 ==3930== the cost of reduced accuracy of conflicting-access information
 ==3930== ERROR SUMMARY: 9 errors from 1 contexts (suppressed: 955 from 9)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;As&amp;nbsp;we&amp;nbsp;see, &lt;code&gt;EVP_MD_CTX_create&lt;/code&gt; leads to&amp;nbsp;data race. This is&amp;nbsp;an&amp;nbsp;openssl’s&amp;nbsp;&lt;a href="#fn1" class="footnoteRef" id="fnref1"&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; function that initializes context for hash calculation. I&amp;nbsp;calculate hash for blocks read in&amp;nbsp;each thread with &lt;code&gt;EVP_DigestUpdate&lt;/code&gt; and then write it&amp;nbsp;to&amp;nbsp;file after final &lt;code&gt;EVP_DigesFinal_ex&lt;/code&gt;. So&amp;nbsp;this &lt;em&gt;Helgrind&lt;/em&gt; errors are related to&amp;nbsp;openssl functions. And I&amp;nbsp;asked myself&amp;nbsp;&amp;mdash; &amp;laquo;Is&amp;nbsp;libcrypto &lt;nobr&gt;thread-safe&lt;/nobr&gt;?&amp;raquo;. So&amp;nbsp;I&amp;nbsp;used my&amp;nbsp;&lt;nobr&gt;google-fu&lt;/nobr&gt; and the answer is&amp;nbsp;&amp;mdash; &lt;a href="http://wiki.openssl.org/index.php/Libcrypto_API#Thread_Safety"&gt;&lt;strong&gt;by&amp;nbsp;default&lt;/strong&gt; no&lt;/a&gt;. To&amp;nbsp;use EVP functions in&amp;nbsp;multithreaded applications openssl recommends to&amp;nbsp;either register 2 crazy callbacks or&amp;nbsp;use dynamic locks (see &lt;a href="http://www.openssl.org/docs/crypto/threads.html"&gt;here&lt;/a&gt;). As&amp;nbsp;for me, I’ve&amp;nbsp;just wrapped context initialization in&amp;nbsp;pthread mutex and &lt;a href="https://github.com/dzeban/block_hasher/commit/c1994f763d4fce8bb41e97af45eac6e2ad0dc3b7"&gt;that’s&amp;nbsp;it&lt;/a&gt;.&lt;/p&gt;
-&lt;pre class="sourceCode diff"&gt;&lt;code class="sourceCode diff"&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode diff"&gt;&lt;code class="sourceCode diff"&gt;
 &lt;span class="dt"&gt;@@ -159,9 +159,11 @@ void *thread_func(void *arg)&lt;/span&gt;
      gap = num_threads * block_size; // Multiply here to avoid integer overflow
  
@@ -3197,7 +3197,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
      md = EVP_sha1();
      mdctx = EVP_MD_CTX_create();
      EVP_DigestInit_ex( mdctx, md, NULL );
-&lt;span class="ot"&gt;+    pthread_mutex_unlock( &amp;amp;mutex );&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;span class="ot"&gt;+    pthread_mutex_unlock( &amp;amp;mutex );&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;If&amp;nbsp;anyone knows something about this&amp;nbsp;&amp;mdash; please, tell me.&lt;/p&gt;
 &lt;h2 id="drd"&gt;DRD&lt;/h2&gt;
 &lt;p&gt;&lt;em&gt;DRD&lt;/em&gt; is&amp;nbsp;one more tool in&amp;nbsp;&lt;em&gt;Valgrind&lt;/em&gt; suite that can detect thread errors. It’s&amp;nbsp;more thorough and has more features while less memory hungry.&lt;/p&gt;
@@ -3260,7 +3260,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
                   U mcount@@GLIBC_2.2.5&lt;/code&gt;&lt;/pre&gt;
 &lt;h3 id="profiling-block_hasher-under-gprof"&gt;Profiling block_hasher under gprof&lt;/h3&gt;
 &lt;p&gt;As&amp;nbsp;I&amp;nbsp;said earlier to&amp;nbsp;collect useful statistic we&amp;nbsp;should run program several times and accumulate metrics. To&amp;nbsp;do&amp;nbsp;that I’ve&amp;nbsp;written simple bash script:&lt;/p&gt;
-&lt;pre class="sourceCode bash"&gt;&lt;code class="sourceCode bash"&gt;&lt;span class="co"&gt;#!/bin/bash&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode bash"&gt;&lt;code class="sourceCode bash"&gt;&lt;span class="co"&gt;#!/bin/bash&lt;/span&gt;
 
 &lt;span class="kw"&gt;if [&lt;/span&gt; &lt;span class="ot"&gt;$#&lt;/span&gt; &lt;span class="ot"&gt;-ne&lt;/span&gt; 1&lt;span class="kw"&gt; ]&lt;/span&gt;; &lt;span class="kw"&gt;then&lt;/span&gt;
     &lt;span class="kw"&gt;echo&lt;/span&gt; &lt;span class="st"&gt;&amp;quot;gprof.sh &amp;lt;number of runs&amp;gt;&amp;quot;&lt;/span&gt;
@@ -3281,7 +3281,7 @@ block_hasher-28990 [000] 10235.125332: funcgraph_exit:       + 13.638 us  |  }&l
 &lt;span class="kw"&gt;done&lt;/span&gt;
 
 &lt;span class="co"&gt;# Make final profile&lt;/span&gt;
-&lt;span class="kw"&gt;gprof&lt;/span&gt; block_hasher gmon.sum &lt;span class="kw"&gt;&amp;gt;&lt;/span&gt; gmon.profile&lt;/code&gt;&lt;/pre&gt;
+&lt;span class="kw"&gt;gprof&lt;/span&gt; block_hasher gmon.sum &lt;span class="kw"&gt;&amp;gt;&lt;/span&gt; gmon.profile&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;So, each launch will create &lt;em&gt;gmon.out&lt;/em&gt; that gprof will combine in&amp;nbsp;&lt;em&gt;gmon.sum&lt;/em&gt;. Finally, &lt;em&gt;gmon.sum&lt;/em&gt; will be&amp;nbsp;feed to&amp;nbsp;&lt;em&gt;gprof&lt;/em&gt; to&amp;nbsp;get flat text profile and call graph.&lt;/p&gt;
 &lt;h3 id="analyzing"&gt;Analyzing&lt;/h3&gt;
 &lt;p&gt;Flat profile has info about program routines and time spent in&amp;nbsp;it.&lt;/p&gt;
@@ -3538,7 +3538,7 @@ T09: 29.88 MB/s f6eb529ee5b59824a657fb8de43c8c6d3e29cb00&lt;/code&gt;&lt;/pre&gt
 &lt;pre&gt;&lt;code&gt;printk(&amp;quot;&amp;quot;);&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;then data was not corrupted at&amp;nbsp;all. I&amp;nbsp;thought such things were only subject of&amp;nbsp;DailyWTF stories or&amp;nbsp;developers jokes. We&amp;nbsp;checked everything several times on&amp;nbsp;different hosts&amp;nbsp;&amp;mdash; data was correct. Well, there were nothing left for us&amp;nbsp;except disassemble object files to&amp;nbsp;determine what was so&amp;nbsp;special about &lt;code&gt;printk&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;So&amp;nbsp;we&amp;nbsp;did a&amp;nbsp;diff between 2 object files with and without &lt;code&gt;printk&lt;/code&gt;.&lt;/p&gt;
-&lt;pre class="sourceCode diff"&gt;&lt;code class="sourceCode diff"&gt;&lt;span class="kw"&gt;--- Calculation.s    2014-01-27 15:52:11.581387291 +0300&lt;/span&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode diff"&gt;&lt;code class="sourceCode diff"&gt;&lt;span class="kw"&gt;--- Calculation.s    2014-01-27 15:52:11.581387291 +0300&lt;/span&gt;
 &lt;span class="dt"&gt;+++ Calculation_printk.s 2014-01-27 15:51:50.109512524 +0300&lt;/span&gt;
 &lt;span class="dt"&gt;@@ -1,10 +1,15 @@&lt;/span&gt;
     .file   &amp;quot;Calculation.c&amp;quot;
@@ -3597,7 +3597,7 @@ T09: 29.88 MB/s f6eb529ee5b59824a657fb8de43c8c6d3e29cb00&lt;/code&gt;&lt;/pre&gt
 &lt;span class="ot"&gt;+   .uleb128 0x8&lt;/span&gt;
     .align 8
  .LEFDE1:
-    .ident  &amp;quot;GCC: (GNU) 4.4.5 20110214 (Red Hat 4.4.5-6)&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+    .ident  &amp;quot;GCC: (GNU) 4.4.5 20110214 (Red Hat 4.4.5-6)&amp;quot;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Ok, looks like nothing changed much. String declaration in&amp;nbsp;&lt;code&gt;.rodata&lt;/code&gt; section, call to&amp;nbsp;&lt;code&gt;printk&lt;/code&gt; in&amp;nbsp;the end. But what looked really strange to&amp;nbsp;me&amp;nbsp;is&amp;nbsp;changes in&amp;nbsp;&lt;code&gt;%rsp&lt;/code&gt; manipulations. Seems like there were doing the same, but in&amp;nbsp;the printk version they shifted in&amp;nbsp;24 bytes because in&amp;nbsp;the start it&amp;nbsp;does &lt;code&gt;subq $24, %rsp&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;We&amp;nbsp;didn’t&amp;nbsp;care much about it&amp;nbsp;at&amp;nbsp;first. On&amp;nbsp;x86 architecture stack grows down, i.e. to&amp;nbsp;smaller addresses. So&amp;nbsp;to&amp;nbsp;access local variables (these are on&amp;nbsp;stack) you create new stack frame by&amp;nbsp;saving current &lt;code&gt;%rsp&lt;/code&gt; in&amp;nbsp;&lt;code&gt;%rbp&lt;/code&gt; and shifting &lt;code&gt;%rsp&lt;/code&gt; thus allocating space on&amp;nbsp;stack. This is&amp;nbsp;called function prologue and it&amp;nbsp;was absent in&amp;nbsp;our assembly function without printk.&lt;/p&gt;
 &lt;p&gt;You need this stack manipulation later to&amp;nbsp;access your local vars by&amp;nbsp;subtracting from &lt;code&gt;%rbp&lt;/code&gt;. But we&amp;nbsp;were subtratcting from &lt;code&gt;%rsp&lt;/code&gt;, isn’t&amp;nbsp;it&amp;nbsp;strange?&lt;/p&gt;

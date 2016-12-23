@@ -66,7 +66,7 @@
                             <p>As&nbsp;a&nbsp;headcase, in&nbsp;my&nbsp;spare time (among other things) I’m&nbsp;writing an&nbsp;operating system kernel. There is&nbsp;nothing much at&nbsp;this moment because I’m&nbsp;digging into boot process of&nbsp;x86 system<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>. And, to&nbsp;commit my&nbsp;knowledge so&nbsp;far, I’ll&nbsp;explain first simple but really important steps of&nbsp;booting trivial kernel.</p>
 <h2 id="the-kernel">The &laquo;kernel&raquo;</h2>
 <p>For illustrations I’m&nbsp;gonna use &laquo;Hello world&raquo; kernel that is&nbsp;written in&nbsp;NASM assembly (grab the source <a href="http://github.com/dzeban/hello-kernel">from github</a>):</p>
-<pre class="sourceCode nasm"><code class="sourceCode nasm">    <span class="kw">global</span> start                    <span class="co">; the entry symbol for ELF</span>
+<div class="sourceCode"><pre class="sourceCode nasm"><code class="sourceCode nasm">    <span class="kw">global</span> start                    <span class="co">; the entry symbol for ELF</span>
 
     MAGIC_NUMBER <span class="dt">equ</span> <span class="bn">0x1BADB002</span>     <span class="co">; define the magic number constant</span>
     FLAGS        <span class="dt">equ</span><span class="bn"> 0x0            </span><span class="co">; multiboot flags</span>
@@ -96,7 +96,7 @@
       <span class="kw">mov</span> [<span class="kw">ebx</span>], <span class="kw">eax</span>
 
 <span class="fu">    .loop:</span>
-        <span class="kw">jmp</span> .<span class="kw">loop</span>                   <span class="co">; loop forever</span></code></pre>
+        <span class="kw">jmp</span> .<span class="kw">loop</span>                   <span class="co">; loop forever</span></code></pre></div>
 <p>This kernel works with VGA buffer&nbsp;&mdash; it&nbsp;clears the screen from the old BIOS messages and print capital ‘A’ letter in&nbsp;red. After it, it&nbsp;just loop forever.</p>
 <p>Compile it&nbsp;with</p>
 <pre><code>nasm -f elf32 kernel.S -o kernel.o</code></pre>
@@ -148,7 +148,7 @@ SECTIONS {
 <li>If&nbsp;the image is&nbsp;not in&nbsp;ELF format it&nbsp;loads kernel to&nbsp;address either supplied in&nbsp;address field or&nbsp;in&nbsp;the flags field.</li>
 </ul>
 <p>In&nbsp;our kernel’s&nbsp;text section we’ve&nbsp;done it:</p>
-<pre class="sourceCode nasm"><code class="sourceCode nasm">    MAGIC_NUMBER <span class="dt">equ</span> <span class="bn">0x1BADB002</span>     <span class="co">; define the magic number constant</span>
+<div class="sourceCode"><pre class="sourceCode nasm"><code class="sourceCode nasm">    MAGIC_NUMBER <span class="dt">equ</span> <span class="bn">0x1BADB002</span>     <span class="co">; define the magic number constant</span>
     FLAGS        <span class="dt">equ</span><span class="bn"> 0x0            </span><span class="co">; multiboot flags</span>
     CHECKSUM     <span class="dt">equ</span> -MAGIC_NUMBER  <span class="co">; calculate the checksum</span>
                                     <span class="co">; (magic number + checksum + flags should equal 0)</span>
@@ -157,7 +157,7 @@ SECTIONS {
     <span class="kw">align</span> <span class="dv">4</span>                         <span class="co">; the code must be 4 byte aligned</span>
         <span class="dt">dd</span> MAGIC_NUMBER             <span class="co">; write the magic number to the machine code,</span>
         <span class="dt">dd</span> FLAGS                    <span class="co">; the flags,</span>
-        <span class="dt">dd</span> CHECKSUM                 <span class="co">; and the checksum</span></code></pre>
+        <span class="dt">dd</span> CHECKSUM                 <span class="co">; and the checksum</span></code></pre></div>
 <p>We&nbsp;didn’t&nbsp;specify any flags because we&nbsp;don’t&nbsp;need anything from bootloader like memory maps and stuff, and bootloader doesn’t&nbsp;need anything from us&nbsp;because we’re&nbsp;in&nbsp;ELF format. For other formats you must supply loading address in&nbsp;its multiboot header. Multiboot header is&nbsp;pretty simple:</p>
 <table summary>
 <tbody>
@@ -352,5 +352,15 @@ if&nbsp;flags[2] is&nbsp;set <br>
     <script>
       $(document).foundation();
     </script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-89410369-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
 </body>
 </html>

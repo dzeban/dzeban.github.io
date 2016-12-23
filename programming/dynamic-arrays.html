@@ -86,7 +86,7 @@ while the relative advantages of arrays include:
 <li>Deleting all elements.</li>
 </ol>
 <p>Sources are at&nbsp;my&nbsp;CS&nbsp;playground in&nbsp;<a href="https://github.com/dzeban/cs/tree/master/ds/list-perf"><code>ds/<nobr>list-perf</nobr></code> dir</a>. There is&nbsp;Maven project, so&nbsp;you can just do&nbsp;<code>mvn package</code> and get a&nbsp;jar. Tests are quite simple, for example, here is&nbsp;the random insertion test:</p>
-<pre class="sourceCode java"><code class="sourceCode java"><span class="kw">package com.dzyoba.alex;</span>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="kw">package com.dzyoba.alex;</span>
 
 <span class="kw">import java.util.List;</span>
 <span class="kw">import java.util.Random;</span>
@@ -111,7 +111,7 @@ while the relative advantages of arrays include:
             list.<span class="fu">add</span>(index, element);
         }
     }
-}</code></pre>
+}</code></pre></div>
 <p>It’s&nbsp;working using <code>List</code> interface (yay, polymorphism!), so&nbsp;we&nbsp;can pass <code>LinkedList</code> and <code>ArrayList</code> without changing anything. It&nbsp;runs tests in&nbsp;the order mentioned above (allocation-&gt;insertions-&gt;search-&gt;delete) several times and calculating min/median/max of&nbsp;all test results.</p>
 <p>Alright, enough words, let’s&nbsp;run it!</p>
 <pre><code>$ time java -cp target/TestList-1.0-SNAPSHOT.jar com.dzyoba.alex.TestList
@@ -153,7 +153,7 @@ sys 0m1.011s</code></pre>
 <p>To&nbsp;explain this, we’ll&nbsp;dive a&nbsp;little bit into implementation. I’ll&nbsp;use OpenJDK sources of&nbsp;Java 8.</p>
 <p>So, <code>ArrayList</code> and <code>LinkedList</code> sources are in&nbsp;<a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/">src/share/classes/java/util</a></p>
 <p><code>LinkedList</code> in&nbsp;Java is&nbsp;implemented as&nbsp;a&nbsp;<nobr>doubly-linked</nobr> list via <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/LinkedList.java#969"><code>Node</code> inner class</a>:</p>
-<pre class="sourceCode java"><code class="sourceCode java"><span class="kw">private</span> <span class="dt">static</span> <span class="kw">class</span> Node&lt;E&gt; {
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="kw">private</span> <span class="dt">static</span> <span class="kw">class</span> Node&lt;E&gt; {
     E item;
     Node&lt;E&gt; next;
     Node&lt;E&gt; prev;
@@ -163,13 +163,13 @@ sys 0m1.011s</code></pre>
         <span class="kw">this</span>.<span class="fu">next</span> = next;
         <span class="kw">this</span>.<span class="fu">prev</span> = prev;
     }
-}</code></pre>
+}</code></pre></div>
 <p>Now, let’s&nbsp;look at&nbsp;what’s&nbsp;happening under the hood in&nbsp;the simple allocation test.</p>
-<pre class="sourceCode java"><code class="sourceCode java"><span class="kw">for</span> (<span class="dt">int</span> i = <span class="dv">0</span>; i &lt; listSize; i++) {
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="kw">for</span> (<span class="dt">int</span> i = <span class="dv">0</span>; i &lt; listSize; i++) {
     list.<span class="fu">add</span>(i);
-}</code></pre>
+}</code></pre></div>
 <p>It&nbsp;invokes <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/LinkedList.java#329"><code>add</code></a> method which invokes <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/LinkedList.java#137"><code>linkLast</code></a> method in&nbsp;JDK:</p>
-<pre class="sourceCode java"><code class="sourceCode java"><span class="kw">public</span> <span class="dt">boolean</span> <span class="fu">add</span>(E e) {
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="kw">public</span> <span class="dt">boolean</span> <span class="fu">add</span>(E e) {
     <span class="fu">linkLast</span>(e);
     <span class="kw">return</span> <span class="kw">true</span>;
 }
@@ -184,9 +184,9 @@ sys 0m1.011s</code></pre>
         l.<span class="fu">next</span> = newNode;
     size++;
     modCount++;
-}</code></pre>
+}</code></pre></div>
 <p>Essentially, allocation in&nbsp;<code>LinkedList</code> is&nbsp;a&nbsp;<strong>constant time operation</strong>. <code>LinkedList</code> class maintains the tail pointer, so&nbsp;to&nbsp;insert it&nbsp;just has to&nbsp;allocate a&nbsp;new object and update 2 pointers. It&nbsp;<strong>shouldn’t&nbsp;be&nbsp;that slow</strong>! But why does it&nbsp;happens? Let’s&nbsp;compare with <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/ArrayList.java#207"><code>ArrayList</code></a>.</p>
-<pre class="sourceCode java"><code class="sourceCode java"><span class="kw">public</span> <span class="dt">boolean</span> <span class="fu">add</span>(E e) {
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="kw">public</span> <span class="dt">boolean</span> <span class="fu">add</span>(E e) {
     <span class="fu">ensureCapacityInternal</span>(size + <span class="dv">1</span>);  <span class="co">// Increments modCount!!</span>
     elementData[size++] = e;
     <span class="kw">return</span> <span class="kw">true</span>;
@@ -218,11 +218,11 @@ sys 0m1.011s</code></pre>
         newCapacity = <span class="fu">hugeCapacity</span>(minCapacity);
     <span class="co">// minCapacity is usually close to size, so this is a win:</span>
     elementData = Arrays.<span class="fu">copyOf</span>(elementData, newCapacity);
-}</code></pre>
+}</code></pre></div>
 <p><code>ArrayList</code> in&nbsp;Java is, indeed, a&nbsp;dynamic array that increases its size in&nbsp;1.5 each grow with the initial capacity of&nbsp;10. Also this <code>//<nobr>overflow-conscious</nobr> code</code> is&nbsp;actually pretty funny. You can read why is&nbsp;that so&nbsp;<a href="http://stackoverflow.com/questions/33147339/difference-between-if-a-b-0-and-if-a-b">here</a>)</p>
 <p>The resizing itself is&nbsp;done via <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/util/Arrays.java#3260"><code>Arrays.copyOf</code></a> which calls <a href="http://code.metager.de/source/xref/openjdk/jdk8/jdk/src/share/classes/java/lang/System.java#480"><code>System.arraycopy</code></a> which is&nbsp;a&nbsp;Java <em>native</em> method. Implementation of&nbsp;native methods is&nbsp;not part of&nbsp;JDK, it’s&nbsp;a&nbsp;particular JVM function. Let’s&nbsp;grab Hotspot source code and look into it.</p>
 <p>Long story short&nbsp;&mdash; it’s&nbsp;in&nbsp;<a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/share/vm/oops/typeArrayKlass.cpp#128"><code>TypeArrayKlass:copy_array</code></a> method that invokes <a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/share/vm/utilities/copy.cpp#29"><code>Copy:conjoint_memory_atomic</code></a>. This one is&nbsp;looking for alignment, namely there are variant for long, int, short and bytes(unaligned) copy. We’ll&nbsp;look plain int variant&nbsp;&mdash; <a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/share/vm/utilities/copy.hpp#137"><code>conjoint_jints_atomic</code></a> which is&nbsp;a&nbsp;wrapper for <a href="http://code.metager.de/source/xref/openjdk/jdk6/hotspot/src/os_cpu/linux_x86/vm/copy_linux_x86.inline.hpp#229"><code>pd_conjoint_jints_atomic</code></a>. This one is&nbsp;OS&nbsp;and CPU specific. Looking for Linux variant we’ll&nbsp;find a&nbsp;call to&nbsp;<a href="http://code.metager.de/source/xref/openjdk/jdk8/hotspot/src/os_cpu/linux_x86/vm/linux_x86_32.s#420"><code>_Copy_conjoint_jints_atomic</code></a>. And the last one is&nbsp;an&nbsp;assembly beast!</p>
-<pre class="sourceCode gnuassembler"><code class="sourceCode gnuassembler">        <span class="co"># Support for void Copy::conjoint_jints_atomic(void* from,</span>
+<div class="sourceCode"><pre class="sourceCode gnuassembler"><code class="sourceCode gnuassembler">        <span class="co"># Support for void Copy::conjoint_jints_atomic(void* from,</span>
         <span class="co">#                                              void* to,</span>
         <span class="co">#                                              size_t count)</span>
         <span class="co"># Equivalent to</span>
@@ -283,7 +283,7 @@ sys 0m1.011s</code></pre>
         cld
         popl     %edi
         popl     %esi
-        ret</code></pre>
+        ret</code></pre></div>
 <p>The point is&nbsp;<strong>not</strong> that VM&nbsp;languages are slower, but that random memory access kills performance. The essence of&nbsp;<code>conjoint_jints_atomic</code> is&nbsp;<code>rep; smovl</code><a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>. And if&nbsp;CPU really loves something it&nbsp;is&nbsp;<code>rep</code> instructions. For this, CPU can pipeline, prefetch, cache and do&nbsp;all the things it&nbsp;was built for&nbsp;&mdash; streaming calculations and predictable memory access. Just read the awesome <a href="http://www.lighterra.com/papers/modernmicroprocessors/">&laquo;Modern Microprocessors. A&nbsp;90 Minute Guide!&raquo;</a>.</p>
 <p>What it’s&nbsp;all mean is&nbsp;that for application <code>rep smovl</code> is&nbsp;not really a&nbsp;linear operation, but somewhat constant. Let’s&nbsp;illustrate the last point. For a&nbsp;list of&nbsp;1&nbsp;000&nbsp;000 elements let’s&nbsp;do&nbsp;insertion to&nbsp;the head of&nbsp;the list for 100, 1000 and 10000 elements. On&nbsp;my&nbsp;machine I’ve&nbsp;got the next samples:</p>
 <ul>
@@ -323,5 +323,15 @@ sys 0m1.011s</code></pre>
     <script>
       $(document).foundation();
     </script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-89410369-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
 </body>
 </html>

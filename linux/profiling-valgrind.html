@@ -118,7 +118,7 @@
 <pre><code>total heap usage: 43 allocs, 42 frees, 10,491,624 bytes allocated</code></pre>
 <p>I&nbsp;have somewhere forgotten to&nbsp;call <code>free</code>. And that’s&nbsp;true, in&nbsp;<code>bdev_open</code> I’m&nbsp;allocating struct for <code>block_device</code> but in&nbsp;<code>bdev_close</code> it’s&nbsp;not freeing. By&nbsp;the way, it’s&nbsp;interesting that <em>Memcheck</em> reports about 16 bytes loss, while <code>block_device</code> is&nbsp;<code>int</code> and <code>off_t</code> that should occupy <code>4 + 8 = 12</code> bytes. Where are 4 more bytes? Structs are 8 byte aligned (for 64 bit system), that’s&nbsp;why <code>int</code> field are padded with 4 bytes.</p>
 <p>Anyway, I’ve&nbsp;<a href="https://github.com/dzeban/block_hasher/commit/f86fa71c45c3a59ced99b74b44a30cb8d94ba72d">fixed</a> memory leak:</p>
-<pre class="sourceCode diff"><code class="sourceCode diff"><span class="dt">@@ -240,6 +241,9 @@ void bdev_close( struct block_device *dev )</span>
+<div class="sourceCode"><pre class="sourceCode diff"><code class="sourceCode diff"><span class="dt">@@ -240,6 +241,9 @@ void bdev_close( struct block_device *dev )</span>
          perror(&quot;close&quot;);
      }
  
@@ -126,7 +126,7 @@
 <span class="ot">+    dev = NULL;</span>
 <span class="ot">+</span>
      return;
- }</code></pre>
+ }</code></pre></div>
 <p>Check:</p>
 <pre><code>[root@simplex block_hasher]# valgrind --leak-check=full ./block_hasher -d /dev/md126 -b 1048576 -t 10 -n 1000
 ==15178== Memcheck, a memory error detector
@@ -295,7 +295,7 @@
 ==3930== the cost of reduced accuracy of conflicting-access information
 ==3930== ERROR SUMMARY: 9 errors from 1 contexts (suppressed: 955 from 9)</code></pre>
 <p>As&nbsp;we&nbsp;see, <code>EVP_MD_CTX_create</code> leads to&nbsp;data race. This is&nbsp;an&nbsp;openssl’s&nbsp;<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> function that initializes context for hash calculation. I&nbsp;calculate hash for blocks read in&nbsp;each thread with <code>EVP_DigestUpdate</code> and then write it&nbsp;to&nbsp;file after final <code>EVP_DigesFinal_ex</code>. So&nbsp;this <em>Helgrind</em> errors are related to&nbsp;openssl functions. And I&nbsp;asked myself&nbsp;&mdash; &laquo;Is&nbsp;libcrypto <nobr>thread-safe</nobr>?&raquo;. So&nbsp;I&nbsp;used my&nbsp;<nobr>google-fu</nobr> and the answer is&nbsp;&mdash; <a href="http://wiki.openssl.org/index.php/Libcrypto_API#Thread_Safety"><strong>by&nbsp;default</strong> no</a>. To&nbsp;use EVP functions in&nbsp;multithreaded applications openssl recommends to&nbsp;either register 2 crazy callbacks or&nbsp;use dynamic locks (see <a href="http://www.openssl.org/docs/crypto/threads.html">here</a>). As&nbsp;for me, I’ve&nbsp;just wrapped context initialization in&nbsp;pthread mutex and <a href="https://github.com/dzeban/block_hasher/commit/c1994f763d4fce8bb41e97af45eac6e2ad0dc3b7">that’s&nbsp;it</a>.</p>
-<pre class="sourceCode diff"><code class="sourceCode diff">
+<div class="sourceCode"><pre class="sourceCode diff"><code class="sourceCode diff">
 <span class="dt">@@ -159,9 +159,11 @@ void *thread_func(void *arg)</span>
      gap = num_threads * block_size; // Multiply here to avoid integer overflow
  
@@ -304,7 +304,7 @@
      md = EVP_sha1();
      mdctx = EVP_MD_CTX_create();
      EVP_DigestInit_ex( mdctx, md, NULL );
-<span class="ot">+    pthread_mutex_unlock( &amp;mutex );</span></code></pre>
+<span class="ot">+    pthread_mutex_unlock( &amp;mutex );</span></code></pre></div>
 <p>If&nbsp;anyone knows something about this&nbsp;&mdash; please, tell me.</p>
 <h2 id="drd">DRD</h2>
 <p><em>DRD</em> is&nbsp;one more tool in&nbsp;<em>Valgrind</em> suite that can detect thread errors. It’s&nbsp;more thorough and has more features while less memory hungry.</p>
@@ -356,5 +356,15 @@
     <script>
       $(document).foundation();
     </script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-89410369-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
 </body>
 </html>

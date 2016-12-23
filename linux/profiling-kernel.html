@@ -100,7 +100,7 @@
 <p>Tracepoint&nbsp;&mdash; it’s&nbsp;a&nbsp;place in&nbsp;code where you can bind your callback. <em>Tracepoints</em> can be&nbsp;disabled (no&nbsp;callback) and enabled (has callback). There might be&nbsp;several callbacks though it’s&nbsp;still lightweight&nbsp;&mdash; when callback disabled it’s&nbsp;actually looks like <code>if&nbsp;(unlikely(tracepoint.enabled))</code>.</p>
 <p><em>Tracepoint</em> output is&nbsp;written in&nbsp;ring buffer that is&nbsp;export through <em>debugfs</em> at&nbsp;<code>/sys/kernel/debug/tracing/trace</code>. There are also whole tree of&nbsp;traceable events at&nbsp;<code>/sys/kernel/debug/tracing/events</code> that exports control files to&nbsp;enable/disable particular event.</p>
 <p>Despite of&nbsp;it’s&nbsp;name <em>tracepoints</em> are base for <nobr>event-based</nobr> profiling because besides traceing you can do&nbsp;anything in&nbsp;callback, e.g. timestamping and measuring resource usage. Linux kernel is&nbsp;already (since <nobr>2.6.28</nobr>) instrumented with that tracepoints in&nbsp;many places. For example, <a href="http://lxr.free-electrons.com/source/mm/slab.c?v=3.12#L3714"><code>__do_kmalloc</code></a>:</p>
-<pre class="sourceCode c"><code class="sourceCode c"><span class="co">/**</span>
+<div class="sourceCode"><pre class="sourceCode c"><code class="sourceCode c"><span class="co">/**</span>
 <span class="co"> * __do_kmalloc - allocate memory</span>
 <span class="co"> * </span>@size:<span class="co"> how many bytes of memory are required.</span>
 <span class="co"> * </span>@flags:<span class="co"> the type of memory to allocate (see kmalloc).</span>
@@ -126,7 +126,7 @@
                       size, cachep-&gt;size, flags);
 
         <span class="kw">return</span> ret;
-}</code></pre>
+}</code></pre></div>
 <p><code>trace_kmalloc</code> is&nbsp;<em>tracepoint</em>. There are many others in&nbsp;other critical parts of&nbsp;kernel such as&nbsp;schedulers, block I/O, networking and even interrupt handlers. All of&nbsp;them are used by&nbsp;most profilers because they have minimal overhead, fires by&nbsp;event and saves you from modifying kernel.</p>
 <p>Ok, so&nbsp;by&nbsp;now you may be&nbsp;eager to&nbsp;insert in&nbsp;all of&nbsp;your kernel modules and profile it&nbsp;to&nbsp;hell, but BEWARE. If&nbsp;you want to&nbsp;add <em>tracepoints</em> you must have a&nbsp;lot of&nbsp;patience and skills because writing your own tracepoints is&nbsp;really ugly and awkward. You can see examples at&nbsp;<a href="http://lxr.free-electrons.com/source/samples/trace_events/?v=3.13"><em>samples/trace_events/</em></a>. Under the hood <em>tracepoints</em> are C&nbsp;macros black magic that only bold and fearless persons could understand.</p>
 <p>And even if&nbsp;you do&nbsp;all that crazy macro declarations and struct definitions it&nbsp;might just simply not work at&nbsp;all if&nbsp;you have <code>CONFIG_MODULE_SIG=y</code> and don’t&nbsp;sign module. It&nbsp;might seem kinda strange configuration but in&nbsp;reality it’s&nbsp;a&nbsp;default for all major distributions including Fedora and Ubuntu. That said, after 9 circles of&nbsp;hell, you will end up&nbsp;with nothing.</p>
@@ -136,7 +136,7 @@
 </blockquote>
 <p>Now I’m&nbsp;gonna explain why it’s&nbsp;happening. So&nbsp;if&nbsp;you tired of&nbsp;<em>tracepoints</em> just skip to&nbsp;read about <a href="#kprobes"><em>kprobes</em></a>.</p>
 <p>Ok, so&nbsp;some time ago while preparing kernel 3.1<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> these code was added:</p>
-<pre class="sourceCode c"><code class="sourceCode c"><span class="dt">static</span> <span class="dt">int</span> tracepoint_module_coming(<span class="kw">struct</span> module *mod)
+<div class="sourceCode"><pre class="sourceCode c"><code class="sourceCode c"><span class="dt">static</span> <span class="dt">int</span> tracepoint_module_coming(<span class="kw">struct</span> module *mod)
 {
           <span class="kw">struct</span> tp_module *tp_mod, *iter;
           <span class="dt">int</span> ret = <span class="dv">0</span>;
@@ -146,15 +146,15 @@
 <span class="co">           * module header (for forced load), to make sure we don&#39;t cause a crash.</span>
 <span class="co">           */</span>
           <span class="kw">if</span> (mod-&gt;taints)
-                  <span class="kw">return</span> <span class="dv">0</span>;</code></pre>
+                  <span class="kw">return</span> <span class="dv">0</span>;</code></pre></div>
 <p>If&nbsp;module is&nbsp;tainted we&nbsp;will NOT write ANY tracepoints. Later it&nbsp;became more adequate</p>
-<pre class="sourceCode c"><code class="sourceCode c"><span class="co">/*</span>
+<div class="sourceCode"><pre class="sourceCode c"><code class="sourceCode c"><span class="co">/*</span>
 <span class="co"> * We skip modules that taint the kernel, especially those with different</span>
 <span class="co"> * module headers (for forced load), to make sure we don&#39;t cause a crash.</span>
 <span class="co"> * Staging and out-of-tree GPL modules are fine.</span>
 <span class="co"> */</span>
 <span class="kw">if</span> (mod-&gt;taints &amp; ~((<span class="dv">1</span> &lt;&lt; TAINT_OOT_MODULE) | (<span class="dv">1</span> &lt;&lt; TAINT_CRAP)))
-        <span class="kw">return</span> <span class="dv">0</span>;</code></pre>
+        <span class="kw">return</span> <span class="dv">0</span>;</code></pre></div>
 <p>Like, ok&nbsp;it&nbsp;may be&nbsp;<nobr>out-of-tree</nobr> (<code>TAINT_OOT_MODULE</code>) or&nbsp;staginig(<code>TAINT_CRAP</code>) but any others are <nobr>no-no</nobr>.</p>
 <p>Seems legit, right? Now what whould you think will be&nbsp;if&nbsp;your kernel is&nbsp;compiled with <code>CONFIG_MODULE_SIG</code> enabled and your pretty module is&nbsp;not signed? Well, module loader will set <code>TAINT_FORCES_MODULE</code> flag for it. And now your pretty module will never pass the condition in&nbsp;<code>tracepoint_module_coming</code> and never show you any tracepoints output. And as&nbsp;I&nbsp;said earlier this stupid option is&nbsp;set for all major distributions including Fedora and Ubuntu since kernel version 3.1.</p>
 <p>If&nbsp;you think&nbsp;&mdash; &laquo;Well, lets sign goddamn module!&raquo;&nbsp;&mdash; you’re&nbsp;wrong. Modules must be&nbsp;signed with kernel <strong>private</strong> key that are held by&nbsp;your Linux distro vendor and, of&nbsp;course, not available for you.</p>
@@ -229,12 +229,12 @@
 <li>After all we&nbsp;restore registers, copies back instruction at&nbsp;A&nbsp;and continues execution.</li>
 </ul>
 <p>Our handler usually gets as&nbsp;an&nbsp;argument adress where breakpoint happened and registers values in&nbsp;<code>pt_args</code> structures. <em>kprobes</em> handler prototype:</p>
-<pre class="sourceCode c"><code class="sourceCode c">    <span class="kw">typedef</span> <span class="dt">int</span> (*kprobe_break_handler_t) (<span class="kw">struct</span> kprobe *, <span class="kw">struct</span> pt_regs *);</code></pre>
+<div class="sourceCode"><pre class="sourceCode c"><code class="sourceCode c">    <span class="kw">typedef</span> <span class="dt">int</span> (*kprobe_break_handler_t) (<span class="kw">struct</span> kprobe *, <span class="kw">struct</span> pt_regs *);</code></pre></div>
 <p>In&nbsp;most cases except debugging this info is&nbsp;useless because we&nbsp;have <em>jprobes</em>. <em>jprobes</em> handler has exactly the same prototype as&nbsp;and intercepting function. For example, this is&nbsp;handler for <code>do_fork</code>:</p>
-<pre class="sourceCode c"><code class="sourceCode c">    <span class="co">/* Proxy routine having the same arguments as actual do_fork() routine */</span>
+<div class="sourceCode"><pre class="sourceCode c"><code class="sourceCode c">    <span class="co">/* Proxy routine having the same arguments as actual do_fork() routine */</span>
     <span class="dt">static</span> <span class="dt">long</span> jdo_fork(<span class="dt">unsigned</span> <span class="dt">long</span> clone_flags, <span class="dt">unsigned</span> <span class="dt">long</span> stack_start,
               <span class="kw">struct</span> pt_regs *regs, <span class="dt">unsigned</span> <span class="dt">long</span> stack_size,
-              <span class="dt">int</span> __user *parent_tidptr, <span class="dt">int</span> __user *child_tidptr)</code></pre>
+              <span class="dt">int</span> __user *parent_tidptr, <span class="dt">int</span> __user *child_tidptr)</code></pre></div>
 <p>Also <em>jprobes</em> doesn’t&nbsp;causes interrupts because it&nbsp;works with help of&nbsp;<code>setjmp/longjmp</code> that are much more lightweight.</p>
 <p>And finally the most convenient tool for profiling are <em>kretprobes</em>. It&nbsp;allows you to&nbsp;register 2 handlers&nbsp;&mdash; one to&nbsp;invoke on&nbsp;function start and the other to&nbsp;invoke in&nbsp;the end. But really cool feature is&nbsp;that it&nbsp;allows you to&nbsp;save state between those 2 calls, like timestamp or&nbsp;counters.</p>
 <p>Instead of&nbsp;thousand words&nbsp;&mdash; look at&nbsp;absolutely astonishing samples at&nbsp;<a href="http://lxr.free-electrons.com/source/samples/kprobes/?v=3.13"><em>samples/kprobes</em></a>.</p>
@@ -310,5 +310,15 @@
     <script>
       $(document).foundation();
     </script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-89410369-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
 </body>
 </html>
