@@ -2,13 +2,108 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title type="text">Voluntary madness!</title>
   <id>http://alex.dzyoba.com/feed</id>
-  <updated>2016-06-26T00:00:00Z</updated>
+  <updated>2017-01-28T00:00:00Z</updated>
   <link href="http://alex.dzyoba.com" />
   <link href="http://alex.dzyoba.com/feed" rel="self" />
   <author>
     <name>Alex Dzyoba</name>
   </author>
   <generator>PyAtom</generator>
+  <entry xml:base="http://alex.dzyoba.com/feed">
+    <title type="text">Solving pointers problems</title>
+    <id>programming/solving-pointer-problems.html</id>
+    <updated>2017-01-28T00:00:00Z</updated>
+    <link href="programming/solving-pointer-problems.html" />
+    <author>
+      <name>avd</name>
+    </author>
+    <content type="html">&lt;p&gt;It’s&amp;nbsp;not secret that the hardest part in&amp;nbsp;C&amp;nbsp;programming is&amp;nbsp;working with pointers. They seem simple&amp;nbsp;&amp;mdash; &amp;laquo;A&amp;nbsp;pointer is&amp;nbsp;a&amp;nbsp;variable that contains the address of&amp;nbsp;a&amp;nbsp;variable&amp;raquo; (K&amp;R&amp;nbsp;Chapter 5). But when you start working with it, it’s&amp;nbsp;so&amp;nbsp;easy to&amp;nbsp;mess up&amp;nbsp;with stars and ampersands and arrows and stuff.&lt;/p&gt;
+&lt;p&gt;Most of&amp;nbsp;the times you can get away with some shallow understanding of&amp;nbsp;pointers. Indeed, even in&amp;nbsp;production code you rarely see anything other than taking a&amp;nbsp;pointer from &lt;code&gt;malloc&lt;/code&gt; and passing it&amp;nbsp;to&amp;nbsp;some functions. And that’s&amp;nbsp;where you are caught on&amp;nbsp;C&amp;nbsp;programming interviews questions because people love to&amp;nbsp;ask tricky pointer questions. Like, write a&amp;nbsp;function to&amp;nbsp;reverse a&amp;nbsp;linked list or&amp;nbsp;do&amp;nbsp;an&amp;nbsp;&lt;nobr&gt;in-order&lt;/nobr&gt; traversal of&amp;nbsp;the binary tree.&lt;/p&gt;
+&lt;p&gt;I&amp;nbsp;actually failed one interview back in&amp;nbsp;2012 because I&amp;nbsp;failed to&amp;nbsp;write a&amp;nbsp;function that reverts a&amp;nbsp;linked list. Yeah, I&amp;nbsp;was depressed. Since then I&amp;nbsp;promised myself that I&amp;nbsp;will figure out how this shit really works. So&amp;nbsp;this is&amp;nbsp;my&amp;nbsp;pointers epiphany post.&lt;/p&gt;
+&lt;p&gt;I&amp;nbsp;think that &lt;strong&gt;the key to&amp;nbsp;solving any pointers problem is&amp;nbsp;to&amp;nbsp;draw them correctly&lt;/strong&gt;. Let me&amp;nbsp;show you an&amp;nbsp;example of&amp;nbsp;linked list because it&amp;nbsp;has a&amp;nbsp;lot of&amp;nbsp;pointers:&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/slist/slist-basic.png" alt="Linked list" /&gt;
+&lt;p class="caption"&gt;Linked list&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;Each element is&amp;nbsp;2 squares&amp;nbsp;&amp;mdash; one for the &amp;laquo;payload&amp;raquo; variable and another for the pointer variable. Last pointer value is, of&amp;nbsp;course, NULL. Head of&amp;nbsp;the list is&amp;nbsp;a&amp;nbsp;pointer and it’s&amp;nbsp;drawn in&amp;nbsp;a&amp;nbsp;&amp;laquo;box&amp;raquo; as&amp;nbsp;any other variable.&lt;/p&gt;
+&lt;p&gt;It’s&amp;nbsp;of&amp;nbsp;paramount importance to&amp;nbsp;draw pointers in&amp;nbsp;boxes as&amp;nbsp;any other variables and showing with the arrow where the pointer value points because this representation will help you to&amp;nbsp;understand pointers code.&lt;/p&gt;
+&lt;p&gt;For example, here is&amp;nbsp;the code to&amp;nbsp;iterate over a&amp;nbsp;linked list:&lt;/p&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="kw"&gt;struct&lt;/span&gt; list *cur = head;
+&lt;span class="kw"&gt;while&lt;/span&gt; (cur) {
+    printf(&lt;span class="st"&gt;&amp;quot;cur is %p, val is %d&lt;/span&gt;&lt;span class="ch"&gt;\n&lt;/span&gt;&lt;span class="st"&gt;&amp;quot;&lt;/span&gt;, cur, cur-&amp;gt;n);
+    cur = cur-&amp;gt;next;
+}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;You can kind of&amp;nbsp;understand it&amp;nbsp;by&amp;nbsp;intuition but do&amp;nbsp;you really understand why and how &lt;code&gt;cur = cur-&amp;gt;next&lt;/code&gt; works? Draw a&amp;nbsp;picture!&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/slist/slist-iter.png" alt="Linked list iteration" /&gt;
+&lt;p class="caption"&gt;Linked list iteration&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;cur = cur-&amp;gt;next&lt;/code&gt; is&amp;nbsp;doing its magic because arrow operator in&amp;nbsp;C&amp;nbsp;translates to&amp;nbsp;this: &lt;code&gt;cur = (*cur).next&lt;/code&gt;. First, you are dereferencing a&amp;nbsp;pointer&amp;nbsp;&amp;mdash; that gives you a&amp;nbsp;value under the pointer. Second, you get the value of&amp;nbsp;&lt;code&gt;next&lt;/code&gt; pointer. Third, you copy that value to&amp;nbsp;the &lt;code&gt;cur&lt;/code&gt;. This is&amp;nbsp;how it&amp;nbsp;allows you to&amp;nbsp;jump over the pointers.&lt;/p&gt;
+&lt;p&gt;If&amp;nbsp;it&amp;nbsp;doesn’t&amp;nbsp;click, don’t&amp;nbsp;worry. Take your time, draw it&amp;nbsp;yourself and make it&amp;nbsp;sink.&lt;/p&gt;
+&lt;p&gt;Now, when it&amp;nbsp;seems easy, let’s&amp;nbsp;look at&amp;nbsp;the double pointer or&amp;nbsp;pointer to&amp;nbsp;pointer.&lt;/p&gt;
+&lt;p&gt;Here is&amp;nbsp;the same iteration but with double pointers:&lt;/p&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="kw"&gt;struct&lt;/span&gt; list **pp = &amp;amp;head;
+&lt;span class="kw"&gt;while&lt;/span&gt; (*pp) {
+    cur = *pp;
+    printf(&lt;span class="st"&gt;&amp;quot;cur is %p, val is %d&lt;/span&gt;&lt;span class="ch"&gt;\n&lt;/span&gt;&lt;span class="st"&gt;&amp;quot;&lt;/span&gt;, cur, cur-&amp;gt;n);
+    *pp = &amp;amp;(cur-&amp;gt;next);
+}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;And here is&amp;nbsp;the representation of&amp;nbsp;it:&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/slist/slist-pp.png" alt="Pointer to pointer" /&gt;
+&lt;p class="caption"&gt;Pointer to&amp;nbsp;pointer&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;Double pointers are useful because they allow you to&amp;nbsp;change the underlying pointer &lt;strong&gt;and&lt;/strong&gt; value. Here is&amp;nbsp;the illustration of&amp;nbsp;why it’s&amp;nbsp;possible:&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/slist/slist-pp-val.png" alt="Double pointer dereference" /&gt;
+&lt;p class="caption"&gt;Double pointer dereference&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;Note, that &lt;code&gt;*pp&lt;/code&gt; is&amp;nbsp;a&amp;nbsp;pointer, but it’s&amp;nbsp;a&amp;nbsp;different &amp;laquo;box&amp;raquo; than &lt;code&gt;pp&lt;/code&gt;. &lt;code&gt;pp&lt;/code&gt; points to&amp;nbsp;the pointer, while &lt;code&gt;*pp&lt;/code&gt; points to&amp;nbsp;value.&lt;/p&gt;
+&lt;p&gt;All of&amp;nbsp;this may not sound useful at&amp;nbsp;first but, without double pointers, some code is&amp;nbsp;much harder to&amp;nbsp;read and some not even possible.&lt;/p&gt;
+&lt;p&gt;Take for example task of&amp;nbsp;removing an&amp;nbsp;element from a&amp;nbsp;linked list. You have to&amp;nbsp;iterate over the list to&amp;nbsp;find the element to&amp;nbsp;delete, then you have to&amp;nbsp;delete it. Deleting an&amp;nbsp;element from linked list is&amp;nbsp;an&amp;nbsp;update of&amp;nbsp;adjacent pointers. This includes &lt;code&gt;head&lt;/code&gt; pointer because you may need to&amp;nbsp;remove the first element.&lt;/p&gt;
+&lt;p&gt;If&amp;nbsp;you iterate over elements with a&amp;nbsp;simple pointer, like in&amp;nbsp;my&amp;nbsp;first example, you have to&amp;nbsp;have &lt;code&gt;cur&lt;/code&gt; and &lt;code&gt;prev&lt;/code&gt; pointers to&amp;nbsp;make the previous pointer around deleted element. That’s&amp;nbsp;OK, but you also need a&amp;nbsp;special case if&amp;nbsp;&lt;code&gt;prev&lt;/code&gt; pointer is&amp;nbsp;the &lt;code&gt;head&lt;/code&gt; because head must be&amp;nbsp;updated. Here is&amp;nbsp;the code:&lt;/p&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="dt"&gt;void&lt;/span&gt; list_remove(&lt;span class="dt"&gt;int&lt;/span&gt; i, &lt;span class="kw"&gt;struct&lt;/span&gt; list **head)
+{
+    &lt;span class="kw"&gt;struct&lt;/span&gt; list *cur = *head;
+    &lt;span class="kw"&gt;struct&lt;/span&gt; list *prev = NULL;
+    &lt;span class="kw"&gt;while&lt;/span&gt; (cur-&amp;gt;next) {
+        &lt;span class="kw"&gt;if&lt;/span&gt; (cur-&amp;gt;n == i) {
+            &lt;span class="kw"&gt;if&lt;/span&gt; (prev) {
+                &lt;span class="co"&gt;// Make previous pointer around deleted element&lt;/span&gt;
+                prev-&amp;gt;next = cur-&amp;gt;next;
+            } &lt;span class="kw"&gt;else&lt;/span&gt; {
+                &lt;span class="co"&gt;// prev == NULL means we removing head,&lt;/span&gt;
+                &lt;span class="co"&gt;// so shift head to next element.&lt;/span&gt;
+                *head = cur-&amp;gt;next;
+            }
+            free(cur);
+        }
+
+        &lt;span class="co"&gt;// Iterating...&lt;/span&gt;
+        prev = cur;
+        cur = cur-&amp;gt;next;
+    }
+}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;It&amp;nbsp;works but seems a&amp;nbsp;bit complicated&amp;nbsp;&amp;mdash; it&amp;nbsp;&lt;em&gt;requires&lt;/em&gt; comments explaining what’s&amp;nbsp;happening here. With double pointers it&amp;nbsp;looks like a&amp;nbsp;breeze:&lt;/p&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode c"&gt;&lt;code class="sourceCode c"&gt;&lt;span class="dt"&gt;void&lt;/span&gt; list_remove_pp(&lt;span class="dt"&gt;int&lt;/span&gt; i, &lt;span class="kw"&gt;struct&lt;/span&gt; list **head)
+{
+    &lt;span class="kw"&gt;struct&lt;/span&gt; list **pp;
+    &lt;span class="kw"&gt;struct&lt;/span&gt; list *cur;
+
+    pp = head;
+    &lt;span class="kw"&gt;while&lt;/span&gt; (*pp) {
+        cur = *pp;
+        &lt;span class="kw"&gt;if&lt;/span&gt; (cur-&amp;gt;n == i) {
+            *pp = cur-&amp;gt;next;
+            free(cur);
+        }
+        pp = &amp;amp;((*pp)-&amp;gt;next);
+    }
+}&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Because we&amp;nbsp;use double pointers, we&amp;nbsp;don’t&amp;nbsp;have a&amp;nbsp;special case for head&amp;nbsp;&amp;mdash; with &lt;code&gt;pp&lt;/code&gt; we&amp;nbsp;can modify it&amp;nbsp;just as&amp;nbsp;any other pointer in&amp;nbsp;the list.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;the next time you’ll&amp;nbsp;find yourself struggle with some pointer problem&amp;nbsp;&amp;mdash; draw a&amp;nbsp;picture showing pointers as&amp;nbsp;any other variable and you’ll&amp;nbsp;find the answer.&lt;/p&gt;
+&lt;p&gt;Just remember, there is&amp;nbsp;no&amp;nbsp;magic here&amp;nbsp;&amp;mdash; &lt;strong&gt;pointer is&amp;nbsp;just a&amp;nbsp;usual variable, but you work with it&amp;nbsp;in&amp;nbsp;an&amp;nbsp;unusual way&lt;/strong&gt;.&lt;/p&gt;</content>
+  </entry>
   <entry xml:base="http://alex.dzyoba.com/feed">
     <title type="text">On dynamic arrays</title>
     <id>programming/dynamic-arrays.html</id>

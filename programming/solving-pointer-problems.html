@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Solving pointers problems | Alex Dzyoba</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="page-header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">Alex Dzyoba</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Solving pointers problems</h2>
+                            <h6 class="post-meta">
+                              28 Jan 2017, in
+                              <a class="disabled" href="/categories/programming">programming</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>It’s&nbsp;not secret that the hardest part in&nbsp;C&nbsp;programming is&nbsp;working with pointers. They seem simple&nbsp;&mdash; &laquo;A&nbsp;pointer is&nbsp;a&nbsp;variable that contains the address of&nbsp;a&nbsp;variable&raquo; (K&R&nbsp;Chapter 5). But when you start working with it, it’s&nbsp;so&nbsp;easy to&nbsp;mess up&nbsp;with stars and ampersands and arrows and stuff.</p>
+<p>Most of&nbsp;the times you can get away with some shallow understanding of&nbsp;pointers. Indeed, even in&nbsp;production code you rarely see anything other than taking a&nbsp;pointer from <code>malloc</code> and passing it&nbsp;to&nbsp;some functions. And that’s&nbsp;where you are caught on&nbsp;C&nbsp;programming interviews questions because people love to&nbsp;ask tricky pointer questions. Like, write a&nbsp;function to&nbsp;reverse a&nbsp;linked list or&nbsp;do&nbsp;an&nbsp;<nobr>in-order</nobr> traversal of&nbsp;the binary tree.</p>
+<p>I&nbsp;actually failed one interview back in&nbsp;2012 because I&nbsp;failed to&nbsp;write a&nbsp;function that reverts a&nbsp;linked list. Yeah, I&nbsp;was depressed. Since then I&nbsp;promised myself that I&nbsp;will figure out how this shit really works. So&nbsp;this is&nbsp;my&nbsp;pointers epiphany post.</p>
+<p>I&nbsp;think that <strong>the key to&nbsp;solving any pointers problem is&nbsp;to&nbsp;draw them correctly</strong>. Let me&nbsp;show you an&nbsp;example of&nbsp;linked list because it&nbsp;has a&nbsp;lot of&nbsp;pointers:</p>
+<div class="figure">
+<img src="/assets/img/slist/slist-basic.png" alt="Linked list" />
+<p class="caption">Linked list</p>
+</div>
+<p>Each element is&nbsp;2 squares&nbsp;&mdash; one for the &laquo;payload&raquo; variable and another for the pointer variable. Last pointer value is, of&nbsp;course, NULL. Head of&nbsp;the list is&nbsp;a&nbsp;pointer and it’s&nbsp;drawn in&nbsp;a&nbsp;&laquo;box&raquo; as&nbsp;any other variable.</p>
+<p>It’s&nbsp;of&nbsp;paramount importance to&nbsp;draw pointers in&nbsp;boxes as&nbsp;any other variables and showing with the arrow where the pointer value points because this representation will help you to&nbsp;understand pointers code.</p>
+<p>For example, here is&nbsp;the code to&nbsp;iterate over a&nbsp;linked list:</p>
+<div class="sourceCode"><pre class="sourceCode c"><code class="sourceCode c"><span class="kw">struct</span> list *cur = head;
+<span class="kw">while</span> (cur) {
+    printf(<span class="st">&quot;cur is %p, val is %d</span><span class="ch">\n</span><span class="st">&quot;</span>, cur, cur-&gt;n);
+    cur = cur-&gt;next;
+}</code></pre></div>
+<p>You can kind of&nbsp;understand it&nbsp;by&nbsp;intuition but do&nbsp;you really understand why and how <code>cur = cur-&gt;next</code> works? Draw a&nbsp;picture!</p>
+<div class="figure">
+<img src="/assets/img/slist/slist-iter.png" alt="Linked list iteration" />
+<p class="caption">Linked list iteration</p>
+</div>
+<p><code>cur = cur-&gt;next</code> is&nbsp;doing its magic because arrow operator in&nbsp;C&nbsp;translates to&nbsp;this: <code>cur = (*cur).next</code>. First, you are dereferencing a&nbsp;pointer&nbsp;&mdash; that gives you a&nbsp;value under the pointer. Second, you get the value of&nbsp;<code>next</code> pointer. Third, you copy that value to&nbsp;the <code>cur</code>. This is&nbsp;how it&nbsp;allows you to&nbsp;jump over the pointers.</p>
+<p>If&nbsp;it&nbsp;doesn’t&nbsp;click, don’t&nbsp;worry. Take your time, draw it&nbsp;yourself and make it&nbsp;sink.</p>
+<p>Now, when it&nbsp;seems easy, let’s&nbsp;look at&nbsp;the double pointer or&nbsp;pointer to&nbsp;pointer.</p>
+<p>Here is&nbsp;the same iteration but with double pointers:</p>
+<div class="sourceCode"><pre class="sourceCode c"><code class="sourceCode c"><span class="kw">struct</span> list **pp = &amp;head;
+<span class="kw">while</span> (*pp) {
+    cur = *pp;
+    printf(<span class="st">&quot;cur is %p, val is %d</span><span class="ch">\n</span><span class="st">&quot;</span>, cur, cur-&gt;n);
+    *pp = &amp;(cur-&gt;next);
+}</code></pre></div>
+<p>And here is&nbsp;the representation of&nbsp;it:</p>
+<div class="figure">
+<img src="/assets/img/slist/slist-pp.png" alt="Pointer to pointer" />
+<p class="caption">Pointer to&nbsp;pointer</p>
+</div>
+<p>Double pointers are useful because they allow you to&nbsp;change the underlying pointer <strong>and</strong> value. Here is&nbsp;the illustration of&nbsp;why it’s&nbsp;possible:</p>
+<div class="figure">
+<img src="/assets/img/slist/slist-pp-val.png" alt="Double pointer dereference" />
+<p class="caption">Double pointer dereference</p>
+</div>
+<p>Note, that <code>*pp</code> is&nbsp;a&nbsp;pointer, but it’s&nbsp;a&nbsp;different &laquo;box&raquo; than <code>pp</code>. <code>pp</code> points to&nbsp;the pointer, while <code>*pp</code> points to&nbsp;value.</p>
+<p>All of&nbsp;this may not sound useful at&nbsp;first but, without double pointers, some code is&nbsp;much harder to&nbsp;read and some not even possible.</p>
+<p>Take for example task of&nbsp;removing an&nbsp;element from a&nbsp;linked list. You have to&nbsp;iterate over the list to&nbsp;find the element to&nbsp;delete, then you have to&nbsp;delete it. Deleting an&nbsp;element from linked list is&nbsp;an&nbsp;update of&nbsp;adjacent pointers. This includes <code>head</code> pointer because you may need to&nbsp;remove the first element.</p>
+<p>If&nbsp;you iterate over elements with a&nbsp;simple pointer, like in&nbsp;my&nbsp;first example, you have to&nbsp;have <code>cur</code> and <code>prev</code> pointers to&nbsp;make the previous pointer around deleted element. That’s&nbsp;OK, but you also need a&nbsp;special case if&nbsp;<code>prev</code> pointer is&nbsp;the <code>head</code> because head must be&nbsp;updated. Here is&nbsp;the code:</p>
+<div class="sourceCode"><pre class="sourceCode c"><code class="sourceCode c"><span class="dt">void</span> list_remove(<span class="dt">int</span> i, <span class="kw">struct</span> list **head)
+{
+    <span class="kw">struct</span> list *cur = *head;
+    <span class="kw">struct</span> list *prev = NULL;
+    <span class="kw">while</span> (cur-&gt;next) {
+        <span class="kw">if</span> (cur-&gt;n == i) {
+            <span class="kw">if</span> (prev) {
+                <span class="co">// Make previous pointer around deleted element</span>
+                prev-&gt;next = cur-&gt;next;
+            } <span class="kw">else</span> {
+                <span class="co">// prev == NULL means we removing head,</span>
+                <span class="co">// so shift head to next element.</span>
+                *head = cur-&gt;next;
+            }
+            free(cur);
+        }
+
+        <span class="co">// Iterating...</span>
+        prev = cur;
+        cur = cur-&gt;next;
+    }
+}</code></pre></div>
+<p>It&nbsp;works but seems a&nbsp;bit complicated&nbsp;&mdash; it&nbsp;<em>requires</em> comments explaining what’s&nbsp;happening here. With double pointers it&nbsp;looks like a&nbsp;breeze:</p>
+<div class="sourceCode"><pre class="sourceCode c"><code class="sourceCode c"><span class="dt">void</span> list_remove_pp(<span class="dt">int</span> i, <span class="kw">struct</span> list **head)
+{
+    <span class="kw">struct</span> list **pp;
+    <span class="kw">struct</span> list *cur;
+
+    pp = head;
+    <span class="kw">while</span> (*pp) {
+        cur = *pp;
+        <span class="kw">if</span> (cur-&gt;n == i) {
+            *pp = cur-&gt;next;
+            free(cur);
+        }
+        pp = &amp;((*pp)-&gt;next);
+    }
+}</code></pre></div>
+<p>Because we&nbsp;use double pointers, we&nbsp;don’t&nbsp;have a&nbsp;special case for head&nbsp;&mdash; with <code>pp</code> we&nbsp;can modify it&nbsp;just as&nbsp;any other pointer in&nbsp;the list.</p>
+<p>So&nbsp;the next time you’ll&nbsp;find yourself struggle with some pointer problem&nbsp;&mdash; draw a&nbsp;picture showing pointers as&nbsp;any other variable and you’ll&nbsp;find the answer.</p>
+<p>Just remember, there is&nbsp;no&nbsp;magic here&nbsp;&mdash; <strong>pointer is&nbsp;just a&nbsp;usual variable, but you work with it&nbsp;in&nbsp;an&nbsp;unusual way</strong>.</p>
+                        </div>
+                    </article>
+                </div>
+        </div>
+		<!--
+		<div class="row comments">
+      <a class="muut" href="https://muut.com/i/alex-dzyoba-blog/general" type="dynamic">Comments</a>
+      <script src="//cdn.muut.com/1/moot.min.js"></script>
+		</div>
+		-->
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+		&copy; 2016 Alex Dzyoba / CC-BY 4.0
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-89410369-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</body>
+</html>
