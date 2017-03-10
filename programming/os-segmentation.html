@@ -73,58 +73,58 @@
 <li>‘IDTR’ The OS&nbsp;image must leave interrupts disabled until it&nbsp;sets up&nbsp;its own IDT.</li>
 </ul>
 <p>Setting up&nbsp;a&nbsp;stack is&nbsp;simple&nbsp;&mdash; you just put 2 labels divided by&nbsp;your stack size. <a href="https://github.com/dzeban/hydra/blob/86b67dfe27001a9f21de64307eb6ec3395aecddd/arch/i386/boot.S#L15-L19">In&nbsp;&laquo;hydra&raquo; it’s&nbsp;16 KiB</a>:</p>
-<pre class="asm"><code># Reserve a stack for the initial thread.
-.section .bootstrap_stack, &quot;aw&quot;, @nobits
-stack_bottom:
-.skip 16384 # 16 KiB
-stack_top:</code></pre>
+<div class="sourceCode"><pre class="sourceCode asm"><code class="sourceCode fasm"># Reserve a <span class="kw">stack</span> for the initial thread.
+.<span class="kw">section</span> .bootstrap_stack, <span class="st">&quot;aw&quot;</span>, @nobits
+<span class="fu">stack_bottom:</span>
+.skip <span class="dv">16384</span> # <span class="dv">16</span> KiB
+<span class="fu">stack_top:</span></code></pre></div>
 <p>Next, we&nbsp;need to&nbsp;setup segmentation. We&nbsp;have to&nbsp;do&nbsp;this before setting up&nbsp;interrupts because each IDT descriptor gate must contain segment selector for destination code segment&nbsp;&mdash; a&nbsp;kernel code segment that we&nbsp;must setup.</p>
 <p>Nevertheless it&nbsp;almost certainly will work even without setting up&nbsp;GDT because Multiboot bootloader sets it&nbsp;by&nbsp;itself and we&nbsp;left with its configuration that usually will set up&nbsp;flat memory model. For example, here is&nbsp;the GDT that legacy grub set:</p>
 <table>
 <thead>
 <tr class="header">
 <th align="left">Index</th>
-<th align="left">Base</th>
+<th>Base</th>
 <th align="left">Size</th>
-<th align="left">DPL</th>
-<th align="left">Info</th>
+<th>DPL</th>
+<th>Info</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td align="left">00 (Selector 0&times;0000)</td>
-<td align="left">0&times;0</td>
+<td>0&times;0</td>
 <td align="left">0xfff0</td>
-<td align="left">0</td>
-<td align="left">Unused</td>
+<td>0</td>
+<td>Unused</td>
 </tr>
 <tr class="even">
 <td align="left">01 (Selector 0&times;0008)</td>
-<td align="left">0&times;0</td>
+<td>0&times;0</td>
 <td align="left">0xffffffff</td>
-<td align="left">0</td>
-<td align="left"><nobr>32-bit</nobr> code</td>
+<td>0</td>
+<td><nobr>32-bit</nobr> code</td>
 </tr>
 <tr class="odd">
 <td align="left">02 (Selector 0&times;0010)</td>
-<td align="left">0&times;0</td>
+<td>0&times;0</td>
 <td align="left">0xffffffff</td>
-<td align="left">0</td>
-<td align="left"><nobr>32-bit</nobr> data</td>
+<td>0</td>
+<td><nobr>32-bit</nobr> data</td>
 </tr>
 <tr class="even">
 <td align="left">03 (Selector 0&times;0018)</td>
-<td align="left">0&times;0</td>
+<td>0&times;0</td>
 <td align="left">0xffff</td>
-<td align="left">0</td>
-<td align="left"><nobr>16-bit</nobr> code</td>
+<td>0</td>
+<td><nobr>16-bit</nobr> code</td>
 </tr>
 <tr class="odd">
 <td align="left">04 (Selector 0&times;0020)</td>
-<td align="left">0&times;0</td>
+<td>0&times;0</td>
 <td align="left">0xffff</td>
-<td align="left">0</td>
-<td align="left"><nobr>16-bit</nobr> data</td>
+<td>0</td>
+<td><nobr>16-bit</nobr> data</td>
 </tr>
 </tbody>
 </table>
@@ -241,11 +241,11 @@ jmp 0x10:eax ; Far jump</code></pre>
 <p>Basically, there is&nbsp;a&nbsp;flat memory model with 4 segments from <code>0</code> to&nbsp;<code>0xfffff * granularity</code>, where granularity flag set to&nbsp;1 specifies 4096 increments, thus giving us&nbsp;limit of&nbsp;4 GiB. Userspace and kernel segments differs in&nbsp;DPL only.</p>
 <h3 id="first-linux-version-0.01">First Linux version 0.01</h3>
 <p>In&nbsp;the Linux version 0.01 there were no&nbsp;userspace segments. In&nbsp;<a href="http://code.metager.de/source/xref/linux/historic/0.01/boot/head.s#171">boot/head.s</a></p>
-<pre class="asm"><code>_gdt:   .quad 0x0000000000000000    /* NULL descriptor */
-    .quad 0x00c09a00000007ff    /* 8Mb */
-    .quad 0x00c09200000007ff    /* 8Mb */
-    .quad 0x0000000000000000    /* TEMPORARY - don&#39;t use */
-    .fill 252,8,0           /* space for LDT&#39;s and TSS&#39;s etc */</code></pre>
+<div class="sourceCode"><pre class="sourceCode asm"><code class="sourceCode fasm"><span class="fu">_gdt:</span>   .quad<span class="bn"> 0x0000000000000000    </span>/* NULL descriptor */
+    .quad<span class="bn"> 0x00c09a00000007ff    </span>/* 8Mb */
+    .quad<span class="bn"> 0x00c09200000007ff    </span>/* 8Mb */
+    .quad<span class="bn"> 0x0000000000000000    </span>/* TEMPORARY - don<span class="st">&#39;t use */</span>
+    .fill <span class="dv">252</span>,<span class="dv">8</span>,<span class="dv">0</span>           /* space for LDT<span class="st">&#39;s and TSS&#39;</span>s etc */</code></pre></div>
 <p>Unfortunately, I&nbsp;wasn’t&nbsp;able to&nbsp;track down how userspace was set up&nbsp;(TSS only?).</p>
 <h3 id="netbsd">NetBSD</h3>
 <p>NetBSD kernel defines 4 segments as&nbsp;everybody. In&nbsp;<a href="http://nxr.netbsd.org/xref/src/sys/arch/i386/include/segments.h#285">sys/arch/i386/include/segments.h</a></p>

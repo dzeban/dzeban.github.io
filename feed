@@ -2,7 +2,7 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title type="text">Voluntary madness!</title>
   <id>http://alex.dzyoba.com/feed</id>
-  <updated>2017-01-28T00:00:00Z</updated>
+  <updated>2017-03-11T00:00:00Z</updated>
   <link href="http://alex.dzyoba.com" />
   <link href="http://alex.dzyoba.com/feed" rel="self" />
   <author>
@@ -10,9 +10,132 @@
   </author>
   <generator>PyAtom</generator>
   <entry xml:base="http://alex.dzyoba.com/feed">
+    <title type="text">Installing Fedora on Macbook Air</title>
+    <id>linux/macbook-air-linux.html</id>
+    <updated>2017-03-11T00:00:00Z</updated>
+    <link href="linux/macbook-air-linux.html" />
+    <author>
+      <name>avd</name>
+    </author>
+    <content type="html">&lt;h2 id="preface"&gt;Preface&lt;/h2&gt;
+&lt;p&gt;I&amp;nbsp;never was a&amp;nbsp;fan of&amp;nbsp;laptops, I&amp;nbsp;mean 2000s era laptops, the ones that were bulky, heavy and hard to&amp;nbsp;upgrade. The last point was especially important to&amp;nbsp;me&amp;nbsp;because in&amp;nbsp;the 2000s you had to&amp;nbsp;upgrade your station, add more RAM, more HDD, and newer CPU. You followed Intel’s&amp;nbsp;&lt;nobr&gt;Tick-Tock&lt;/nobr&gt; schedule, chosen Tock ones, and got a&amp;nbsp;performance boost (according to&amp;nbsp;benchmarks).&lt;/p&gt;
+&lt;p&gt;But recently, all of&amp;nbsp;a&amp;nbsp;sudden I’ve&amp;nbsp;realized that I&amp;nbsp;have a&amp;nbsp;&lt;nobr&gt;4-year-old&lt;/nobr&gt; machine with Intel i3 CPU and &lt;em&gt;it’s&amp;nbsp;fine&lt;/em&gt;. I&amp;nbsp;don’t&amp;nbsp;feel the need to&amp;nbsp;upgrade. Partly it’s&amp;nbsp;because I’m&amp;nbsp;not using a&amp;nbsp;Windows for a&amp;nbsp;long time. On&amp;nbsp;my&amp;nbsp;Fedora, I&amp;nbsp;mostly sit in&amp;nbsp;the terminal without desktop environment like Gnome or&amp;nbsp;KDE, edit text in&amp;nbsp;Vim and that’s&amp;nbsp;all I&amp;nbsp;need. The heaviest thing on&amp;nbsp;my&amp;nbsp;machine&amp;nbsp;&amp;mdash; the browser&amp;nbsp;&amp;mdash; is&amp;nbsp;working fine too, I&amp;nbsp;can play a&amp;nbsp;1080p youtube video, I&amp;nbsp;can load &lt;a href="http://idlewords.com/talks/website_obesity.htm"&gt;bloated sites&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;The other part that saves me&amp;nbsp;from the upgrade is&amp;nbsp;that hardware itself is&amp;nbsp;not improving vertically, but rather horizontally. Simply switching to&amp;nbsp;the newer CPU will not make your computer life full of&amp;nbsp;magic and unicorns&amp;nbsp;&amp;mdash; just &lt;a href="https://ark.intel.com/compare/97128,80806"&gt;compare Haswell and Kaby Lake CPUs&lt;/a&gt;. The only thing that increased in&amp;nbsp;the clock rate and might gain you some performance is&amp;nbsp;the bus speed that was increased from 5 GT/s to&amp;nbsp;8 GT/s. All the other things are about attaching more stuff on&amp;nbsp;your CPU&amp;nbsp;&amp;mdash; more memory, more I/O devices. And the funny thing is&amp;nbsp;that &lt;nobr&gt;3-year-old&lt;/nobr&gt; Haswell from 2014 costs the same $310 as&amp;nbsp;new and shiny Kaby Lake. I’m&amp;nbsp;not saying that the progress in&amp;nbsp;CPUs has stopped, there is&amp;nbsp;a&amp;nbsp;servers market, there are a&amp;nbsp;gaming market and HPC market that needs and feels all these developments. I’m&amp;nbsp;saying that for consumer machines like desktops there is&amp;nbsp;no&amp;nbsp;need to&amp;nbsp;upgrade often.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;there is&amp;nbsp;a&amp;nbsp;rare need to&amp;nbsp;upgrade your machine now and recent laptops are nice, light and hold battery for at&amp;nbsp;least 8 hours. So&amp;nbsp;when I&amp;nbsp;got an&amp;nbsp;option to&amp;nbsp;get a&amp;nbsp;laptop at&amp;nbsp;my&amp;nbsp;job, I&amp;nbsp;took it. The problem was that it&amp;nbsp;was a&amp;nbsp;Macbook Air.&lt;/p&gt;
+&lt;p&gt;And I’m&amp;nbsp;a&amp;nbsp;Linux guy, so&amp;nbsp;I&amp;nbsp;had to&amp;nbsp;install Fedora on&amp;nbsp;this stuff. I&amp;nbsp;don’t&amp;nbsp;care about you guys whining &amp;laquo;&amp;hellip;but macOS is&amp;nbsp;so&amp;nbsp;much better and friendly and nice and &lt;nobr&gt;blah-blah&lt;/nobr&gt;&amp;hellip;&amp;raquo;. No. It’s&amp;nbsp;not. Well, it’s&amp;nbsp;&lt;strong&gt;not for me&lt;/strong&gt;. I&amp;nbsp;have a&amp;nbsp;simple and efficient setup that serves me&amp;nbsp;extremely well, looks gorgeous for me&amp;nbsp;and don’t&amp;nbsp;interfere with my&amp;nbsp;work. It&amp;nbsp;doesn’t&amp;nbsp;mean that I&amp;nbsp;didn’t&amp;nbsp;try&amp;nbsp;&amp;mdash; I&amp;nbsp;did, but working in&amp;nbsp;macOS without tiling WM, strange keyboard shortcuts (you can’t&amp;nbsp;set &lt;nobr&gt;Alt-Shift&lt;/nobr&gt; to&amp;nbsp;switch keyboard layout) and fake &lt;nobr&gt;user-friendliness&lt;/nobr&gt; (I&amp;nbsp;dare you to&amp;nbsp;tell me&amp;nbsp;how to&amp;nbsp;show hidden files in&amp;nbsp;Finder) make me&amp;nbsp;dog slow.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;I’ve&amp;nbsp;decided to&amp;nbsp;install Fedora on&amp;nbsp;Macbook Air and because it’s&amp;nbsp;a&amp;nbsp;little bit tricky, I&amp;nbsp;wrote this guide. In&amp;nbsp;the end, we’ll&amp;nbsp;have a&amp;nbsp;laptop with:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Dual boot macOS and Fedora&lt;/li&gt;
+&lt;li&gt;Working multimedia keys&lt;/li&gt;
+&lt;li&gt;Working brightness control including keyboard brightness&lt;/li&gt;
+&lt;li&gt;Working laptop lid close/open&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="preparations"&gt;Preparations&lt;/h2&gt;
+&lt;p&gt;Because we’ll&amp;nbsp;leave macOS we&amp;nbsp;have to&amp;nbsp;prepare Macbook. Thanks to&amp;nbsp;the UEFI advancement in&amp;nbsp;the Linux we&amp;nbsp;don’t&amp;nbsp;need rEFIt/rEFInd&amp;nbsp;&amp;mdash; modern distros are installed as&amp;nbsp;a&amp;nbsp;breeze. So&amp;nbsp;the only thing we&amp;nbsp;have to&amp;nbsp;do&amp;nbsp;is&amp;nbsp;shrink macOS partition and prepare USB stick.&lt;/p&gt;
+&lt;h3 id="make-partition-for-linux"&gt;Make partition for Linux&lt;/h3&gt;
+&lt;p&gt;My&amp;nbsp;Macbook has only 128 GBs of&amp;nbsp;SSD and I’ve&amp;nbsp;decided to&amp;nbsp;leave macOS on&amp;nbsp;it, so&amp;nbsp;I&amp;nbsp;need to&amp;nbsp;partition the drive leaving some usable amount of&amp;nbsp;space for macOS. I&amp;nbsp;don’t&amp;nbsp;have any experience with macOS and thought that 40 GBs will be&amp;nbsp;enough even if&amp;nbsp;I&amp;nbsp;will use it.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;partition the drive I’ve&amp;nbsp;used &amp;laquo;Disk Utility&amp;raquo;. Just press ‘+’ button and set the desired size for the new partition. Leave ‘Format’ default (&amp;laquo;Mac OS&amp;nbsp;Extended (Journaled)&amp;raquo;) because you’ll&amp;nbsp;anyway format it&amp;nbsp;with ext4. Then hit ‘Apply’ and that’s&amp;nbsp;it.&lt;/p&gt;
+&lt;p&gt;Here is&amp;nbsp;mine, though it’s&amp;nbsp;already after I’ve&amp;nbsp;installed Fedora.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/macbook-disk-partitions.png" alt="Macbook Air Linux partitions" /&gt;
+&lt;p class="caption"&gt;Macbook Air Linux partitions&lt;/p&gt;
+&lt;/div&gt;
+&lt;h3 id="create-usb-stick"&gt;Create USB stick&lt;/h3&gt;
+&lt;p&gt;First of&amp;nbsp;all, you can’t&amp;nbsp;use Fedora netinst image, because there is&amp;nbsp;no&amp;nbsp;working open source driver for Broadcom WiFi card that is&amp;nbsp;installed in&amp;nbsp;Macbook Air. So&amp;nbsp;choose a&amp;nbsp;full image that doesn’t&amp;nbsp;require an&amp;nbsp;internet connection like MATE or&amp;nbsp;Gnome.&lt;/p&gt;
+&lt;p&gt;Now, you have to&amp;nbsp;create USB stick with Fedora. There is&amp;nbsp;a&amp;nbsp;tool called &amp;laquo;Fedora Media Writer&amp;raquo; that will make bootable stick on&amp;nbsp;macOS but, unfortunately, I’ve&amp;nbsp;failed to&amp;nbsp;boot with it. It&amp;nbsp;seems that after repartitioning on&amp;nbsp;macOS it&amp;nbsp;immediately mounts the new partitions and touch it&amp;nbsp;making it&amp;nbsp;somehow unusable for installation.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;I’ve&amp;nbsp;created USB stick on&amp;nbsp;Linux with simple&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ dd if=Fedora-Workstation-netinst-x86_64-25-1.3.iso of=/dev/sdd bs=1M oflag=direct&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now for the installation part.&lt;/p&gt;
+&lt;h2 id="fedora-installation"&gt;Fedora Installation&lt;/h2&gt;
+&lt;h3 id="boot-into-usb-stick"&gt;Boot into USB stick&lt;/h3&gt;
+&lt;p&gt;Insert USB into Macbook, hold &amp;laquo;alt&amp;raquo; key and press power button still holding &amp;laquo;alt&amp;raquo; key until you see boot choice menu with Fedora.&lt;/p&gt;
+&lt;h3 id="most-important-linux-partitions-and-installation-destination"&gt;MOST IMPORTANT! Linux partitions and installation destination&lt;/h3&gt;
+&lt;p&gt;After booting from USB you’ll&amp;nbsp;see usual Anaconda installer. First and most important we&amp;nbsp;must configure installation destination.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/macbook-air-installer-enter.png" alt="Macbook Air Fedora installer enter" /&gt;
+&lt;p class="caption"&gt;Macbook Air Fedora installer enter&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;Enter this menu, choose &amp;laquo;ATA APPLE SSD&amp;raquo; and then choose &amp;laquo;I&amp;nbsp;will configure partitioning&amp;raquo; and click &amp;laquo;Done&amp;raquo; in&amp;nbsp;the top of&amp;nbsp;the window.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/macbook-air-installation-destination.png" alt="Macbook Air Fedora installation destination" /&gt;
+&lt;p class="caption"&gt;Macbook Air Fedora installation destination&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;Expand &amp;laquo;Unknown&amp;raquo; widget, find your 80 GBs or&amp;nbsp;74 GiBs partition of&amp;nbsp;type &amp;laquo;hfs+" and delete it. Now you’ll&amp;nbsp;see 74 GiBs of&amp;nbsp;available space in&amp;nbsp;the pink rectangle at&amp;nbsp;the bottom.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/macbook-air-fedora-partitions-empty.png" alt="Macbook Air empty partitions" /&gt;
+&lt;p class="caption"&gt;Macbook Air empty partitions&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;Now choose &amp;laquo;Standart Partition&amp;raquo; scheme from the dropdown menu in&amp;nbsp;&amp;laquo;New Fedora 25 Installation&amp;raquo; widget, and then click on&amp;nbsp;the link &amp;laquo;Click here to&amp;nbsp;create them automatically&amp;raquo;.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/macbook-air-fedora-partitions-auto.png" alt="Macbook Air auto partitioning" /&gt;
+&lt;p class="caption"&gt;Macbook Air auto partitioning&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;It&amp;nbsp;will create separate / and /home partitions and also a&amp;nbsp;whooping 8 GBs swap. You can tweak automatically created scheme at&amp;nbsp;your taste, just &lt;strong&gt;don’t&amp;nbsp;touch &amp;laquo;/boot/efi&amp;raquo; partition&lt;/strong&gt; or&amp;nbsp;otherwise it&amp;nbsp;won’t&amp;nbsp;boot. I’ve&amp;nbsp;changed swap size to&amp;nbsp;2 GBs, removed /home and / partition and manually add / partition to&amp;nbsp;span all available space of&amp;nbsp;almost 80 GBs.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img src="/assets/img/macbook-air-fedora-partitions-my.png" alt="Macbook Air my partitioning" /&gt;
+&lt;p class="caption"&gt;Macbook Air my&amp;nbsp;partitioning&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;Also, I&amp;nbsp;setup LUKS encryption for my&amp;nbsp;partitions, because it’s&amp;nbsp;a&amp;nbsp;laptop after all, if&amp;nbsp;I&amp;nbsp;lose it&amp;nbsp;you won’t&amp;nbsp;be&amp;nbsp;able to&amp;nbsp;steal my&amp;nbsp;stuff by&amp;nbsp;directly connecting the SSD drive. Also, LUKS encryption doesn’t&amp;nbsp;make any performance penalty.&lt;/p&gt;
+&lt;p&gt;Then hit &amp;laquo;Done&amp;raquo; and confirm your disk layout.&lt;/p&gt;
+&lt;h3 id="configure-installation"&gt;Configure installation&lt;/h3&gt;
+&lt;p&gt;Now when you have partitioning configured, just setup your installation with Anaconda.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;make hardware work nicely like brightness control and lid close/open install some DE&amp;nbsp;like MATE in&amp;nbsp;my&amp;nbsp;case. DEs have decent udev rules and configs for hardware. It&amp;nbsp;also setup display manager (the one that asks for the login and password) and X&amp;nbsp;server. It’s&amp;nbsp;amazing how everything works out of&amp;nbsp;the box. Something like 5 years ago it&amp;nbsp;was a&amp;nbsp;pain to&amp;nbsp;make mic and brightness work and now you just don’t&amp;nbsp;worry. Kudos to&amp;nbsp;distro and DE&amp;nbsp;guys!&lt;/p&gt;
+&lt;p&gt;You can stick with MATE but I’ll&amp;nbsp;install and configure i3 window manager over MATE.&lt;/p&gt;
+&lt;h3 id="wait-until-installation-is-done"&gt;Wait until installation is&amp;nbsp;done&lt;/h3&gt;
+&lt;p&gt;and then reboot into your fresh Fedora by&amp;nbsp;holding &amp;laquo;alt&amp;raquo; key.&lt;/p&gt;
+&lt;h2 id="install-wifi-drivers"&gt;Install WiFi drivers&lt;/h2&gt;
+&lt;p&gt;Macbook Air has crappy proprietary Broadcom WiFi chips. To&amp;nbsp;make it&amp;nbsp;work you’ll&amp;nbsp;need an&amp;nbsp;alternative network. You can use USB to&amp;nbsp;Ethernet cable, or, as&amp;nbsp;in&amp;nbsp;my&amp;nbsp;case, you can use your Android phone as&amp;nbsp;a&amp;nbsp;modem. No&amp;nbsp;seriously, just attach your Android phone, select Modem mode and you’ll&amp;nbsp;immediately see the network connected.&lt;/p&gt;
+&lt;p&gt;Now, when you have a&amp;nbsp;network, to&amp;nbsp;install Broadcom WiFi drivers open root terminal and do&amp;nbsp;the following:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;# Enable RPM fusion repo
+dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+
+# Install packages
+dnf install -y broadcom-wl akmods &amp;quot;kernel-devel-uname-r == $(uname -r)&amp;quot;
+
+# Rebuild driver for your kernel
+akmods
+
+# Load the new driver
+modprobe wl&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;After that, you’ll&amp;nbsp;have WiFi working.&lt;/p&gt;
+&lt;h2 id="making-things-nice-for-me"&gt;Making things nice (for me)&lt;/h2&gt;
+&lt;p&gt;Now it’s&amp;nbsp;time for tweaking. My&amp;nbsp;favorite!&lt;/p&gt;
+&lt;h3 id="enable-fnlock"&gt;Enable fnlock&lt;/h3&gt;
+&lt;p&gt;By&amp;nbsp;default, function keys are working as&amp;nbsp;multimedia keys. To&amp;nbsp;revert it&amp;nbsp;back to&amp;nbsp;the functions we&amp;nbsp;have to&amp;nbsp;enable &lt;nobr&gt;so-called&lt;/nobr&gt; fn&amp;nbsp;lock.&lt;/p&gt;
+&lt;p&gt;Create file &lt;code&gt;/etc/modprobe.d/hid_apple.conf&lt;/code&gt; as&amp;nbsp;root and add the following to&amp;nbsp;it:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;options hid_apple fnmode=2&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Don’t&amp;nbsp;try to&amp;nbsp;remove hid_apple kernel module&amp;nbsp;&amp;mdash; your keyboard stop working. Just reboot.&lt;/p&gt;
+&lt;h3 id="infinality-patches"&gt;Infinality patches&lt;/h3&gt;
+&lt;p&gt;Infinality is&amp;nbsp;a&amp;nbsp;set of&amp;nbsp;patches for fontconfig that makes fonts looking gorgeous. I&amp;nbsp;dare you to&amp;nbsp;try it&amp;nbsp;&amp;mdash; after it, anything else will look like a&amp;nbsp;crap including macOS fonts:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;dnf copr enable caoli5288/infinality-ultimate
+dnf install --allowerasing cairo-infinality-ultimate freetype-infinality-ultimate fontconfig-infinality-ultimate&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="getting-my-configs"&gt;Getting my&amp;nbsp;configs&lt;/h3&gt;
+&lt;p&gt;Because Linux software is&amp;nbsp;awesome and has text configs, I&amp;nbsp;store most of&amp;nbsp;them in&amp;nbsp;Dropbox and put known and loved configuration by&amp;nbsp;simple copying or&amp;nbsp;symlinking.&lt;/p&gt;
+&lt;p&gt;Install headless Dropbox:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;cd ~ &amp;amp;&amp;amp; wget -O - &amp;quot;https://www.dropbox.com/download?plat=lnx.x86_64&amp;quot; | tar xzf -&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And put dropbox CLI client to&amp;nbsp;your ~/bin folder:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;mkdir -p ~/bin &amp;amp;&amp;amp; cd ~/bin &amp;amp;&amp;amp; wget https://www.dropbox.com/download?dl=packages/dropbox.py&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now launch it&amp;nbsp;with &lt;code&gt;dropbox start&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="installing-i3-for-mate"&gt;Installing i3 for MATE&lt;/h3&gt;
+&lt;p&gt;Ok, so&amp;nbsp;before that I&amp;nbsp;was using MATE and while it’s&amp;nbsp;nice I&amp;nbsp;prefer tiling WM, namely i3. I&amp;nbsp;install it&amp;nbsp;with dnf:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;dnf install i3&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;and then copy or&amp;nbsp;symlink ~/.i3 directory with the configuration in&amp;nbsp;my&amp;nbsp;Dropbox. But what is&amp;nbsp;really awesome is&amp;nbsp;that we&amp;nbsp;can use i3wm instead of&amp;nbsp;MATE’s&amp;nbsp;window manager&amp;nbsp;&amp;mdash; Marco. This way we’ll&amp;nbsp;have all the niceties of&amp;nbsp;DE&amp;nbsp;like working multimedia buttons and brightness control while using our slick and nice tiling WM.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;change MATE’s&amp;nbsp;window manager just issue these 2 commands under your user (no&amp;nbsp;need for sudo):&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;dconf write /org/mate/desktop/session/required-components/windowmanager &amp;quot;&amp;#39;i3&amp;#39;&amp;quot;
+dconf write /org/mate/desktop/session/required-components-list &amp;quot;[&amp;#39;windowmanager&amp;#39;]&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Logout and login and you’ll&amp;nbsp;have it!&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;exit from i3 as&amp;nbsp;a&amp;nbsp;window manager for MATE, use this in&amp;nbsp;your i3 config&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;bindsym $mod+Shift+q exec &amp;quot;mate-session-save --logout&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="settings"&gt;Settings&lt;/h3&gt;
+&lt;p&gt;Everything else I&amp;nbsp;configure with &lt;code&gt;&lt;nobr&gt;mate-control-center&lt;/nobr&gt;&lt;/code&gt;.&lt;/p&gt;
+&lt;h2 id="conclusion"&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;So&amp;nbsp;the hardest part in&amp;nbsp;installing Fedora on&amp;nbsp;Macbook Air is&amp;nbsp;partitioning and WiFi driver. Everything else just works!&lt;/p&gt;
+&lt;p&gt;After using this setup for a&amp;nbsp;couple of&amp;nbsp;months I&amp;nbsp;can say that it’s&amp;nbsp;great. There are things that I&amp;nbsp;wish could be&amp;nbsp;better, but it’s&amp;nbsp;mostly about hardware. Like screen is&amp;nbsp;crappy 1440&amp;times;900 and keyboard is&amp;nbsp;way too limited (no&amp;nbsp;separate home/end, have to&amp;nbsp;use fn+left/right). I&amp;nbsp;would rather use some lightweight Thinkpad. But anyway, the freedom to&amp;nbsp;move your workspace with you is&amp;nbsp;amazing, so&amp;nbsp;I&amp;nbsp;think I’ll&amp;nbsp;never buy a&amp;nbsp;desktop machine anymore.&lt;/p&gt;</content>
+  </entry>
+  <entry xml:base="http://alex.dzyoba.com/feed">
     <title type="text">Solving pointers problems</title>
     <id>programming/solving-pointer-problems.html</id>
-    <updated>2017-01-28T00:00:00Z</updated>
+    <updated>2017-02-01T00:00:00Z</updated>
     <link href="programming/solving-pointer-problems.html" />
     <author>
       <name>avd</name>
@@ -513,58 +636,58 @@ sys 0m1.011s&lt;/code&gt;&lt;/pre&gt;
 &lt;li&gt;‘IDTR’ The OS&amp;nbsp;image must leave interrupts disabled until it&amp;nbsp;sets up&amp;nbsp;its own IDT.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;Setting up&amp;nbsp;a&amp;nbsp;stack is&amp;nbsp;simple&amp;nbsp;&amp;mdash; you just put 2 labels divided by&amp;nbsp;your stack size. &lt;a href="https://github.com/dzeban/hydra/blob/86b67dfe27001a9f21de64307eb6ec3395aecddd/arch/i386/boot.S#L15-L19"&gt;In&amp;nbsp;&amp;laquo;hydra&amp;raquo; it’s&amp;nbsp;16 KiB&lt;/a&gt;:&lt;/p&gt;
-&lt;pre class="asm"&gt;&lt;code&gt;# Reserve a stack for the initial thread.
-.section .bootstrap_stack, &amp;quot;aw&amp;quot;, @nobits
-stack_bottom:
-.skip 16384 # 16 KiB
-stack_top:&lt;/code&gt;&lt;/pre&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode asm"&gt;&lt;code class="sourceCode fasm"&gt;# Reserve a &lt;span class="kw"&gt;stack&lt;/span&gt; for the initial thread.
+.&lt;span class="kw"&gt;section&lt;/span&gt; .bootstrap_stack, &lt;span class="st"&gt;&amp;quot;aw&amp;quot;&lt;/span&gt;, @nobits
+&lt;span class="fu"&gt;stack_bottom:&lt;/span&gt;
+.skip &lt;span class="dv"&gt;16384&lt;/span&gt; # &lt;span class="dv"&gt;16&lt;/span&gt; KiB
+&lt;span class="fu"&gt;stack_top:&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Next, we&amp;nbsp;need to&amp;nbsp;setup segmentation. We&amp;nbsp;have to&amp;nbsp;do&amp;nbsp;this before setting up&amp;nbsp;interrupts because each IDT descriptor gate must contain segment selector for destination code segment&amp;nbsp;&amp;mdash; a&amp;nbsp;kernel code segment that we&amp;nbsp;must setup.&lt;/p&gt;
 &lt;p&gt;Nevertheless it&amp;nbsp;almost certainly will work even without setting up&amp;nbsp;GDT because Multiboot bootloader sets it&amp;nbsp;by&amp;nbsp;itself and we&amp;nbsp;left with its configuration that usually will set up&amp;nbsp;flat memory model. For example, here is&amp;nbsp;the GDT that legacy grub set:&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr class="header"&gt;
 &lt;th align="left"&gt;Index&lt;/th&gt;
-&lt;th align="left"&gt;Base&lt;/th&gt;
+&lt;th&gt;Base&lt;/th&gt;
 &lt;th align="left"&gt;Size&lt;/th&gt;
-&lt;th align="left"&gt;DPL&lt;/th&gt;
-&lt;th align="left"&gt;Info&lt;/th&gt;
+&lt;th&gt;DPL&lt;/th&gt;
+&lt;th&gt;Info&lt;/th&gt;
 &lt;/tr&gt;
 &lt;/thead&gt;
 &lt;tbody&gt;
 &lt;tr class="odd"&gt;
 &lt;td align="left"&gt;00 (Selector 0&amp;times;0000)&lt;/td&gt;
-&lt;td align="left"&gt;0&amp;times;0&lt;/td&gt;
+&lt;td&gt;0&amp;times;0&lt;/td&gt;
 &lt;td align="left"&gt;0xfff0&lt;/td&gt;
-&lt;td align="left"&gt;0&lt;/td&gt;
-&lt;td align="left"&gt;Unused&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;Unused&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class="even"&gt;
 &lt;td align="left"&gt;01 (Selector 0&amp;times;0008)&lt;/td&gt;
-&lt;td align="left"&gt;0&amp;times;0&lt;/td&gt;
+&lt;td&gt;0&amp;times;0&lt;/td&gt;
 &lt;td align="left"&gt;0xffffffff&lt;/td&gt;
-&lt;td align="left"&gt;0&lt;/td&gt;
-&lt;td align="left"&gt;&lt;nobr&gt;32-bit&lt;/nobr&gt; code&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;&lt;nobr&gt;32-bit&lt;/nobr&gt; code&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class="odd"&gt;
 &lt;td align="left"&gt;02 (Selector 0&amp;times;0010)&lt;/td&gt;
-&lt;td align="left"&gt;0&amp;times;0&lt;/td&gt;
+&lt;td&gt;0&amp;times;0&lt;/td&gt;
 &lt;td align="left"&gt;0xffffffff&lt;/td&gt;
-&lt;td align="left"&gt;0&lt;/td&gt;
-&lt;td align="left"&gt;&lt;nobr&gt;32-bit&lt;/nobr&gt; data&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;&lt;nobr&gt;32-bit&lt;/nobr&gt; data&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class="even"&gt;
 &lt;td align="left"&gt;03 (Selector 0&amp;times;0018)&lt;/td&gt;
-&lt;td align="left"&gt;0&amp;times;0&lt;/td&gt;
+&lt;td&gt;0&amp;times;0&lt;/td&gt;
 &lt;td align="left"&gt;0xffff&lt;/td&gt;
-&lt;td align="left"&gt;0&lt;/td&gt;
-&lt;td align="left"&gt;&lt;nobr&gt;16-bit&lt;/nobr&gt; code&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;&lt;nobr&gt;16-bit&lt;/nobr&gt; code&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class="odd"&gt;
 &lt;td align="left"&gt;04 (Selector 0&amp;times;0020)&lt;/td&gt;
-&lt;td align="left"&gt;0&amp;times;0&lt;/td&gt;
+&lt;td&gt;0&amp;times;0&lt;/td&gt;
 &lt;td align="left"&gt;0xffff&lt;/td&gt;
-&lt;td align="left"&gt;0&lt;/td&gt;
-&lt;td align="left"&gt;&lt;nobr&gt;16-bit&lt;/nobr&gt; data&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;&lt;nobr&gt;16-bit&lt;/nobr&gt; data&lt;/td&gt;
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
@@ -681,11 +804,11 @@ jmp 0x10:eax ; Far jump&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Basically, there is&amp;nbsp;a&amp;nbsp;flat memory model with 4 segments from &lt;code&gt;0&lt;/code&gt; to&amp;nbsp;&lt;code&gt;0xfffff * granularity&lt;/code&gt;, where granularity flag set to&amp;nbsp;1 specifies 4096 increments, thus giving us&amp;nbsp;limit of&amp;nbsp;4 GiB. Userspace and kernel segments differs in&amp;nbsp;DPL only.&lt;/p&gt;
 &lt;h3 id="first-linux-version-0.01"&gt;First Linux version 0.01&lt;/h3&gt;
 &lt;p&gt;In&amp;nbsp;the Linux version 0.01 there were no&amp;nbsp;userspace segments. In&amp;nbsp;&lt;a href="http://code.metager.de/source/xref/linux/historic/0.01/boot/head.s#171"&gt;boot/head.s&lt;/a&gt;&lt;/p&gt;
-&lt;pre class="asm"&gt;&lt;code&gt;_gdt:   .quad 0x0000000000000000    /* NULL descriptor */
-    .quad 0x00c09a00000007ff    /* 8Mb */
-    .quad 0x00c09200000007ff    /* 8Mb */
-    .quad 0x0000000000000000    /* TEMPORARY - don&amp;#39;t use */
-    .fill 252,8,0           /* space for LDT&amp;#39;s and TSS&amp;#39;s etc */&lt;/code&gt;&lt;/pre&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode asm"&gt;&lt;code class="sourceCode fasm"&gt;&lt;span class="fu"&gt;_gdt:&lt;/span&gt;   .quad&lt;span class="bn"&gt; 0x0000000000000000    &lt;/span&gt;/* NULL descriptor */
+    .quad&lt;span class="bn"&gt; 0x00c09a00000007ff    &lt;/span&gt;/* 8Mb */
+    .quad&lt;span class="bn"&gt; 0x00c09200000007ff    &lt;/span&gt;/* 8Mb */
+    .quad&lt;span class="bn"&gt; 0x0000000000000000    &lt;/span&gt;/* TEMPORARY - don&lt;span class="st"&gt;&amp;#39;t use */&lt;/span&gt;
+    .fill &lt;span class="dv"&gt;252&lt;/span&gt;,&lt;span class="dv"&gt;8&lt;/span&gt;,&lt;span class="dv"&gt;0&lt;/span&gt;           /* space for LDT&lt;span class="st"&gt;&amp;#39;s and TSS&amp;#39;&lt;/span&gt;s etc */&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Unfortunately, I&amp;nbsp;wasn’t&amp;nbsp;able to&amp;nbsp;track down how userspace was set up&amp;nbsp;(TSS only?).&lt;/p&gt;
 &lt;h3 id="netbsd"&gt;NetBSD&lt;/h3&gt;
 &lt;p&gt;NetBSD kernel defines 4 segments as&amp;nbsp;everybody. In&amp;nbsp;&lt;a href="http://nxr.netbsd.org/xref/src/sys/arch/i386/include/segments.h#285"&gt;sys/arch/i386/include/segments.h&lt;/a&gt;&lt;/p&gt;
@@ -1921,7 +2044,7 @@ Range is 1000000
 &lt;/colgroup&gt;
 &lt;thead&gt;
 &lt;tr class="header"&gt;
-&lt;th align="left"&gt;Test case&lt;/th&gt;
+&lt;th&gt;Test case&lt;/th&gt;
 &lt;th align="left"&gt;Naive QuickSort&lt;/th&gt;
 &lt;th align="left"&gt;mmap and QuickSort&lt;/th&gt;
 &lt;th align="left"&gt;External merge sort&lt;/th&gt;
@@ -1931,7 +2054,7 @@ Range is 1000000
 &lt;/thead&gt;
 &lt;tbody&gt;
 &lt;tr class="odd"&gt;
-&lt;td align="left"&gt;4 MiB in&amp;nbsp;2 MiB&lt;/td&gt;
+&lt;td&gt;4 MiB in&amp;nbsp;2 MiB&lt;/td&gt;
 &lt;td align="left"&gt;Segfault&lt;/td&gt;
 &lt;td align="left"&gt;N/A&lt;/td&gt;
 &lt;td align="left"&gt;0.38s&lt;/td&gt;
@@ -1939,7 +2062,7 @@ Range is 1000000
 &lt;td align="left"&gt;0.01&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class="even"&gt;
-&lt;td align="left"&gt;500 MB&amp;nbsp;in&amp;nbsp;128 MiB&lt;/td&gt;
+&lt;td&gt;500 MB&amp;nbsp;in&amp;nbsp;128 MiB&lt;/td&gt;
 &lt;td align="left"&gt;Segfault&lt;/td&gt;
 &lt;td align="left"&gt;32.25s&lt;/td&gt;
 &lt;td align="left"&gt;87.14s&lt;/td&gt;
@@ -3702,7 +3825,7 @@ T09: 29.88 MB/s f6eb529ee5b59824a657fb8de43c8c6d3e29cb00&lt;/code&gt;&lt;/pre&gt
 &lt;p class="caption"&gt;Stack&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;Holy shucks! We&amp;nbsp;are processing undefined memory. All instructions like this&lt;/p&gt;
-&lt;pre class="asm"&gt;&lt;code&gt;movdqa  -24(%rsp), %xmm0&lt;/code&gt;&lt;/pre&gt;
+&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode asm"&gt;&lt;code class="sourceCode fasm"&gt;&lt;span class="kw"&gt;movdqa&lt;/span&gt;  -&lt;span class="dv"&gt;24&lt;/span&gt;(%&lt;span class="kw"&gt;rsp&lt;/span&gt;), %&lt;span class="kw"&gt;xmm0&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;moving aligned data from &lt;code&gt;xmm0&lt;/code&gt; to&amp;nbsp;address &lt;code&gt;&lt;nobr&gt;rsp-24&lt;/nobr&gt;&lt;/code&gt; is&amp;nbsp;actually the access over the top of&amp;nbsp;the stack!&lt;/p&gt;
 &lt;div class="figure"&gt;
 &lt;img src="https://mlpforums.com/uploads/monthly_03_2012/post-2103-0-68261500-1332210132.png" /&gt;

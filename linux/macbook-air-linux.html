@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Installing Fedora on Macbook Air | Alex Dzyoba</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="google-site-verification" content="kKKMHTs7HfNXfxxmEYk_twXJ1nWtH_8XHO8vU-9-c-M" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="page-header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">Alex Dzyoba</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Installing Fedora on Macbook Air</h2>
+                            <h6 class="post-meta">
+                              11 Mar 2017, in
+                              <a class="disabled" href="/categories/linux">linux</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <h2 id="preface">Preface</h2>
+<p>I&nbsp;never was a&nbsp;fan of&nbsp;laptops, I&nbsp;mean 2000s era laptops, the ones that were bulky, heavy and hard to&nbsp;upgrade. The last point was especially important to&nbsp;me&nbsp;because in&nbsp;the 2000s you had to&nbsp;upgrade your station, add more RAM, more HDD, and newer CPU. You followed Intel’s&nbsp;<nobr>Tick-Tock</nobr> schedule, chosen Tock ones, and got a&nbsp;performance boost (according to&nbsp;benchmarks).</p>
+<p>But recently, all of&nbsp;a&nbsp;sudden I’ve&nbsp;realized that I&nbsp;have a&nbsp;<nobr>4-year-old</nobr> machine with Intel i3 CPU and <em>it’s&nbsp;fine</em>. I&nbsp;don’t&nbsp;feel the need to&nbsp;upgrade. Partly it’s&nbsp;because I’m&nbsp;not using a&nbsp;Windows for a&nbsp;long time. On&nbsp;my&nbsp;Fedora, I&nbsp;mostly sit in&nbsp;the terminal without desktop environment like Gnome or&nbsp;KDE, edit text in&nbsp;Vim and that’s&nbsp;all I&nbsp;need. The heaviest thing on&nbsp;my&nbsp;machine&nbsp;&mdash; the browser&nbsp;&mdash; is&nbsp;working fine too, I&nbsp;can play a&nbsp;1080p youtube video, I&nbsp;can load <a href="http://idlewords.com/talks/website_obesity.htm">bloated sites</a>.</p>
+<p>The other part that saves me&nbsp;from the upgrade is&nbsp;that hardware itself is&nbsp;not improving vertically, but rather horizontally. Simply switching to&nbsp;the newer CPU will not make your computer life full of&nbsp;magic and unicorns&nbsp;&mdash; just <a href="https://ark.intel.com/compare/97128,80806">compare Haswell and Kaby Lake CPUs</a>. The only thing that increased in&nbsp;the clock rate and might gain you some performance is&nbsp;the bus speed that was increased from 5 GT/s to&nbsp;8 GT/s. All the other things are about attaching more stuff on&nbsp;your CPU&nbsp;&mdash; more memory, more I/O devices. And the funny thing is&nbsp;that <nobr>3-year-old</nobr> Haswell from 2014 costs the same $310 as&nbsp;new and shiny Kaby Lake. I’m&nbsp;not saying that the progress in&nbsp;CPUs has stopped, there is&nbsp;a&nbsp;servers market, there are a&nbsp;gaming market and HPC market that needs and feels all these developments. I’m&nbsp;saying that for consumer machines like desktops there is&nbsp;no&nbsp;need to&nbsp;upgrade often.</p>
+<p>So&nbsp;there is&nbsp;a&nbsp;rare need to&nbsp;upgrade your machine now and recent laptops are nice, light and hold battery for at&nbsp;least 8 hours. So&nbsp;when I&nbsp;got an&nbsp;option to&nbsp;get a&nbsp;laptop at&nbsp;my&nbsp;job, I&nbsp;took it. The problem was that it&nbsp;was a&nbsp;Macbook Air.</p>
+<p>And I’m&nbsp;a&nbsp;Linux guy, so&nbsp;I&nbsp;had to&nbsp;install Fedora on&nbsp;this stuff. I&nbsp;don’t&nbsp;care about you guys whining &laquo;&hellip;but macOS is&nbsp;so&nbsp;much better and friendly and nice and <nobr>blah-blah</nobr>&hellip;&raquo;. No. It’s&nbsp;not. Well, it’s&nbsp;<strong>not for me</strong>. I&nbsp;have a&nbsp;simple and efficient setup that serves me&nbsp;extremely well, looks gorgeous for me&nbsp;and don’t&nbsp;interfere with my&nbsp;work. It&nbsp;doesn’t&nbsp;mean that I&nbsp;didn’t&nbsp;try&nbsp;&mdash; I&nbsp;did, but working in&nbsp;macOS without tiling WM, strange keyboard shortcuts (you can’t&nbsp;set <nobr>Alt-Shift</nobr> to&nbsp;switch keyboard layout) and fake <nobr>user-friendliness</nobr> (I&nbsp;dare you to&nbsp;tell me&nbsp;how to&nbsp;show hidden files in&nbsp;Finder) make me&nbsp;dog slow.</p>
+<p>So&nbsp;I’ve&nbsp;decided to&nbsp;install Fedora on&nbsp;Macbook Air and because it’s&nbsp;a&nbsp;little bit tricky, I&nbsp;wrote this guide. In&nbsp;the end, we’ll&nbsp;have a&nbsp;laptop with:</p>
+<ul>
+<li>Dual boot macOS and Fedora</li>
+<li>Working multimedia keys</li>
+<li>Working brightness control including keyboard brightness</li>
+<li>Working laptop lid close/open</li>
+</ul>
+<h2 id="preparations">Preparations</h2>
+<p>Because we’ll&nbsp;leave macOS we&nbsp;have to&nbsp;prepare Macbook. Thanks to&nbsp;the UEFI advancement in&nbsp;the Linux we&nbsp;don’t&nbsp;need rEFIt/rEFInd&nbsp;&mdash; modern distros are installed as&nbsp;a&nbsp;breeze. So&nbsp;the only thing we&nbsp;have to&nbsp;do&nbsp;is&nbsp;shrink macOS partition and prepare USB stick.</p>
+<h3 id="make-partition-for-linux">Make partition for Linux</h3>
+<p>My&nbsp;Macbook has only 128 GBs of&nbsp;SSD and I’ve&nbsp;decided to&nbsp;leave macOS on&nbsp;it, so&nbsp;I&nbsp;need to&nbsp;partition the drive leaving some usable amount of&nbsp;space for macOS. I&nbsp;don’t&nbsp;have any experience with macOS and thought that 40 GBs will be&nbsp;enough even if&nbsp;I&nbsp;will use it.</p>
+<p>To&nbsp;partition the drive I’ve&nbsp;used &laquo;Disk Utility&raquo;. Just press ‘+’ button and set the desired size for the new partition. Leave ‘Format’ default (&laquo;Mac OS&nbsp;Extended (Journaled)&raquo;) because you’ll&nbsp;anyway format it&nbsp;with ext4. Then hit ‘Apply’ and that’s&nbsp;it.</p>
+<p>Here is&nbsp;mine, though it’s&nbsp;already after I’ve&nbsp;installed Fedora.</p>
+<div class="figure">
+<img src="/assets/img/macbook-disk-partitions.png" alt="Macbook Air Linux partitions" />
+<p class="caption">Macbook Air Linux partitions</p>
+</div>
+<h3 id="create-usb-stick">Create USB stick</h3>
+<p>First of&nbsp;all, you can’t&nbsp;use Fedora netinst image, because there is&nbsp;no&nbsp;working open source driver for Broadcom WiFi card that is&nbsp;installed in&nbsp;Macbook Air. So&nbsp;choose a&nbsp;full image that doesn’t&nbsp;require an&nbsp;internet connection like MATE or&nbsp;Gnome.</p>
+<p>Now, you have to&nbsp;create USB stick with Fedora. There is&nbsp;a&nbsp;tool called &laquo;Fedora Media Writer&raquo; that will make bootable stick on&nbsp;macOS but, unfortunately, I’ve&nbsp;failed to&nbsp;boot with it. It&nbsp;seems that after repartitioning on&nbsp;macOS it&nbsp;immediately mounts the new partitions and touch it&nbsp;making it&nbsp;somehow unusable for installation.</p>
+<p>So&nbsp;I’ve&nbsp;created USB stick on&nbsp;Linux with simple</p>
+<pre><code>$ dd if=Fedora-Workstation-netinst-x86_64-25-1.3.iso of=/dev/sdd bs=1M oflag=direct</code></pre>
+<p>Now for the installation part.</p>
+<h2 id="fedora-installation">Fedora Installation</h2>
+<h3 id="boot-into-usb-stick">Boot into USB stick</h3>
+<p>Insert USB into Macbook, hold &laquo;alt&raquo; key and press power button still holding &laquo;alt&raquo; key until you see boot choice menu with Fedora.</p>
+<h3 id="most-important-linux-partitions-and-installation-destination">MOST IMPORTANT! Linux partitions and installation destination</h3>
+<p>After booting from USB you’ll&nbsp;see usual Anaconda installer. First and most important we&nbsp;must configure installation destination.</p>
+<div class="figure">
+<img src="/assets/img/macbook-air-installer-enter.png" alt="Macbook Air Fedora installer enter" />
+<p class="caption">Macbook Air Fedora installer enter</p>
+</div>
+<p>Enter this menu, choose &laquo;ATA APPLE SSD&raquo; and then choose &laquo;I&nbsp;will configure partitioning&raquo; and click &laquo;Done&raquo; in&nbsp;the top of&nbsp;the window.</p>
+<div class="figure">
+<img src="/assets/img/macbook-air-installation-destination.png" alt="Macbook Air Fedora installation destination" />
+<p class="caption">Macbook Air Fedora installation destination</p>
+</div>
+<p>Expand &laquo;Unknown&raquo; widget, find your 80 GBs or&nbsp;74 GiBs partition of&nbsp;type &laquo;hfs+" and delete it. Now you’ll&nbsp;see 74 GiBs of&nbsp;available space in&nbsp;the pink rectangle at&nbsp;the bottom.</p>
+<div class="figure">
+<img src="/assets/img/macbook-air-fedora-partitions-empty.png" alt="Macbook Air empty partitions" />
+<p class="caption">Macbook Air empty partitions</p>
+</div>
+<p>Now choose &laquo;Standart Partition&raquo; scheme from the dropdown menu in&nbsp;&laquo;New Fedora 25 Installation&raquo; widget, and then click on&nbsp;the link &laquo;Click here to&nbsp;create them automatically&raquo;.</p>
+<div class="figure">
+<img src="/assets/img/macbook-air-fedora-partitions-auto.png" alt="Macbook Air auto partitioning" />
+<p class="caption">Macbook Air auto partitioning</p>
+</div>
+<p>It&nbsp;will create separate / and /home partitions and also a&nbsp;whooping 8 GBs swap. You can tweak automatically created scheme at&nbsp;your taste, just <strong>don’t&nbsp;touch &laquo;/boot/efi&raquo; partition</strong> or&nbsp;otherwise it&nbsp;won’t&nbsp;boot. I’ve&nbsp;changed swap size to&nbsp;2 GBs, removed /home and / partition and manually add / partition to&nbsp;span all available space of&nbsp;almost 80 GBs.</p>
+<div class="figure">
+<img src="/assets/img/macbook-air-fedora-partitions-my.png" alt="Macbook Air my partitioning" />
+<p class="caption">Macbook Air my&nbsp;partitioning</p>
+</div>
+<p>Also, I&nbsp;setup LUKS encryption for my&nbsp;partitions, because it’s&nbsp;a&nbsp;laptop after all, if&nbsp;I&nbsp;lose it&nbsp;you won’t&nbsp;be&nbsp;able to&nbsp;steal my&nbsp;stuff by&nbsp;directly connecting the SSD drive. Also, LUKS encryption doesn’t&nbsp;make any performance penalty.</p>
+<p>Then hit &laquo;Done&raquo; and confirm your disk layout.</p>
+<h3 id="configure-installation">Configure installation</h3>
+<p>Now when you have partitioning configured, just setup your installation with Anaconda.</p>
+<p>To&nbsp;make hardware work nicely like brightness control and lid close/open install some DE&nbsp;like MATE in&nbsp;my&nbsp;case. DEs have decent udev rules and configs for hardware. It&nbsp;also setup display manager (the one that asks for the login and password) and X&nbsp;server. It’s&nbsp;amazing how everything works out of&nbsp;the box. Something like 5 years ago it&nbsp;was a&nbsp;pain to&nbsp;make mic and brightness work and now you just don’t&nbsp;worry. Kudos to&nbsp;distro and DE&nbsp;guys!</p>
+<p>You can stick with MATE but I’ll&nbsp;install and configure i3 window manager over MATE.</p>
+<h3 id="wait-until-installation-is-done">Wait until installation is&nbsp;done</h3>
+<p>and then reboot into your fresh Fedora by&nbsp;holding &laquo;alt&raquo; key.</p>
+<h2 id="install-wifi-drivers">Install WiFi drivers</h2>
+<p>Macbook Air has crappy proprietary Broadcom WiFi chips. To&nbsp;make it&nbsp;work you’ll&nbsp;need an&nbsp;alternative network. You can use USB to&nbsp;Ethernet cable, or, as&nbsp;in&nbsp;my&nbsp;case, you can use your Android phone as&nbsp;a&nbsp;modem. No&nbsp;seriously, just attach your Android phone, select Modem mode and you’ll&nbsp;immediately see the network connected.</p>
+<p>Now, when you have a&nbsp;network, to&nbsp;install Broadcom WiFi drivers open root terminal and do&nbsp;the following:</p>
+<pre><code># Enable RPM fusion repo
+dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+
+# Install packages
+dnf install -y broadcom-wl akmods &quot;kernel-devel-uname-r == $(uname -r)&quot;
+
+# Rebuild driver for your kernel
+akmods
+
+# Load the new driver
+modprobe wl</code></pre>
+<p>After that, you’ll&nbsp;have WiFi working.</p>
+<h2 id="making-things-nice-for-me">Making things nice (for me)</h2>
+<p>Now it’s&nbsp;time for tweaking. My&nbsp;favorite!</p>
+<h3 id="enable-fnlock">Enable fnlock</h3>
+<p>By&nbsp;default, function keys are working as&nbsp;multimedia keys. To&nbsp;revert it&nbsp;back to&nbsp;the functions we&nbsp;have to&nbsp;enable <nobr>so-called</nobr> fn&nbsp;lock.</p>
+<p>Create file <code>/etc/modprobe.d/hid_apple.conf</code> as&nbsp;root and add the following to&nbsp;it:</p>
+<pre><code>options hid_apple fnmode=2</code></pre>
+<p>Don’t&nbsp;try to&nbsp;remove hid_apple kernel module&nbsp;&mdash; your keyboard stop working. Just reboot.</p>
+<h3 id="infinality-patches">Infinality patches</h3>
+<p>Infinality is&nbsp;a&nbsp;set of&nbsp;patches for fontconfig that makes fonts looking gorgeous. I&nbsp;dare you to&nbsp;try it&nbsp;&mdash; after it, anything else will look like a&nbsp;crap including macOS fonts:</p>
+<pre><code>dnf copr enable caoli5288/infinality-ultimate
+dnf install --allowerasing cairo-infinality-ultimate freetype-infinality-ultimate fontconfig-infinality-ultimate</code></pre>
+<h3 id="getting-my-configs">Getting my&nbsp;configs</h3>
+<p>Because Linux software is&nbsp;awesome and has text configs, I&nbsp;store most of&nbsp;them in&nbsp;Dropbox and put known and loved configuration by&nbsp;simple copying or&nbsp;symlinking.</p>
+<p>Install headless Dropbox:</p>
+<pre><code>cd ~ &amp;&amp; wget -O - &quot;https://www.dropbox.com/download?plat=lnx.x86_64&quot; | tar xzf -</code></pre>
+<p>And put dropbox CLI client to&nbsp;your ~/bin folder:</p>
+<pre><code>mkdir -p ~/bin &amp;&amp; cd ~/bin &amp;&amp; wget https://www.dropbox.com/download?dl=packages/dropbox.py</code></pre>
+<p>Now launch it&nbsp;with <code>dropbox start</code>.</p>
+<h3 id="installing-i3-for-mate">Installing i3 for MATE</h3>
+<p>Ok, so&nbsp;before that I&nbsp;was using MATE and while it’s&nbsp;nice I&nbsp;prefer tiling WM, namely i3. I&nbsp;install it&nbsp;with dnf:</p>
+<pre><code>dnf install i3</code></pre>
+<p>and then copy or&nbsp;symlink ~/.i3 directory with the configuration in&nbsp;my&nbsp;Dropbox. But what is&nbsp;really awesome is&nbsp;that we&nbsp;can use i3wm instead of&nbsp;MATE’s&nbsp;window manager&nbsp;&mdash; Marco. This way we’ll&nbsp;have all the niceties of&nbsp;DE&nbsp;like working multimedia buttons and brightness control while using our slick and nice tiling WM.</p>
+<p>To&nbsp;change MATE’s&nbsp;window manager just issue these 2 commands under your user (no&nbsp;need for sudo):</p>
+<pre><code>dconf write /org/mate/desktop/session/required-components/windowmanager &quot;&#39;i3&#39;&quot;
+dconf write /org/mate/desktop/session/required-components-list &quot;[&#39;windowmanager&#39;]&quot;</code></pre>
+<p>Logout and login and you’ll&nbsp;have it!</p>
+<p>To&nbsp;exit from i3 as&nbsp;a&nbsp;window manager for MATE, use this in&nbsp;your i3 config</p>
+<pre><code>bindsym $mod+Shift+q exec &quot;mate-session-save --logout&quot;</code></pre>
+<h3 id="settings">Settings</h3>
+<p>Everything else I&nbsp;configure with <code><nobr>mate-control-center</nobr></code>.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>So&nbsp;the hardest part in&nbsp;installing Fedora on&nbsp;Macbook Air is&nbsp;partitioning and WiFi driver. Everything else just works!</p>
+<p>After using this setup for a&nbsp;couple of&nbsp;months I&nbsp;can say that it’s&nbsp;great. There are things that I&nbsp;wish could be&nbsp;better, but it’s&nbsp;mostly about hardware. Like screen is&nbsp;crappy 1440&times;900 and keyboard is&nbsp;way too limited (no&nbsp;separate home/end, have to&nbsp;use fn+left/right). I&nbsp;would rather use some lightweight Thinkpad. But anyway, the freedom to&nbsp;move your workspace with you is&nbsp;amazing, so&nbsp;I&nbsp;think I’ll&nbsp;never buy a&nbsp;desktop machine anymore.</p>
+                        </div>
+                    </article>
+                </div>
+        </div>
+		<!--
+		<div class="row comments">
+      <a class="muut" href="https://muut.com/i/alex-dzyoba-blog/general" type="dynamic">Comments</a>
+      <script src="//cdn.muut.com/1/moot.min.js"></script>
+		</div>
+		-->
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+		&copy; 2016 Alex Dzyoba / CC-BY 4.0
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-89410369-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</body>
+</html>

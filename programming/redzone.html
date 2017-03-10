@@ -147,7 +147,7 @@
 <p class="caption">Stack</p>
 </div>
 <p>Holy shucks! We&nbsp;are processing undefined memory. All instructions like this</p>
-<pre class="asm"><code>movdqa  -24(%rsp), %xmm0</code></pre>
+<div class="sourceCode"><pre class="sourceCode asm"><code class="sourceCode fasm"><span class="kw">movdqa</span>  -<span class="dv">24</span>(%<span class="kw">rsp</span>), %<span class="kw">xmm0</span></code></pre></div>
 <p>moving aligned data from <code>xmm0</code> to&nbsp;address <code><nobr>rsp-24</nobr></code> is&nbsp;actually the access over the top of&nbsp;the stack!</p>
 <div class="figure">
 <img src="https://mlpforums.com/uploads/monthly_03_2012/post-2103-0-68261500-1332210132.png" />
