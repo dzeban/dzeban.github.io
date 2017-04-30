@@ -2,13 +2,207 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title type="text">Voluntary madness!</title>
   <id>http://alex.dzyoba.com/feed</id>
-  <updated>2017-03-11T00:00:00Z</updated>
+  <updated>2017-04-30T00:00:00Z</updated>
   <link href="http://alex.dzyoba.com" />
   <link href="http://alex.dzyoba.com/feed" rel="self" />
   <author>
     <name>Alex Dzyoba</name>
   </author>
   <generator>PyAtom</generator>
+  <entry xml:base="http://alex.dzyoba.com/feed">
+    <title type="text">How to point GDB to your sources</title>
+    <id>programming/gdb-source-path.html</id>
+    <updated>2017-04-30T00:00:00Z</updated>
+    <link href="programming/gdb-source-path.html" />
+    <author>
+      <name>avd</name>
+    </author>
+    <content type="html">&lt;p&gt;So, you have a&amp;nbsp;binary that you or&amp;nbsp;someone developed and, surprise, it&amp;nbsp;has some bug. Or&amp;nbsp;you just curious how it’s&amp;nbsp;working. Great tool to&amp;nbsp;help with these cases is&amp;nbsp;a&amp;nbsp;debugger.&lt;/p&gt;
+&lt;p&gt;It’s&amp;nbsp;really seldom when you want to&amp;nbsp;debug on&amp;nbsp;assembly level, usually, you want to&amp;nbsp;see the sources. But often times you debug the program on&amp;nbsp;the host other than the build host and see this really frustrating message:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ gdb -q python3.7
+Reading symbols from python3.7...done.
+(gdb) l
+6   ./Programs/python.c: No such file or directory.&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Ouch. Everybody was here. I’ve&amp;nbsp;seen this so&amp;nbsp;often while it’s&amp;nbsp;so&amp;nbsp;vital for sensible debugging so&amp;nbsp;I&amp;nbsp;think it’s&amp;nbsp;very important to&amp;nbsp;get into details and understand how GDB shows source code in&amp;nbsp;debugging session.&lt;/p&gt;
+&lt;h2 id="debug-info"&gt;Debug info&lt;/h2&gt;
+&lt;p&gt;It&amp;nbsp;all starts with &lt;em&gt;debug info&lt;/em&gt;&amp;nbsp;&amp;mdash; special sections in&amp;nbsp;the binary file produced by&amp;nbsp;the compiler and used by&amp;nbsp;the debugger and other handy tools.&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;GCC there is&amp;nbsp;&lt;nobr&gt;well-known&lt;/nobr&gt; &lt;code&gt;-g&lt;/code&gt; flag for that. Most projects with some kind of&amp;nbsp;build system either build with debug info by&amp;nbsp;default or&amp;nbsp;have some flag for it.&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;the case of&amp;nbsp;CPython, you have to&amp;nbsp;do&amp;nbsp;the following:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ ./configure --with-pydebug
+$ make -j&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;-&lt;nobr&gt;with-pydebug&lt;/nobr&gt;&lt;/code&gt; will insert &lt;code&gt;-g&lt;/code&gt; in&amp;nbsp;GCC invocation.&lt;/p&gt;
+&lt;p&gt;This &lt;code&gt;-g&lt;/code&gt; option will generate &lt;em&gt;debug sections&lt;/em&gt;&amp;nbsp;&amp;mdash; binary sections to&amp;nbsp;insert into program’s&amp;nbsp;binary. These sections are usually in&amp;nbsp;DWARF format. For ELF binaries these debug sections have names like &lt;code&gt;.debug_*&lt;/code&gt;, e.g. &lt;code&gt;.debug_info&lt;/code&gt; or&amp;nbsp;&lt;code&gt;.debug_loc&lt;/code&gt;. These debug sections are what makes the magic of&amp;nbsp;debugging possible&amp;nbsp;&amp;mdash; basically, it’s&amp;nbsp;a&amp;nbsp;mapping of&amp;nbsp;assembly level instructions to&amp;nbsp;the source code.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;find whether your program has debug symbols you can list the sections of&amp;nbsp;the binary with &lt;code&gt;objdump&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ objdump -h ./python
+
+python:     file format elf64-x86-64
+
+Sections:
+Idx Name          Size      VMA               LMA               File off  Algn
+  0 .interp       0000001c  0000000000400238  0000000000400238  00000238  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  1 .note.ABI-tag 00000020  0000000000400254  0000000000400254  00000254  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+...
+ 25 .bss          00031f70  00000000008d9e00  00000000008d9e00  002d9dfe  2**5
+                  ALLOC
+ 26 .comment      00000058  0000000000000000  0000000000000000  002d9dfe  2**0
+                  CONTENTS, READONLY
+ 27 .debug_aranges 000017f0  0000000000000000  0000000000000000  002d9e56  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 28 .debug_info   00377bac  0000000000000000  0000000000000000  002db646  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 29 .debug_abbrev 0001fcd7  0000000000000000  0000000000000000  006531f2  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 30 .debug_line   0008b441  0000000000000000  0000000000000000  00672ec9  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 31 .debug_str    00031f18  0000000000000000  0000000000000000  006fe30a  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 32 .debug_loc    0034190c  0000000000000000  0000000000000000  00730222  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 33 .debug_ranges 00062e10  0000000000000000  0000000000000000  00a71b2e  2**0
+                  CONTENTS, READONLY, DEBUGGING&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;or&amp;nbsp;&lt;code&gt;readelf&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ readelf -S ./python
+There are 38 section headers, starting at offset 0xb41840:
+
+Section Headers:
+  [Nr] Name              Type             Address           Offset
+       Size              EntSize          Flags  Link  Info  Align
+  [ 0]                   NULL             0000000000000000  00000000
+       0000000000000000  0000000000000000           0     0     0
+  [ 1] .interp           PROGBITS         0000000000400238  00000238
+       000000000000001c  0000000000000000   A       0     0     1
+
+...
+
+  [26] .bss              NOBITS           00000000008d9e00  002d9dfe
+       0000000000031f70  0000000000000000  WA       0     0     32
+  [27] .comment          PROGBITS         0000000000000000  002d9dfe
+       0000000000000058  0000000000000001  MS       0     0     1
+  [28] .debug_aranges    PROGBITS         0000000000000000  002d9e56
+       00000000000017f0  0000000000000000           0     0     1
+  [29] .debug_info       PROGBITS         0000000000000000  002db646
+       0000000000377bac  0000000000000000           0     0     1
+  [30] .debug_abbrev     PROGBITS         0000000000000000  006531f2
+       000000000001fcd7  0000000000000000           0     0     1
+  [31] .debug_line       PROGBITS         0000000000000000  00672ec9
+       000000000008b441  0000000000000000           0     0     1
+  [32] .debug_str        PROGBITS         0000000000000000  006fe30a
+       0000000000031f18  0000000000000001  MS       0     0     1
+  [33] .debug_loc        PROGBITS         0000000000000000  00730222
+       000000000034190c  0000000000000000           0     0     1
+  [34] .debug_ranges     PROGBITS         0000000000000000  00a71b2e
+       0000000000062e10  0000000000000000           0     0     1
+  [35] .shstrtab         STRTAB           0000000000000000  00b416d5
+       0000000000000165  0000000000000000           0     0     1
+  [36] .symtab           SYMTAB           0000000000000000  00ad4940
+       000000000003f978  0000000000000018          37   8762     8
+  [37] .strtab           STRTAB           0000000000000000  00b142b8
+       000000000002d41d  0000000000000000           0     0     1
+Key to Flags:
+  W (write), A (alloc), X (execute), M (merge), S (strings), l (large)
+  I (info), L (link order), G (group), T (TLS), E (exclude), x (unknown)
+  O (extra OS processing required) o (OS specific), p (processor specific)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;as&amp;nbsp;we&amp;nbsp;see in&amp;nbsp;our fresh compiled Python&amp;nbsp;&amp;mdash; it&amp;nbsp;has &lt;code&gt;.debug_*&lt;/code&gt; section, hence it&amp;nbsp;has debug info.&lt;/p&gt;
+&lt;p&gt;Debug info is&amp;nbsp;a&amp;nbsp;collection of&amp;nbsp;DIEs&amp;nbsp;&amp;mdash; Debug Info Entries. Each DIE has a&amp;nbsp;tag specifying what kind of&amp;nbsp;DIE it&amp;nbsp;is&amp;nbsp;and attributes that describes this DIE&amp;nbsp;&amp;mdash; things like variable name and line number.&lt;/p&gt;
+&lt;h2 id="how-gdb-finds-source-code"&gt;How GDB finds source code&lt;/h2&gt;
+&lt;p&gt;To&amp;nbsp;find the sources GDB parses &lt;code&gt;.debug_info&lt;/code&gt; section to&amp;nbsp;find all DIEs with tag &lt;code&gt;DW_TAG_compile_unit&lt;/code&gt;. The DIE with this tag has 2 main attributes &lt;code&gt;DW_AT_comp_dir&lt;/code&gt; (compilation directory) and &lt;code&gt;DW_AT_name&lt;/code&gt;&amp;nbsp;&amp;mdash; path to&amp;nbsp;the source file. Combined they provide the full path to&amp;nbsp;the source file for the particular compilation unit (object file).&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;parse debug info you can again use &lt;code&gt;objdump&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ objdump -g ./python | vim -&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;and there you can see the parsed debug info:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;Contents of the .debug_info section:
+
+  Compilation Unit @ offset 0x0:
+   Length:        0x222d (32-bit)
+   Version:       4
+   Abbrev Offset: 0x0
+   Pointer Size:  8
+ &amp;lt;0&amp;gt;&amp;lt;b&amp;gt;: Abbrev Number: 1 (DW_TAG_compile_unit)
+    &amp;lt;c&amp;gt;   DW_AT_producer    : (indirect string, offset: 0xb6b): GNU C99 6.3.1 20161221 (Red Hat 6.3.1-1) -mtune=generic -march=x86-64 -g -Og -std=c99
+    &amp;lt;10&amp;gt;   DW_AT_language    : 12   (ANSI C99)
+    &amp;lt;11&amp;gt;   DW_AT_name        : (indirect string, offset: 0x10ec): ./Programs/python.c
+    &amp;lt;15&amp;gt;   DW_AT_comp_dir    : (indirect string, offset: 0x7a): /home/avd/dev/cpython
+    &amp;lt;19&amp;gt;   DW_AT_low_pc      : 0x41d2f6
+    &amp;lt;21&amp;gt;   DW_AT_high_pc     : 0x1b3
+    &amp;lt;29&amp;gt;   DW_AT_stmt_list   : 0x0&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It&amp;nbsp;reads like this&amp;nbsp;&amp;mdash; for address range from &lt;code&gt;DW_AT_low_pc&lt;/code&gt; = &lt;code&gt;0&amp;times;41d2f6&lt;/code&gt; to&amp;nbsp;&lt;code&gt;DW_AT_low_pc + DW_AT_high_pc&lt;/code&gt; = &lt;code&gt;0&amp;times;41d2f6&lt;/code&gt; + &lt;code&gt;0&amp;times;1b3&lt;/code&gt; = &lt;code&gt;0&amp;times;41d4a9&lt;/code&gt; source code file is&amp;nbsp;the &lt;code&gt;./Programs/python.c&lt;/code&gt; located in&amp;nbsp;&lt;code&gt;/home/avd/dev/cpython&lt;/code&gt;. Pretty straightforward.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;this is&amp;nbsp;what happens when GDB tries to&amp;nbsp;show you the source code:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;parses the &lt;code&gt;.debug_info&lt;/code&gt; to&amp;nbsp;find &lt;code&gt;DW_AT_comp_dir&lt;/code&gt; with &lt;code&gt;DW_AT_name&lt;/code&gt; attributes for the current object file (range of&amp;nbsp;addresses)&lt;/li&gt;
+&lt;li&gt;opens the file at&amp;nbsp;&lt;code&gt;DW_AT_comp_dir/DW_AT_name&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;shows the content of&amp;nbsp;the file to&amp;nbsp;you&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="how-to-tell-gdb-where-are-the-sources"&gt;How to&amp;nbsp;tell GDB where are the sources&lt;/h2&gt;
+&lt;p&gt;So&amp;nbsp;to&amp;nbsp;fix our problem with &lt;code&gt;./Programs/python.c: No&amp;nbsp;such file or&amp;nbsp;directory.&lt;/code&gt; we&amp;nbsp;have to&amp;nbsp;obtain our sources on&amp;nbsp;the target host (copy or&amp;nbsp;&lt;code&gt;git clone&lt;/code&gt;) and do&amp;nbsp;one of&amp;nbsp;the following:&lt;/p&gt;
+&lt;h3 id="reconstruct-the-sources-path"&gt;1. Reconstruct the sources path&lt;/h3&gt;
+&lt;p&gt;You can reconstruct the sources path on&amp;nbsp;the target host, so&amp;nbsp;GDB will find the source file where it&amp;nbsp;expects. Stupid but it&amp;nbsp;will work.&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;my&amp;nbsp;case, I&amp;nbsp;can just do&amp;nbsp;&lt;code&gt;git clone https://github.com/python/cpython.git /home/avd/dev/cpython&lt;/code&gt; and checkout to&amp;nbsp;the needed &lt;nobr&gt;commit-ish&lt;/nobr&gt;.&lt;/p&gt;
+&lt;h3 id="change-gdb-source-path"&gt;2. Change GDB source path&lt;/h3&gt;
+&lt;p&gt;You can direct GDB to&amp;nbsp;the new source path right in&amp;nbsp;the debug session with &lt;code&gt;directory &amp;lt;dir&amp;gt;&lt;/code&gt; command:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;(gdb) list
+6   ./Programs/python.c: No such file or directory.
+(gdb) directory /usr/src/python
+Source directories searched: /usr/src/python:$cdir:$cwd
+(gdb) list
+6   #ifdef __FreeBSD__
+7   #include &amp;lt;fenv.h&amp;gt;
+8   #endif
+9   
+10  #ifdef MS_WINDOWS
+11  int
+12  wmain(int argc, wchar_t **argv)
+13  {
+14      return Py_Main(argc, argv);
+15  }&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="set-gdb-substitution-rule"&gt;3. Set GDB substitution rule&lt;/h3&gt;
+&lt;p&gt;Sometimes adding another source path is&amp;nbsp;not enough if&amp;nbsp;you have complex hierarchy. In&amp;nbsp;this case you can add substitution rule for source path with &lt;code&gt;set &lt;nobr&gt;substitute-path&lt;/nobr&gt;&lt;/code&gt; GDB command.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;(gdb) list
+6   ./Programs/python.c: No such file or directory.
+(gdb) set substitute-path /home/avd/dev/cpython /usr/src/python
+(gdb) list
+6   #ifdef __FreeBSD__
+7   #include &amp;lt;fenv.h&amp;gt;
+8   #endif
+9   
+10  #ifdef MS_WINDOWS
+11  int
+12  wmain(int argc, wchar_t **argv)
+13  {
+14      return Py_Main(argc, argv);
+15  }&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id="move-binary-to-sources"&gt;4. Move binary to&amp;nbsp;sources&lt;/h3&gt;
+&lt;p&gt;You can trick GDB source path by&amp;nbsp;moving binary to&amp;nbsp;the directory with sources.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;mv python /home/user/sources/cpython&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This will work because GDB will try to&amp;nbsp;look for sources in&amp;nbsp;the current directory (&lt;code&gt;$cwd&lt;/code&gt;) as&amp;nbsp;the last resort.&lt;/p&gt;
+&lt;h3 id="compile-with--fdebug-prefix-map"&gt;5. Compile with &lt;code&gt;-&lt;nobr&gt;fdebug-prefix-map&lt;/nobr&gt;&lt;/code&gt;&lt;/h3&gt;
+&lt;p&gt;You can substitute the source path on&amp;nbsp;the build stage with &lt;code&gt;-&lt;nobr&gt;fdebug-prefix-map&lt;/nobr&gt;=old_path=new_path&lt;/code&gt; option. Here is&amp;nbsp;how to&amp;nbsp;do&amp;nbsp;it&amp;nbsp;within CPython project:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ make distclean    # start clean
+$ ./configure CFLAGS=&amp;quot;-fdebug-prefix-map=$(pwd)=/usr/src/python&amp;quot; --with-pydebug
+$ make -j&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And now we&amp;nbsp;have new sources dir:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;$ objdump -g ./python
+...
+ &amp;lt;0&amp;gt;&amp;lt;b&amp;gt;: Abbrev Number: 1 (DW_TAG_compile_unit)
+    &amp;lt;c&amp;gt;   DW_AT_producer    : (indirect string, offset: 0xb65): GNU C99 6.3.1 20161221 (Red Hat 6.3.1-1) -mtune=generic -march=x86-64 -g -Og -std=c99
+    &amp;lt;10&amp;gt;   DW_AT_language    : 12       (ANSI C99)
+    &amp;lt;11&amp;gt;   DW_AT_name        : (indirect string, offset: 0x10ff): ./Programs/python.c
+    &amp;lt;15&amp;gt;   DW_AT_comp_dir    : (indirect string, offset: 0x558): /usr/src/python
+    &amp;lt;19&amp;gt;   DW_AT_low_pc      : 0x41d336
+    &amp;lt;21&amp;gt;   DW_AT_high_pc     : 0x1b3
+    &amp;lt;29&amp;gt;   DW_AT_stmt_list   : 0x0
+...&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This is&amp;nbsp;the most robust way to&amp;nbsp;do&amp;nbsp;it&amp;nbsp;because you can set it&amp;nbsp;to&amp;nbsp;something like &lt;code&gt;/usr/src/&amp;lt;project&amp;gt;&lt;/code&gt;, install sources there from a&amp;nbsp;package and debug like a&amp;nbsp;boss.&lt;/p&gt;
+&lt;h2 id="conclusion"&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;GDB uses debug info stored in&amp;nbsp;DWARF format to&amp;nbsp;find source level info. DWARF is&amp;nbsp;pretty straightforward format&amp;nbsp;&amp;mdash; basically, it’s&amp;nbsp;a&amp;nbsp;tree of&amp;nbsp;DIEs (Debug Info Entries) that describes object files of&amp;nbsp;your programs along with variables and functions.&lt;/p&gt;
+&lt;p&gt;There are multiple ways to&amp;nbsp;help GDB find sources, where the easiest ones are &lt;code&gt;directory&lt;/code&gt; and &lt;code&gt;set &lt;nobr&gt;substitute-path&lt;/nobr&gt;&lt;/code&gt; commands, though &lt;code&gt;-&lt;nobr&gt;fdebug-prefix-map&lt;/nobr&gt;&lt;/code&gt; is&amp;nbsp;really useful.&lt;/p&gt;
+&lt;p&gt;Now, when you have source level info go&amp;nbsp;and explore something!&lt;/p&gt;
+&lt;h2 id="resources"&gt;Resources&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf"&gt;Introduction to&amp;nbsp;the DWARF Debugging Format&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://sourceware.org/gdb/onlinedocs/gdb/Source-Path.html"&gt;GDB doc on&amp;nbsp;source path&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</content>
+  </entry>
   <entry xml:base="http://alex.dzyoba.com/feed">
     <title type="text">Installing Fedora on Macbook Air</title>
     <id>linux/macbook-air-linux.html</id>
@@ -636,58 +830,58 @@ sys 0m1.011s&lt;/code&gt;&lt;/pre&gt;
 &lt;li&gt;‘IDTR’ The OS&amp;nbsp;image must leave interrupts disabled until it&amp;nbsp;sets up&amp;nbsp;its own IDT.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;Setting up&amp;nbsp;a&amp;nbsp;stack is&amp;nbsp;simple&amp;nbsp;&amp;mdash; you just put 2 labels divided by&amp;nbsp;your stack size. &lt;a href="https://github.com/dzeban/hydra/blob/86b67dfe27001a9f21de64307eb6ec3395aecddd/arch/i386/boot.S#L15-L19"&gt;In&amp;nbsp;&amp;laquo;hydra&amp;raquo; it’s&amp;nbsp;16 KiB&lt;/a&gt;:&lt;/p&gt;
-&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode asm"&gt;&lt;code class="sourceCode fasm"&gt;# Reserve a &lt;span class="kw"&gt;stack&lt;/span&gt; for the initial thread.
-.&lt;span class="kw"&gt;section&lt;/span&gt; .bootstrap_stack, &lt;span class="st"&gt;&amp;quot;aw&amp;quot;&lt;/span&gt;, @nobits
-&lt;span class="fu"&gt;stack_bottom:&lt;/span&gt;
-.skip &lt;span class="dv"&gt;16384&lt;/span&gt; # &lt;span class="dv"&gt;16&lt;/span&gt; KiB
-&lt;span class="fu"&gt;stack_top:&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;pre class="asm"&gt;&lt;code&gt;# Reserve a stack for the initial thread.
+.section .bootstrap_stack, &amp;quot;aw&amp;quot;, @nobits
+stack_bottom:
+.skip 16384 # 16 KiB
+stack_top:&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Next, we&amp;nbsp;need to&amp;nbsp;setup segmentation. We&amp;nbsp;have to&amp;nbsp;do&amp;nbsp;this before setting up&amp;nbsp;interrupts because each IDT descriptor gate must contain segment selector for destination code segment&amp;nbsp;&amp;mdash; a&amp;nbsp;kernel code segment that we&amp;nbsp;must setup.&lt;/p&gt;
 &lt;p&gt;Nevertheless it&amp;nbsp;almost certainly will work even without setting up&amp;nbsp;GDT because Multiboot bootloader sets it&amp;nbsp;by&amp;nbsp;itself and we&amp;nbsp;left with its configuration that usually will set up&amp;nbsp;flat memory model. For example, here is&amp;nbsp;the GDT that legacy grub set:&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr class="header"&gt;
 &lt;th align="left"&gt;Index&lt;/th&gt;
-&lt;th&gt;Base&lt;/th&gt;
+&lt;th align="left"&gt;Base&lt;/th&gt;
 &lt;th align="left"&gt;Size&lt;/th&gt;
-&lt;th&gt;DPL&lt;/th&gt;
-&lt;th&gt;Info&lt;/th&gt;
+&lt;th align="left"&gt;DPL&lt;/th&gt;
+&lt;th align="left"&gt;Info&lt;/th&gt;
 &lt;/tr&gt;
 &lt;/thead&gt;
 &lt;tbody&gt;
 &lt;tr class="odd"&gt;
 &lt;td align="left"&gt;00 (Selector 0&amp;times;0000)&lt;/td&gt;
-&lt;td&gt;0&amp;times;0&lt;/td&gt;
+&lt;td align="left"&gt;0&amp;times;0&lt;/td&gt;
 &lt;td align="left"&gt;0xfff0&lt;/td&gt;
-&lt;td&gt;0&lt;/td&gt;
-&lt;td&gt;Unused&lt;/td&gt;
+&lt;td align="left"&gt;0&lt;/td&gt;
+&lt;td align="left"&gt;Unused&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class="even"&gt;
 &lt;td align="left"&gt;01 (Selector 0&amp;times;0008)&lt;/td&gt;
-&lt;td&gt;0&amp;times;0&lt;/td&gt;
+&lt;td align="left"&gt;0&amp;times;0&lt;/td&gt;
 &lt;td align="left"&gt;0xffffffff&lt;/td&gt;
-&lt;td&gt;0&lt;/td&gt;
-&lt;td&gt;&lt;nobr&gt;32-bit&lt;/nobr&gt; code&lt;/td&gt;
+&lt;td align="left"&gt;0&lt;/td&gt;
+&lt;td align="left"&gt;&lt;nobr&gt;32-bit&lt;/nobr&gt; code&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class="odd"&gt;
 &lt;td align="left"&gt;02 (Selector 0&amp;times;0010)&lt;/td&gt;
-&lt;td&gt;0&amp;times;0&lt;/td&gt;
+&lt;td align="left"&gt;0&amp;times;0&lt;/td&gt;
 &lt;td align="left"&gt;0xffffffff&lt;/td&gt;
-&lt;td&gt;0&lt;/td&gt;
-&lt;td&gt;&lt;nobr&gt;32-bit&lt;/nobr&gt; data&lt;/td&gt;
+&lt;td align="left"&gt;0&lt;/td&gt;
+&lt;td align="left"&gt;&lt;nobr&gt;32-bit&lt;/nobr&gt; data&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class="even"&gt;
 &lt;td align="left"&gt;03 (Selector 0&amp;times;0018)&lt;/td&gt;
-&lt;td&gt;0&amp;times;0&lt;/td&gt;
+&lt;td align="left"&gt;0&amp;times;0&lt;/td&gt;
 &lt;td align="left"&gt;0xffff&lt;/td&gt;
-&lt;td&gt;0&lt;/td&gt;
-&lt;td&gt;&lt;nobr&gt;16-bit&lt;/nobr&gt; code&lt;/td&gt;
+&lt;td align="left"&gt;0&lt;/td&gt;
+&lt;td align="left"&gt;&lt;nobr&gt;16-bit&lt;/nobr&gt; code&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class="odd"&gt;
 &lt;td align="left"&gt;04 (Selector 0&amp;times;0020)&lt;/td&gt;
-&lt;td&gt;0&amp;times;0&lt;/td&gt;
+&lt;td align="left"&gt;0&amp;times;0&lt;/td&gt;
 &lt;td align="left"&gt;0xffff&lt;/td&gt;
-&lt;td&gt;0&lt;/td&gt;
-&lt;td&gt;&lt;nobr&gt;16-bit&lt;/nobr&gt; data&lt;/td&gt;
+&lt;td align="left"&gt;0&lt;/td&gt;
+&lt;td align="left"&gt;&lt;nobr&gt;16-bit&lt;/nobr&gt; data&lt;/td&gt;
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
@@ -804,11 +998,11 @@ jmp 0x10:eax ; Far jump&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Basically, there is&amp;nbsp;a&amp;nbsp;flat memory model with 4 segments from &lt;code&gt;0&lt;/code&gt; to&amp;nbsp;&lt;code&gt;0xfffff * granularity&lt;/code&gt;, where granularity flag set to&amp;nbsp;1 specifies 4096 increments, thus giving us&amp;nbsp;limit of&amp;nbsp;4 GiB. Userspace and kernel segments differs in&amp;nbsp;DPL only.&lt;/p&gt;
 &lt;h3 id="first-linux-version-0.01"&gt;First Linux version 0.01&lt;/h3&gt;
 &lt;p&gt;In&amp;nbsp;the Linux version 0.01 there were no&amp;nbsp;userspace segments. In&amp;nbsp;&lt;a href="http://code.metager.de/source/xref/linux/historic/0.01/boot/head.s#171"&gt;boot/head.s&lt;/a&gt;&lt;/p&gt;
-&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode asm"&gt;&lt;code class="sourceCode fasm"&gt;&lt;span class="fu"&gt;_gdt:&lt;/span&gt;   .quad&lt;span class="bn"&gt; 0x0000000000000000    &lt;/span&gt;/* NULL descriptor */
-    .quad&lt;span class="bn"&gt; 0x00c09a00000007ff    &lt;/span&gt;/* 8Mb */
-    .quad&lt;span class="bn"&gt; 0x00c09200000007ff    &lt;/span&gt;/* 8Mb */
-    .quad&lt;span class="bn"&gt; 0x0000000000000000    &lt;/span&gt;/* TEMPORARY - don&lt;span class="st"&gt;&amp;#39;t use */&lt;/span&gt;
-    .fill &lt;span class="dv"&gt;252&lt;/span&gt;,&lt;span class="dv"&gt;8&lt;/span&gt;,&lt;span class="dv"&gt;0&lt;/span&gt;           /* space for LDT&lt;span class="st"&gt;&amp;#39;s and TSS&amp;#39;&lt;/span&gt;s etc */&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;pre class="asm"&gt;&lt;code&gt;_gdt:   .quad 0x0000000000000000    /* NULL descriptor */
+    .quad 0x00c09a00000007ff    /* 8Mb */
+    .quad 0x00c09200000007ff    /* 8Mb */
+    .quad 0x0000000000000000    /* TEMPORARY - don&amp;#39;t use */
+    .fill 252,8,0           /* space for LDT&amp;#39;s and TSS&amp;#39;s etc */&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Unfortunately, I&amp;nbsp;wasn’t&amp;nbsp;able to&amp;nbsp;track down how userspace was set up&amp;nbsp;(TSS only?).&lt;/p&gt;
 &lt;h3 id="netbsd"&gt;NetBSD&lt;/h3&gt;
 &lt;p&gt;NetBSD kernel defines 4 segments as&amp;nbsp;everybody. In&amp;nbsp;&lt;a href="http://nxr.netbsd.org/xref/src/sys/arch/i386/include/segments.h#285"&gt;sys/arch/i386/include/segments.h&lt;/a&gt;&lt;/p&gt;
@@ -2044,7 +2238,7 @@ Range is 1000000
 &lt;/colgroup&gt;
 &lt;thead&gt;
 &lt;tr class="header"&gt;
-&lt;th&gt;Test case&lt;/th&gt;
+&lt;th align="left"&gt;Test case&lt;/th&gt;
 &lt;th align="left"&gt;Naive QuickSort&lt;/th&gt;
 &lt;th align="left"&gt;mmap and QuickSort&lt;/th&gt;
 &lt;th align="left"&gt;External merge sort&lt;/th&gt;
@@ -2054,7 +2248,7 @@ Range is 1000000
 &lt;/thead&gt;
 &lt;tbody&gt;
 &lt;tr class="odd"&gt;
-&lt;td&gt;4 MiB in&amp;nbsp;2 MiB&lt;/td&gt;
+&lt;td align="left"&gt;4 MiB in&amp;nbsp;2 MiB&lt;/td&gt;
 &lt;td align="left"&gt;Segfault&lt;/td&gt;
 &lt;td align="left"&gt;N/A&lt;/td&gt;
 &lt;td align="left"&gt;0.38s&lt;/td&gt;
@@ -2062,7 +2256,7 @@ Range is 1000000
 &lt;td align="left"&gt;0.01&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class="even"&gt;
-&lt;td&gt;500 MB&amp;nbsp;in&amp;nbsp;128 MiB&lt;/td&gt;
+&lt;td align="left"&gt;500 MB&amp;nbsp;in&amp;nbsp;128 MiB&lt;/td&gt;
 &lt;td align="left"&gt;Segfault&lt;/td&gt;
 &lt;td align="left"&gt;32.25s&lt;/td&gt;
 &lt;td align="left"&gt;87.14s&lt;/td&gt;
@@ -3825,7 +4019,7 @@ T09: 29.88 MB/s f6eb529ee5b59824a657fb8de43c8c6d3e29cb00&lt;/code&gt;&lt;/pre&gt
 &lt;p class="caption"&gt;Stack&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;Holy shucks! We&amp;nbsp;are processing undefined memory. All instructions like this&lt;/p&gt;
-&lt;div class="sourceCode"&gt;&lt;pre class="sourceCode asm"&gt;&lt;code class="sourceCode fasm"&gt;&lt;span class="kw"&gt;movdqa&lt;/span&gt;  -&lt;span class="dv"&gt;24&lt;/span&gt;(%&lt;span class="kw"&gt;rsp&lt;/span&gt;), %&lt;span class="kw"&gt;xmm0&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;pre class="asm"&gt;&lt;code&gt;movdqa  -24(%rsp), %xmm0&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;moving aligned data from &lt;code&gt;xmm0&lt;/code&gt; to&amp;nbsp;address &lt;code&gt;&lt;nobr&gt;rsp-24&lt;/nobr&gt;&lt;/code&gt; is&amp;nbsp;actually the access over the top of&amp;nbsp;the stack!&lt;/p&gt;
 &lt;div class="figure"&gt;
 &lt;img src="https://mlpforums.com/uploads/monthly_03_2012/post-2103-0-68261500-1332210132.png" /&gt;

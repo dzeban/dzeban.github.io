@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>How to point GDB to your sources | Alex Dzyoba</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="google-site-verification" content="kKKMHTs7HfNXfxxmEYk_twXJ1nWtH_8XHO8vU-9-c-M" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="page-header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">Alex Dzyoba</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>How to point GDB to your sources</h2>
+                            <h6 class="post-meta">
+                              30 Apr 2017, in
+                              <a class="disabled" href="/categories/programming">programming</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>So, you have a&nbsp;binary that you or&nbsp;someone developed and, surprise, it&nbsp;has some bug. Or&nbsp;you just curious how it’s&nbsp;working. Great tool to&nbsp;help with these cases is&nbsp;a&nbsp;debugger.</p>
+<p>It’s&nbsp;really seldom when you want to&nbsp;debug on&nbsp;assembly level, usually, you want to&nbsp;see the sources. But often times you debug the program on&nbsp;the host other than the build host and see this really frustrating message:</p>
+<pre><code>$ gdb -q python3.7
+Reading symbols from python3.7...done.
+(gdb) l
+6   ./Programs/python.c: No such file or directory.</code></pre>
+<p>Ouch. Everybody was here. I’ve&nbsp;seen this so&nbsp;often while it’s&nbsp;so&nbsp;vital for sensible debugging so&nbsp;I&nbsp;think it’s&nbsp;very important to&nbsp;get into details and understand how GDB shows source code in&nbsp;debugging session.</p>
+<h2 id="debug-info">Debug info</h2>
+<p>It&nbsp;all starts with <em>debug info</em>&nbsp;&mdash; special sections in&nbsp;the binary file produced by&nbsp;the compiler and used by&nbsp;the debugger and other handy tools.</p>
+<p>In&nbsp;GCC there is&nbsp;<nobr>well-known</nobr> <code>-g</code> flag for that. Most projects with some kind of&nbsp;build system either build with debug info by&nbsp;default or&nbsp;have some flag for it.</p>
+<p>In&nbsp;the case of&nbsp;CPython, you have to&nbsp;do&nbsp;the following:</p>
+<pre><code>$ ./configure --with-pydebug
+$ make -j</code></pre>
+<p><code>-<nobr>with-pydebug</nobr></code> will insert <code>-g</code> in&nbsp;GCC invocation.</p>
+<p>This <code>-g</code> option will generate <em>debug sections</em>&nbsp;&mdash; binary sections to&nbsp;insert into program’s&nbsp;binary. These sections are usually in&nbsp;DWARF format. For ELF binaries these debug sections have names like <code>.debug_*</code>, e.g. <code>.debug_info</code> or&nbsp;<code>.debug_loc</code>. These debug sections are what makes the magic of&nbsp;debugging possible&nbsp;&mdash; basically, it’s&nbsp;a&nbsp;mapping of&nbsp;assembly level instructions to&nbsp;the source code.</p>
+<p>To&nbsp;find whether your program has debug symbols you can list the sections of&nbsp;the binary with <code>objdump</code>:</p>
+<pre><code>$ objdump -h ./python
+
+python:     file format elf64-x86-64
+
+Sections:
+Idx Name          Size      VMA               LMA               File off  Algn
+  0 .interp       0000001c  0000000000400238  0000000000400238  00000238  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  1 .note.ABI-tag 00000020  0000000000400254  0000000000400254  00000254  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+...
+ 25 .bss          00031f70  00000000008d9e00  00000000008d9e00  002d9dfe  2**5
+                  ALLOC
+ 26 .comment      00000058  0000000000000000  0000000000000000  002d9dfe  2**0
+                  CONTENTS, READONLY
+ 27 .debug_aranges 000017f0  0000000000000000  0000000000000000  002d9e56  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 28 .debug_info   00377bac  0000000000000000  0000000000000000  002db646  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 29 .debug_abbrev 0001fcd7  0000000000000000  0000000000000000  006531f2  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 30 .debug_line   0008b441  0000000000000000  0000000000000000  00672ec9  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 31 .debug_str    00031f18  0000000000000000  0000000000000000  006fe30a  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 32 .debug_loc    0034190c  0000000000000000  0000000000000000  00730222  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 33 .debug_ranges 00062e10  0000000000000000  0000000000000000  00a71b2e  2**0
+                  CONTENTS, READONLY, DEBUGGING</code></pre>
+<p>or&nbsp;<code>readelf</code>:</p>
+<pre><code>$ readelf -S ./python
+There are 38 section headers, starting at offset 0xb41840:
+
+Section Headers:
+  [Nr] Name              Type             Address           Offset
+       Size              EntSize          Flags  Link  Info  Align
+  [ 0]                   NULL             0000000000000000  00000000
+       0000000000000000  0000000000000000           0     0     0
+  [ 1] .interp           PROGBITS         0000000000400238  00000238
+       000000000000001c  0000000000000000   A       0     0     1
+
+...
+
+  [26] .bss              NOBITS           00000000008d9e00  002d9dfe
+       0000000000031f70  0000000000000000  WA       0     0     32
+  [27] .comment          PROGBITS         0000000000000000  002d9dfe
+       0000000000000058  0000000000000001  MS       0     0     1
+  [28] .debug_aranges    PROGBITS         0000000000000000  002d9e56
+       00000000000017f0  0000000000000000           0     0     1
+  [29] .debug_info       PROGBITS         0000000000000000  002db646
+       0000000000377bac  0000000000000000           0     0     1
+  [30] .debug_abbrev     PROGBITS         0000000000000000  006531f2
+       000000000001fcd7  0000000000000000           0     0     1
+  [31] .debug_line       PROGBITS         0000000000000000  00672ec9
+       000000000008b441  0000000000000000           0     0     1
+  [32] .debug_str        PROGBITS         0000000000000000  006fe30a
+       0000000000031f18  0000000000000001  MS       0     0     1
+  [33] .debug_loc        PROGBITS         0000000000000000  00730222
+       000000000034190c  0000000000000000           0     0     1
+  [34] .debug_ranges     PROGBITS         0000000000000000  00a71b2e
+       0000000000062e10  0000000000000000           0     0     1
+  [35] .shstrtab         STRTAB           0000000000000000  00b416d5
+       0000000000000165  0000000000000000           0     0     1
+  [36] .symtab           SYMTAB           0000000000000000  00ad4940
+       000000000003f978  0000000000000018          37   8762     8
+  [37] .strtab           STRTAB           0000000000000000  00b142b8
+       000000000002d41d  0000000000000000           0     0     1
+Key to Flags:
+  W (write), A (alloc), X (execute), M (merge), S (strings), l (large)
+  I (info), L (link order), G (group), T (TLS), E (exclude), x (unknown)
+  O (extra OS processing required) o (OS specific), p (processor specific)</code></pre>
+<p>as&nbsp;we&nbsp;see in&nbsp;our fresh compiled Python&nbsp;&mdash; it&nbsp;has <code>.debug_*</code> section, hence it&nbsp;has debug info.</p>
+<p>Debug info is&nbsp;a&nbsp;collection of&nbsp;DIEs&nbsp;&mdash; Debug Info Entries. Each DIE has a&nbsp;tag specifying what kind of&nbsp;DIE it&nbsp;is&nbsp;and attributes that describes this DIE&nbsp;&mdash; things like variable name and line number.</p>
+<h2 id="how-gdb-finds-source-code">How GDB finds source code</h2>
+<p>To&nbsp;find the sources GDB parses <code>.debug_info</code> section to&nbsp;find all DIEs with tag <code>DW_TAG_compile_unit</code>. The DIE with this tag has 2 main attributes <code>DW_AT_comp_dir</code> (compilation directory) and <code>DW_AT_name</code>&nbsp;&mdash; path to&nbsp;the source file. Combined they provide the full path to&nbsp;the source file for the particular compilation unit (object file).</p>
+<p>To&nbsp;parse debug info you can again use <code>objdump</code>:</p>
+<pre><code>$ objdump -g ./python | vim -</code></pre>
+<p>and there you can see the parsed debug info:</p>
+<pre><code>Contents of the .debug_info section:
+
+  Compilation Unit @ offset 0x0:
+   Length:        0x222d (32-bit)
+   Version:       4
+   Abbrev Offset: 0x0
+   Pointer Size:  8
+ &lt;0&gt;&lt;b&gt;: Abbrev Number: 1 (DW_TAG_compile_unit)
+    &lt;c&gt;   DW_AT_producer    : (indirect string, offset: 0xb6b): GNU C99 6.3.1 20161221 (Red Hat 6.3.1-1) -mtune=generic -march=x86-64 -g -Og -std=c99
+    &lt;10&gt;   DW_AT_language    : 12   (ANSI C99)
+    &lt;11&gt;   DW_AT_name        : (indirect string, offset: 0x10ec): ./Programs/python.c
+    &lt;15&gt;   DW_AT_comp_dir    : (indirect string, offset: 0x7a): /home/avd/dev/cpython
+    &lt;19&gt;   DW_AT_low_pc      : 0x41d2f6
+    &lt;21&gt;   DW_AT_high_pc     : 0x1b3
+    &lt;29&gt;   DW_AT_stmt_list   : 0x0</code></pre>
+<p>It&nbsp;reads like this&nbsp;&mdash; for address range from <code>DW_AT_low_pc</code> = <code>0&times;41d2f6</code> to&nbsp;<code>DW_AT_low_pc + DW_AT_high_pc</code> = <code>0&times;41d2f6</code> + <code>0&times;1b3</code> = <code>0&times;41d4a9</code> source code file is&nbsp;the <code>./Programs/python.c</code> located in&nbsp;<code>/home/avd/dev/cpython</code>. Pretty straightforward.</p>
+<p>So&nbsp;this is&nbsp;what happens when GDB tries to&nbsp;show you the source code:</p>
+<ul>
+<li>parses the <code>.debug_info</code> to&nbsp;find <code>DW_AT_comp_dir</code> with <code>DW_AT_name</code> attributes for the current object file (range of&nbsp;addresses)</li>
+<li>opens the file at&nbsp;<code>DW_AT_comp_dir/DW_AT_name</code></li>
+<li>shows the content of&nbsp;the file to&nbsp;you</li>
+</ul>
+<h2 id="how-to-tell-gdb-where-are-the-sources">How to&nbsp;tell GDB where are the sources</h2>
+<p>So&nbsp;to&nbsp;fix our problem with <code>./Programs/python.c: No&nbsp;such file or&nbsp;directory.</code> we&nbsp;have to&nbsp;obtain our sources on&nbsp;the target host (copy or&nbsp;<code>git clone</code>) and do&nbsp;one of&nbsp;the following:</p>
+<h3 id="reconstruct-the-sources-path">1. Reconstruct the sources path</h3>
+<p>You can reconstruct the sources path on&nbsp;the target host, so&nbsp;GDB will find the source file where it&nbsp;expects. Stupid but it&nbsp;will work.</p>
+<p>In&nbsp;my&nbsp;case, I&nbsp;can just do&nbsp;<code>git clone https://github.com/python/cpython.git /home/avd/dev/cpython</code> and checkout to&nbsp;the needed <nobr>commit-ish</nobr>.</p>
+<h3 id="change-gdb-source-path">2. Change GDB source path</h3>
+<p>You can direct GDB to&nbsp;the new source path right in&nbsp;the debug session with <code>directory &lt;dir&gt;</code> command:</p>
+<pre><code>(gdb) list
+6   ./Programs/python.c: No such file or directory.
+(gdb) directory /usr/src/python
+Source directories searched: /usr/src/python:$cdir:$cwd
+(gdb) list
+6   #ifdef __FreeBSD__
+7   #include &lt;fenv.h&gt;
+8   #endif
+9   
+10  #ifdef MS_WINDOWS
+11  int
+12  wmain(int argc, wchar_t **argv)
+13  {
+14      return Py_Main(argc, argv);
+15  }</code></pre>
+<h3 id="set-gdb-substitution-rule">3. Set GDB substitution rule</h3>
+<p>Sometimes adding another source path is&nbsp;not enough if&nbsp;you have complex hierarchy. In&nbsp;this case you can add substitution rule for source path with <code>set <nobr>substitute-path</nobr></code> GDB command.</p>
+<pre><code>(gdb) list
+6   ./Programs/python.c: No such file or directory.
+(gdb) set substitute-path /home/avd/dev/cpython /usr/src/python
+(gdb) list
+6   #ifdef __FreeBSD__
+7   #include &lt;fenv.h&gt;
+8   #endif
+9   
+10  #ifdef MS_WINDOWS
+11  int
+12  wmain(int argc, wchar_t **argv)
+13  {
+14      return Py_Main(argc, argv);
+15  }</code></pre>
+<h3 id="move-binary-to-sources">4. Move binary to&nbsp;sources</h3>
+<p>You can trick GDB source path by&nbsp;moving binary to&nbsp;the directory with sources.</p>
+<pre><code>mv python /home/user/sources/cpython</code></pre>
+<p>This will work because GDB will try to&nbsp;look for sources in&nbsp;the current directory (<code>$cwd</code>) as&nbsp;the last resort.</p>
+<h3 id="compile-with--fdebug-prefix-map">5. Compile with <code>-<nobr>fdebug-prefix-map</nobr></code></h3>
+<p>You can substitute the source path on&nbsp;the build stage with <code>-<nobr>fdebug-prefix-map</nobr>=old_path=new_path</code> option. Here is&nbsp;how to&nbsp;do&nbsp;it&nbsp;within CPython project:</p>
+<pre><code>$ make distclean    # start clean
+$ ./configure CFLAGS=&quot;-fdebug-prefix-map=$(pwd)=/usr/src/python&quot; --with-pydebug
+$ make -j</code></pre>
+<p>And now we&nbsp;have new sources dir:</p>
+<pre><code>$ objdump -g ./python
+...
+ &lt;0&gt;&lt;b&gt;: Abbrev Number: 1 (DW_TAG_compile_unit)
+    &lt;c&gt;   DW_AT_producer    : (indirect string, offset: 0xb65): GNU C99 6.3.1 20161221 (Red Hat 6.3.1-1) -mtune=generic -march=x86-64 -g -Og -std=c99
+    &lt;10&gt;   DW_AT_language    : 12       (ANSI C99)
+    &lt;11&gt;   DW_AT_name        : (indirect string, offset: 0x10ff): ./Programs/python.c
+    &lt;15&gt;   DW_AT_comp_dir    : (indirect string, offset: 0x558): /usr/src/python
+    &lt;19&gt;   DW_AT_low_pc      : 0x41d336
+    &lt;21&gt;   DW_AT_high_pc     : 0x1b3
+    &lt;29&gt;   DW_AT_stmt_list   : 0x0
+...</code></pre>
+<p>This is&nbsp;the most robust way to&nbsp;do&nbsp;it&nbsp;because you can set it&nbsp;to&nbsp;something like <code>/usr/src/&lt;project&gt;</code>, install sources there from a&nbsp;package and debug like a&nbsp;boss.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>GDB uses debug info stored in&nbsp;DWARF format to&nbsp;find source level info. DWARF is&nbsp;pretty straightforward format&nbsp;&mdash; basically, it’s&nbsp;a&nbsp;tree of&nbsp;DIEs (Debug Info Entries) that describes object files of&nbsp;your programs along with variables and functions.</p>
+<p>There are multiple ways to&nbsp;help GDB find sources, where the easiest ones are <code>directory</code> and <code>set <nobr>substitute-path</nobr></code> commands, though <code>-<nobr>fdebug-prefix-map</nobr></code> is&nbsp;really useful.</p>
+<p>Now, when you have source level info go&nbsp;and explore something!</p>
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf">Introduction to&nbsp;the DWARF Debugging Format</a></li>
+<li><a href="https://sourceware.org/gdb/onlinedocs/gdb/Source-Path.html">GDB doc on&nbsp;source path</a></li>
+</ul>
+                        </div>
+                    </article>
+                </div>
+        </div>
+		<!--
+		<div class="row comments">
+      <a class="muut" href="https://muut.com/i/alex-dzyoba-blog/general" type="dynamic">Comments</a>
+      <script src="//cdn.muut.com/1/moot.min.js"></script>
+		</div>
+		-->
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+		&copy; 2017 Alex Dzyoba / CC-BY 4.0
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-89410369-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</body>
+</html>
