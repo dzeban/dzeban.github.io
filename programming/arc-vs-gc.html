@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html class="no-js" lang="ru">
+<head>
+    <title>Reference counting and garbage collection in Python | Alex Dzyoba</title>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="google-site-verification" content="kKKMHTs7HfNXfxxmEYk_twXJ1nWtH_8XHO8vU-9-c-M" />
+<link rel="stylesheet" href="/assets/css/foundation.css" />
+<link rel="stylesheet" href="/assets/css/foundation-icons.css" />
+<link rel="stylesheet" href="/assets/css/main.css" />
+<script src="/assets/js/vendor/modernizr.js"></script>
+
+</head>
+<body>
+    <div class="wrapper">
+        <div class="row show-for-large-up">
+  <div class="small-12 columns">
+    <div class="page-header">
+      Voluntary madness!
+    </div>
+  </div>
+</div>
+
+        <nav class="top-bar hide-for-large-up" data-topbar>
+  <ul class="title-area">
+    <li class="name">
+      <h1><a href="/">Alex Dzyoba</a></h1>
+    </li>
+    <li class="toggle-topbar menu-icon">
+      <a href="#">menu</a>
+    </li>
+  </ul>
+
+  <section class="top-bar-section">
+    <ul class="left">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+    </ul>
+  </section>
+</nav>
+
+
+        <div class="row">
+            <div class="large-2 columns show-for-large-up">
+  <ul class="side-nav">
+	  <li><a href="/"><i class="fi-home"></i>&nbsp;&nbsp;Home</a></li>
+<li><a href="/projects.html"><i class="fi-lightbulb"></i>&nbsp;&nbsp;Projects</a></li>
+<li><a href="/about.html"><i class="fi-at-sign"></i>&nbsp;&nbsp;About</a></li>
+<li><a href="/feed"><i class="fi-rss"></i>&nbsp;&nbsp;Feed</a></li>
+
+  </ul>
+</div>
+
+                <div class="large-10 small-12 columns ">
+                    <article class="post-wrapper">
+                        <div class="post-header">
+                            <h1>Reference counting and garbage collection in Python</h2>
+                            <h6 class="post-meta">
+                              03 Sep 2017, in
+                              <a class="disabled" href="/categories/programming">programming</a>
+                            </h6>
+                        </div>
+                        <div class="post-content">
+                            <p>A&nbsp;while ago I’ve&nbsp;read <a href="https://engineering.instagram.com/dismissing-python-garbage-collection-at-instagram-4dca40b29172">a&nbsp;nice story</a> how Instagram disabled garbage collection for their Python apps and memory usage dropped and performance improved by&nbsp;15%. This seems <nobr>counter-intuitive</nobr> at&nbsp;first but uncovers amazing details about Python (namely, CPython) memory management.</p>
+<h2 id="instagram-disabling-garbage-collection-ftw">Instagram disabling garbage collection FTW!</h2>
+<p>Instagram <a href="https://www.youtube.com/watch?v=66XoCk79kjM">is&nbsp;a&nbsp;Python/Django app</a> that is&nbsp;running on&nbsp;uWSGI.</p>
+<p>To&nbsp;run a&nbsp;Python app uWSGI master process forks and launch apps in&nbsp;a&nbsp;child process. This should’ve&nbsp;been leveraging the <nobr>Copy-on-Write</nobr> (CoW) mechanism in&nbsp;Linux&nbsp;&mdash; memory is&nbsp;shared among the processes as&nbsp;long as&nbsp;it’s&nbsp;not modified. And shared memory is&nbsp;good because it&nbsp;doesn’t&nbsp;waste the RAM (because it’s&nbsp;shared) and it&nbsp;improves cache hit ratio because multiple processes read the same memory. Apps that are launched by&nbsp;uWSGI are mostly identical because it’s&nbsp;the same code and so&nbsp;there should be&nbsp;a&nbsp;lot of&nbsp;memory shared between uWSGI master and child processes. But, instead, shared memory was dropping at&nbsp;the start of&nbsp;the process.</p>
+<p>At&nbsp;first, they thought that it&nbsp;was because of&nbsp;<em>reference counting</em> because every read of&nbsp;an&nbsp;object, including immutable ones like code objects, causes write to&nbsp;the memory for that reference counters. But disabling reference counting didn’t&nbsp;prove that, so&nbsp;they went for profiling!</p>
+<p>With the help of&nbsp;<a href="/linux/profiling-perf.html">perf</a>, they found out that it&nbsp;was the garbage collector that caused most of&nbsp;the page faults&nbsp;&mdash; the <code>collect</code> function.</p>
+<p>So&nbsp;they decided to&nbsp;disable garbage collector because there is&nbsp;a&nbsp;reference counting that will still be&nbsp;used to&nbsp;free the memory. CPython provides <a href="https://docs.python.org/3/library/gc.html">a&nbsp;gc&nbsp;module</a> that allows you to&nbsp;control garbage collection. Instagram guys found that it’s&nbsp;better to&nbsp;use <code>gc.set_threshold(0)</code> instead of&nbsp;<code>gc.disable()</code> because some library (like msgpack in&nbsp;their case) can reenable it&nbsp;back, but <code>gc.set_threshold(0)</code> is&nbsp;setting the collection frequency to&nbsp;zero effectively disabling it&nbsp;and also it’s&nbsp;immune to&nbsp;any subsequent <code>gc.enable()</code> calls.</p>
+<p>This worked but the garbage collection was triggered at&nbsp;the exit of&nbsp;the child process and thrashed CPU for the whole minute which is&nbsp;useless because the process was about to&nbsp;be&nbsp;replaced by&nbsp;the new one. This can be&nbsp;dismissed in&nbsp;2 ways:</p>
+<ol style="list-style-type: decimal">
+<li>Adding <code>atexit.register(os._exit, 0)</code>. This tells that at&nbsp;the exit of&nbsp;your Python program just hard exit the process without further cleanup.</li>
+<li>Use <code>-<nobr>skip-atexit-teardown</nobr></code> option in&nbsp;the recent uWSGI.</li>
+</ol>
+<p>With all these hacks the next things now happen:</p>
+<ul>
+<li>uWSGI master process launch a&nbsp;handful of&nbsp;children for the application</li>
+<li>GC&nbsp;is&nbsp;disabled when the child is&nbsp;starting up, so&nbsp;it’s&nbsp;not causing a&nbsp;lot of&nbsp;page faults, saving from CoW and allowing master and children to&nbsp;share much more memory and providing much higher CPU cache hit ratio</li>
+<li>When a&nbsp;child dies it&nbsp;does its own cleanup but skips final GC&nbsp;saving shutdown time and preventing the useless CPU thrashing</li>
+</ul>
+<h2 id="python-memory-management">(Python) memory management</h2>
+<p>What I’ve&nbsp;discovered from this story is&nbsp;that CPython has an&nbsp;interesting scheme for automatic memory management&nbsp;&mdash; it&nbsp;uses reference counting to&nbsp;release the memory that is&nbsp;no&nbsp;longer used and tracing generational garbage collector to&nbsp;fight cyclic objects.</p>
+<p>So&nbsp;this is&nbsp;how reference counting works. Each object in&nbsp;Python has reference counter (<code>ob_refcnt</code> in&nbsp;the <code>PyObject</code> struct)&nbsp;&mdash; a&nbsp;special variable that is&nbsp;incremented when the object is&nbsp;referenced (e.g. added to&nbsp;the list or&nbsp;passed to&nbsp;the function) and decremented when it’s&nbsp;released. When the ref counter value is&nbsp;decremented to&nbsp;zero it’s&nbsp;released by&nbsp;the runtime.</p>
+<p>Reference counting is&nbsp;a&nbsp;very nice and simple method for automatic memory management. It’s&nbsp;deterministic and avoids any background processing which makes it&nbsp;more efficient on&nbsp;the low power systems such as&nbsp;mobile devices.</p>
+<p>But, unfortunately, it&nbsp;has some really bad flaws. First, it&nbsp;adds overhead for storing reference counter in&nbsp;<em>every single object</em>. Second, for multithreaded apps ref counting has to&nbsp;be&nbsp;atomic and thus must be&nbsp;<em>synchronized between CPU cores</em> which is&nbsp;slow. And finally, the references can form cycles which prevent counters from decrementing and such cyclic objects remains allocated forever.</p>
+<p>Anyway, CPython uses reference counting as&nbsp;the main method for memory management. As&nbsp;for the drawbacks is&nbsp;not that scary in&nbsp;most cases. Memory overhead for storing ref counters is&nbsp;not really noticeable&nbsp;&mdash; even for million objects, it&nbsp;would be&nbsp;only 8 MiB (ref counter is&nbsp;<code>ssize_t</code> which is&nbsp;8 bytes). Synchronization for ref counting is&nbsp;not applicable because CPython has Global Interpreter Lock (GIL).</p>
+<p>The only problem left is&nbsp;fighting cycles. That’s&nbsp;why CPython periodically invokes tracing garbage collector. CPython’s&nbsp;GC&nbsp;is&nbsp;generational, i.e. it&nbsp;has 3 generations&nbsp;&mdash; 0, 1 and 2, where 0 is&nbsp;the youngest generation where all objects are born and 2 is&nbsp;the oldest generation where objects live until the process exits. Objects that are survived GC&nbsp;get moved to&nbsp;the next generation.</p>
+<p>The idea of&nbsp;dividing the objects into generations is&nbsp;based on&nbsp;the heuristic that most of&nbsp;the objects that are allocated are short lived and so&nbsp;GC&nbsp;should try to&nbsp;free these objects more frequently than longer lived objects that are usually live forever.</p>
+<p>All of&nbsp;these might seem complicated but I&nbsp;think it’s&nbsp;good tradeoff for CPython to&nbsp;employ such scheme. Some might say&nbsp;&mdash; why not leave only GC&nbsp;like most of&nbsp;the languages do? Well, GC&nbsp;has its own drawbacks. First, it&nbsp;must run in&nbsp;the background which in&nbsp;CPython not really possible because of&nbsp;GIL, so&nbsp;GC&nbsp;is&nbsp;a&nbsp;<nobr>stop-the-world</nobr> process. And second, because GC&nbsp;happens in&nbsp;the background, the exact time frame for object releases is&nbsp;undetermined.</p>
+<p>So&nbsp;I&nbsp;think for CPython it’s&nbsp;a&nbsp;good balance to&nbsp;use ref counting and GC&nbsp;to&nbsp;complement each other.</p>
+<p>In&nbsp;the end, CPython is&nbsp;not the only language/runtime that is&nbsp;using reference counting. <nobr>Objective-C</nobr>, Swift has compile time <a href="https://developer.apple.com/library/content/documentation/Swift/Conceptual/Swift_Programming_Language/AutomaticReferenceCounting.html">automatic reference counting (ARC)</a>. Remember that ref counting is&nbsp;more deterministic, so&nbsp;it&nbsp;is&nbsp;a&nbsp;huge win for iOS devices.</p>
+<p>Rust also <a href="https://www.rust-lang.org/en-US/faq.html#is-rust-garbage-collected">uses reference counting</a></p>
+<p><nobr>C++</nobr> has smart pointers which basically are objects with reference counters, which are destructed by&nbsp;<nobr>C++</nobr> runtime.</p>
+<p>Many others languages like <acronym title="Practical Extraction and Reporting Language" lang="en">Perl</acronym> and <acronym title="Hypertext Preprocessor" lang="en">PHP</acronym> also uses reference counting for memory management.</p>
+<p>But, yeah, most of&nbsp;the languages now are based on&nbsp;pure GC:</p>
+<ul>
+<li>Java/JVM</li>
+<li>C#/CLR</li>
+<li>Go</li>
+<li>Haskell/GHC</li>
+<li>Ruby/MRI</li>
+<li>Many others like Lisp</li>
+</ul>
+<h2 id="conclusion">Conclusion</h2>
+<p>CPython has an&nbsp;interesting scheme for managing memory&nbsp;&mdash; objects lifetime are managed by&nbsp;reference counting and to&nbsp;fight cycles it&nbsp;employs tracing garbage collector.</p>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="https://engineering.instagram.com/dismissing-python-garbage-collection-at-instagram-4dca40b29172">The original Instagram post</a></li>
+<li><a href="https://docs.python.org/3/library/gc.html">Python’s&nbsp;garbage collector module</a></li>
+<li><a href="http://blogs.microsoft.co.il/sasha/2012/01/12/garbage-collection-in-the-age-of-smart-pointers/">Garbage Collection in&nbsp;The Age of&nbsp;Smart Pointers</a></li>
+<li><a href="http://softwareengineering.stackexchange.com/questions/30254/why-garbage-collection-if-smart-pointers-are-there">Why Garbage Collection if&nbsp;smart pointers are there</a></li>
+<li><a href="http://gchandbook.org/">GC&nbsp;handbook</a></li>
+</ul>
+                        </div>
+                    </article>
+                </div>
+        </div>
+		<!--
+		<div class="row comments">
+      <a class="muut" href="https://muut.com/i/alex-dzyoba-blog/general" type="dynamic">Comments</a>
+      <script src="//cdn.muut.com/1/moot.min.js"></script>
+		</div>
+		-->
+        <div class="push"></div>
+    </div>
+    <div class="footer">
+		&copy; 2017 Alex Dzyoba / CC-BY 4.0
+</div>
+
+    <script src="/assets/js/vendor/jquery.js"></script>
+    <script src="/assets/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-89410369-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</body>
+</html>

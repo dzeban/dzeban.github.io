@@ -2,13 +2,73 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title type="text">Voluntary madness!</title>
   <id>http://alex.dzyoba.com/feed</id>
-  <updated>2017-04-30T00:00:00Z</updated>
+  <updated>2017-09-03T00:00:00Z</updated>
   <link href="http://alex.dzyoba.com" />
   <link href="http://alex.dzyoba.com/feed" rel="self" />
   <author>
     <name>Alex Dzyoba</name>
   </author>
   <generator>PyAtom</generator>
+  <entry xml:base="http://alex.dzyoba.com/feed">
+    <title type="text">Reference counting and garbage collection in Python</title>
+    <id>programming/arc-vs-gc.html</id>
+    <updated>2017-09-03T00:00:00Z</updated>
+    <link href="programming/arc-vs-gc.html" />
+    <author>
+      <name>avd</name>
+    </author>
+    <content type="html">&lt;p&gt;A&amp;nbsp;while ago I’ve&amp;nbsp;read &lt;a href="https://engineering.instagram.com/dismissing-python-garbage-collection-at-instagram-4dca40b29172"&gt;a&amp;nbsp;nice story&lt;/a&gt; how Instagram disabled garbage collection for their Python apps and memory usage dropped and performance improved by&amp;nbsp;15%. This seems &lt;nobr&gt;counter-intuitive&lt;/nobr&gt; at&amp;nbsp;first but uncovers amazing details about Python (namely, CPython) memory management.&lt;/p&gt;
+&lt;h2 id="instagram-disabling-garbage-collection-ftw"&gt;Instagram disabling garbage collection FTW!&lt;/h2&gt;
+&lt;p&gt;Instagram &lt;a href="https://www.youtube.com/watch?v=66XoCk79kjM"&gt;is&amp;nbsp;a&amp;nbsp;Python/Django app&lt;/a&gt; that is&amp;nbsp;running on&amp;nbsp;uWSGI.&lt;/p&gt;
+&lt;p&gt;To&amp;nbsp;run a&amp;nbsp;Python app uWSGI master process forks and launch apps in&amp;nbsp;a&amp;nbsp;child process. This should’ve&amp;nbsp;been leveraging the &lt;nobr&gt;Copy-on-Write&lt;/nobr&gt; (CoW) mechanism in&amp;nbsp;Linux&amp;nbsp;&amp;mdash; memory is&amp;nbsp;shared among the processes as&amp;nbsp;long as&amp;nbsp;it’s&amp;nbsp;not modified. And shared memory is&amp;nbsp;good because it&amp;nbsp;doesn’t&amp;nbsp;waste the RAM (because it’s&amp;nbsp;shared) and it&amp;nbsp;improves cache hit ratio because multiple processes read the same memory. Apps that are launched by&amp;nbsp;uWSGI are mostly identical because it’s&amp;nbsp;the same code and so&amp;nbsp;there should be&amp;nbsp;a&amp;nbsp;lot of&amp;nbsp;memory shared between uWSGI master and child processes. But, instead, shared memory was dropping at&amp;nbsp;the start of&amp;nbsp;the process.&lt;/p&gt;
+&lt;p&gt;At&amp;nbsp;first, they thought that it&amp;nbsp;was because of&amp;nbsp;&lt;em&gt;reference counting&lt;/em&gt; because every read of&amp;nbsp;an&amp;nbsp;object, including immutable ones like code objects, causes write to&amp;nbsp;the memory for that reference counters. But disabling reference counting didn’t&amp;nbsp;prove that, so&amp;nbsp;they went for profiling!&lt;/p&gt;
+&lt;p&gt;With the help of&amp;nbsp;&lt;a href="/linux/profiling-perf.html"&gt;perf&lt;/a&gt;, they found out that it&amp;nbsp;was the garbage collector that caused most of&amp;nbsp;the page faults&amp;nbsp;&amp;mdash; the &lt;code&gt;collect&lt;/code&gt; function.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;they decided to&amp;nbsp;disable garbage collector because there is&amp;nbsp;a&amp;nbsp;reference counting that will still be&amp;nbsp;used to&amp;nbsp;free the memory. CPython provides &lt;a href="https://docs.python.org/3/library/gc.html"&gt;a&amp;nbsp;gc&amp;nbsp;module&lt;/a&gt; that allows you to&amp;nbsp;control garbage collection. Instagram guys found that it’s&amp;nbsp;better to&amp;nbsp;use &lt;code&gt;gc.set_threshold(0)&lt;/code&gt; instead of&amp;nbsp;&lt;code&gt;gc.disable()&lt;/code&gt; because some library (like msgpack in&amp;nbsp;their case) can reenable it&amp;nbsp;back, but &lt;code&gt;gc.set_threshold(0)&lt;/code&gt; is&amp;nbsp;setting the collection frequency to&amp;nbsp;zero effectively disabling it&amp;nbsp;and also it’s&amp;nbsp;immune to&amp;nbsp;any subsequent &lt;code&gt;gc.enable()&lt;/code&gt; calls.&lt;/p&gt;
+&lt;p&gt;This worked but the garbage collection was triggered at&amp;nbsp;the exit of&amp;nbsp;the child process and thrashed CPU for the whole minute which is&amp;nbsp;useless because the process was about to&amp;nbsp;be&amp;nbsp;replaced by&amp;nbsp;the new one. This can be&amp;nbsp;dismissed in&amp;nbsp;2 ways:&lt;/p&gt;
+&lt;ol style="list-style-type: decimal"&gt;
+&lt;li&gt;Adding &lt;code&gt;atexit.register(os._exit, 0)&lt;/code&gt;. This tells that at&amp;nbsp;the exit of&amp;nbsp;your Python program just hard exit the process without further cleanup.&lt;/li&gt;
+&lt;li&gt;Use &lt;code&gt;-&lt;nobr&gt;skip-atexit-teardown&lt;/nobr&gt;&lt;/code&gt; option in&amp;nbsp;the recent uWSGI.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;With all these hacks the next things now happen:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;uWSGI master process launch a&amp;nbsp;handful of&amp;nbsp;children for the application&lt;/li&gt;
+&lt;li&gt;GC&amp;nbsp;is&amp;nbsp;disabled when the child is&amp;nbsp;starting up, so&amp;nbsp;it’s&amp;nbsp;not causing a&amp;nbsp;lot of&amp;nbsp;page faults, saving from CoW and allowing master and children to&amp;nbsp;share much more memory and providing much higher CPU cache hit ratio&lt;/li&gt;
+&lt;li&gt;When a&amp;nbsp;child dies it&amp;nbsp;does its own cleanup but skips final GC&amp;nbsp;saving shutdown time and preventing the useless CPU thrashing&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="python-memory-management"&gt;(Python) memory management&lt;/h2&gt;
+&lt;p&gt;What I’ve&amp;nbsp;discovered from this story is&amp;nbsp;that CPython has an&amp;nbsp;interesting scheme for automatic memory management&amp;nbsp;&amp;mdash; it&amp;nbsp;uses reference counting to&amp;nbsp;release the memory that is&amp;nbsp;no&amp;nbsp;longer used and tracing generational garbage collector to&amp;nbsp;fight cyclic objects.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;this is&amp;nbsp;how reference counting works. Each object in&amp;nbsp;Python has reference counter (&lt;code&gt;ob_refcnt&lt;/code&gt; in&amp;nbsp;the &lt;code&gt;PyObject&lt;/code&gt; struct)&amp;nbsp;&amp;mdash; a&amp;nbsp;special variable that is&amp;nbsp;incremented when the object is&amp;nbsp;referenced (e.g. added to&amp;nbsp;the list or&amp;nbsp;passed to&amp;nbsp;the function) and decremented when it’s&amp;nbsp;released. When the ref counter value is&amp;nbsp;decremented to&amp;nbsp;zero it’s&amp;nbsp;released by&amp;nbsp;the runtime.&lt;/p&gt;
+&lt;p&gt;Reference counting is&amp;nbsp;a&amp;nbsp;very nice and simple method for automatic memory management. It’s&amp;nbsp;deterministic and avoids any background processing which makes it&amp;nbsp;more efficient on&amp;nbsp;the low power systems such as&amp;nbsp;mobile devices.&lt;/p&gt;
+&lt;p&gt;But, unfortunately, it&amp;nbsp;has some really bad flaws. First, it&amp;nbsp;adds overhead for storing reference counter in&amp;nbsp;&lt;em&gt;every single object&lt;/em&gt;. Second, for multithreaded apps ref counting has to&amp;nbsp;be&amp;nbsp;atomic and thus must be&amp;nbsp;&lt;em&gt;synchronized between CPU cores&lt;/em&gt; which is&amp;nbsp;slow. And finally, the references can form cycles which prevent counters from decrementing and such cyclic objects remains allocated forever.&lt;/p&gt;
+&lt;p&gt;Anyway, CPython uses reference counting as&amp;nbsp;the main method for memory management. As&amp;nbsp;for the drawbacks is&amp;nbsp;not that scary in&amp;nbsp;most cases. Memory overhead for storing ref counters is&amp;nbsp;not really noticeable&amp;nbsp;&amp;mdash; even for million objects, it&amp;nbsp;would be&amp;nbsp;only 8 MiB (ref counter is&amp;nbsp;&lt;code&gt;ssize_t&lt;/code&gt; which is&amp;nbsp;8 bytes). Synchronization for ref counting is&amp;nbsp;not applicable because CPython has Global Interpreter Lock (GIL).&lt;/p&gt;
+&lt;p&gt;The only problem left is&amp;nbsp;fighting cycles. That’s&amp;nbsp;why CPython periodically invokes tracing garbage collector. CPython’s&amp;nbsp;GC&amp;nbsp;is&amp;nbsp;generational, i.e. it&amp;nbsp;has 3 generations&amp;nbsp;&amp;mdash; 0, 1 and 2, where 0 is&amp;nbsp;the youngest generation where all objects are born and 2 is&amp;nbsp;the oldest generation where objects live until the process exits. Objects that are survived GC&amp;nbsp;get moved to&amp;nbsp;the next generation.&lt;/p&gt;
+&lt;p&gt;The idea of&amp;nbsp;dividing the objects into generations is&amp;nbsp;based on&amp;nbsp;the heuristic that most of&amp;nbsp;the objects that are allocated are short lived and so&amp;nbsp;GC&amp;nbsp;should try to&amp;nbsp;free these objects more frequently than longer lived objects that are usually live forever.&lt;/p&gt;
+&lt;p&gt;All of&amp;nbsp;these might seem complicated but I&amp;nbsp;think it’s&amp;nbsp;good tradeoff for CPython to&amp;nbsp;employ such scheme. Some might say&amp;nbsp;&amp;mdash; why not leave only GC&amp;nbsp;like most of&amp;nbsp;the languages do? Well, GC&amp;nbsp;has its own drawbacks. First, it&amp;nbsp;must run in&amp;nbsp;the background which in&amp;nbsp;CPython not really possible because of&amp;nbsp;GIL, so&amp;nbsp;GC&amp;nbsp;is&amp;nbsp;a&amp;nbsp;&lt;nobr&gt;stop-the-world&lt;/nobr&gt; process. And second, because GC&amp;nbsp;happens in&amp;nbsp;the background, the exact time frame for object releases is&amp;nbsp;undetermined.&lt;/p&gt;
+&lt;p&gt;So&amp;nbsp;I&amp;nbsp;think for CPython it’s&amp;nbsp;a&amp;nbsp;good balance to&amp;nbsp;use ref counting and GC&amp;nbsp;to&amp;nbsp;complement each other.&lt;/p&gt;
+&lt;p&gt;In&amp;nbsp;the end, CPython is&amp;nbsp;not the only language/runtime that is&amp;nbsp;using reference counting. &lt;nobr&gt;Objective-C&lt;/nobr&gt;, Swift has compile time &lt;a href="https://developer.apple.com/library/content/documentation/Swift/Conceptual/Swift_Programming_Language/AutomaticReferenceCounting.html"&gt;automatic reference counting (ARC)&lt;/a&gt;. Remember that ref counting is&amp;nbsp;more deterministic, so&amp;nbsp;it&amp;nbsp;is&amp;nbsp;a&amp;nbsp;huge win for iOS devices.&lt;/p&gt;
+&lt;p&gt;Rust also &lt;a href="https://www.rust-lang.org/en-US/faq.html#is-rust-garbage-collected"&gt;uses reference counting&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;nobr&gt;C++&lt;/nobr&gt; has smart pointers which basically are objects with reference counters, which are destructed by&amp;nbsp;&lt;nobr&gt;C++&lt;/nobr&gt; runtime.&lt;/p&gt;
+&lt;p&gt;Many others languages like &lt;acronym title="Practical Extraction and Reporting Language" lang="en"&gt;Perl&lt;/acronym&gt; and &lt;acronym title="Hypertext Preprocessor" lang="en"&gt;PHP&lt;/acronym&gt; also uses reference counting for memory management.&lt;/p&gt;
+&lt;p&gt;But, yeah, most of&amp;nbsp;the languages now are based on&amp;nbsp;pure GC:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Java/JVM&lt;/li&gt;
+&lt;li&gt;C#/CLR&lt;/li&gt;
+&lt;li&gt;Go&lt;/li&gt;
+&lt;li&gt;Haskell/GHC&lt;/li&gt;
+&lt;li&gt;Ruby/MRI&lt;/li&gt;
+&lt;li&gt;Many others like Lisp&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="conclusion"&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;CPython has an&amp;nbsp;interesting scheme for managing memory&amp;nbsp;&amp;mdash; objects lifetime are managed by&amp;nbsp;reference counting and to&amp;nbsp;fight cycles it&amp;nbsp;employs tracing garbage collector.&lt;/p&gt;
+&lt;h2 id="references"&gt;References&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://engineering.instagram.com/dismissing-python-garbage-collection-at-instagram-4dca40b29172"&gt;The original Instagram post&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://docs.python.org/3/library/gc.html"&gt;Python’s&amp;nbsp;garbage collector module&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://blogs.microsoft.co.il/sasha/2012/01/12/garbage-collection-in-the-age-of-smart-pointers/"&gt;Garbage Collection in&amp;nbsp;The Age of&amp;nbsp;Smart Pointers&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://softwareengineering.stackexchange.com/questions/30254/why-garbage-collection-if-smart-pointers-are-there"&gt;Why Garbage Collection if&amp;nbsp;smart pointers are there&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://gchandbook.org/"&gt;GC&amp;nbsp;handbook&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</content>
+  </entry>
   <entry xml:base="http://alex.dzyoba.com/feed">
     <title type="text">How to point GDB to your sources</title>
     <id>programming/gdb-source-path.html</id>
